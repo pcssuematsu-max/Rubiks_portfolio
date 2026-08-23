@@ -15,7 +15,7 @@ from pyraminx.cube import MasterPyraminxCube, PyraminxCube
 from square1.cube import Square1Cube
 from skewb.cube import SkewbCube
 from cube.rubiks_cube import Rubiks_3
-from managers.debug_analysis import DebugAnalysisManager
+from managers.debug_analysis import DebugAnalysisManager, VIEWER_RANGE_TEXT_WIDTH
 from managers.last_perms_reporter import LastPermsReporter
 from managers.learn_manager import LearnManager
 from managers.myperm_manager import MyPermManager
@@ -912,6 +912,9 @@ class Frame(Tk.Frame):
             font = ('Menlo', 9),
             fg = '#F0F0F0',
             bg = '#303030',
+            width = VIEWER_RANGE_TEXT_WIDTH,
+            height = 3,
+            anchor = 'nw',
             justify = Tk.LEFT,
         )
         self.grad_viewer_negative_range = Tk.Label(
@@ -920,6 +923,9 @@ class Frame(Tk.Frame):
             font = ('Menlo', 9),
             fg = '#F0F0F0',
             bg = '#303030',
+            width = VIEWER_RANGE_TEXT_WIDTH,
+            height = 3,
+            anchor = 'nw',
             justify = Tk.LEFT,
         )
         self.grad_viewer_info_label = Tk.Label(

@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 
+
+VIEWER_RANGE_TEXT_WIDTH = 20
+
+
 class DebugAnalysisManager:
     """AIの内部状態や評価結果を確認するための診断処理を担当する。"""
 
@@ -857,14 +861,15 @@ class DebugAnalysisManager:
         return f'AI {ai_index}  mode={self.grad_mode}  idx={self.grad_index}  layer={self.grad_layer}'
 
     def _viewer_range_text(self, vector, N, positive):
-        """色付け対象として選んだ値のrangeを表示用文字列にする。"""
+        """色付け対象の件数・最小値・最大値を固定幅の3行で返す。"""
         selected_values = self._selected_viewer_values(vector,N,positive)
         label = 'High value' if positive else 'Low value'
         if selected_values.size == 0:
-            return f'{label}: n=0'
+            return f'{label}  n=0\nmin=-\nmax=-'
         return (
-            f'{label}: n={selected_values.size}  '
-            f'[{float(np.min(selected_values)): .4g} .. {float(np.max(selected_values)): .4g}]'
+            f'{label}  n={selected_values.size}\n'
+            f'min={float(np.min(selected_values)):.4g}\n'
+            f'max={float(np.max(selected_values)):.4g}'
         )
 
     def _selected_viewer_values(self, vector, N, positive):

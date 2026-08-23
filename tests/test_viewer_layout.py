@@ -1,5 +1,8 @@
 import unittest
 
+import numpy as np
+
+from managers.debug_analysis import DebugAnalysisManager, VIEWER_RANGE_TEXT_WIDTH
 from ui.viewers import MoveViewer
 
 
@@ -46,6 +49,26 @@ class MoveViewerLayoutTests(unittest.TestCase):
         self.assertEqual(initial_move_width, 45)
         self.assertEqual(initial_key_width, 180)
         self.assertEqual(short_layout, long_layout)
+
+
+class DebugViewerRangeTextTests(unittest.TestCase):
+    def setUp(self):
+        self.manager = DebugAnalysisManager.__new__(DebugAnalysisManager)
+
+    def test_range_text_uses_three_bounded_lines(self):
+        vector = np.asarray((-9.876e20, -1.234e20, 1.234e20, 9.876e20))
+
+        text = self.manager._viewer_range_text(vector, 2, positive=True)
+        lines = text.splitlines()
+
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(lines[0].startswith('High value'))
+        self.assertTrue(all(len(line) <= VIEWER_RANGE_TEXT_WIDTH for line in lines))
+
+    def test_empty_range_keeps_the_same_three_line_shape(self):
+        text = self.manager._viewer_range_text((), 0, positive=False)
+
+        self.assertEqual(text.splitlines(), ['Low value  n=0', 'min=-', 'max=-'])
 
 
 if __name__ == "__main__":
