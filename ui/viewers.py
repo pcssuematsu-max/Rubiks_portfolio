@@ -253,7 +253,7 @@ class StateViewer(Tk.Canvas):
 
 
 class MoveViewer(Tk.Canvas):
-    def __init__(self,master):
+    def __init__(self,master,move_labels = ()):
         self.fixed_r_size = 400
         self.r_size = self.fixed_r_size
         self.c_size = 700
@@ -266,13 +266,24 @@ class MoveViewer(Tk.Canvas):
         self.r_start = 100
         self.c_start_cube_state = 100
         self.r_start_cube_state = 20
-        self.c_dist = 20
+        # Keep the move cells stable throughout a solve.  Recomputing this
+        # value from each result row made puzzles with mixed-length notation
+        # (for example URF / URF') visibly jump between updates.
+        self.c_dist = self._move_column_width(move_labels)
         self.r_dist = 13
         Tk.Canvas.__init__(self,master,relief = Tk.RAISED, bd = 4,width = self.c_size,height = self.r_size,bg = '#000000')
         self.value_start = 600
         self.value_width = 95
-        self.key_width = 110
+        # Search/myperm key labels also vary during a solve.  Reserve the
+        # largest width that the previous dynamic layout allowed.
+        self.key_width = 180
         self.min_move_columns = 4
+
+    @staticmethod
+    def _move_column_width(move_labels):
+        """Return one fixed move-cell width for the puzzle's notation."""
+        max_move_len = max([len(str(label)) for label in move_labels] + [1])
+        return max(20, min(72, max_move_len * 7 + 10))
 
     def set_str(
         self,
@@ -290,7 +301,7 @@ class MoveViewer(Tk.Canvas):
         self.delete('text')
         self.delete('header')
         self.delete('squares')
-        self._configure_layout(scramble_state, move_rows, key_labels)
+        self._configure_layout(scramble_state, move_rows)
         self._draw_cube_state(scramble_state, solved_count, solve_count)
         row_index = self._header_row_index(scramble_state)
         self._draw_header(row_index)
@@ -383,13 +394,8 @@ class MoveViewer(Tk.Canvas):
             return 1
         return (len(move_row) - 1) // self.words_in_a_row + 1
 
-    def _configure_layout(self, scramble_state, move_rows, key_labels):
-        labels = [str(move) for row in move_rows for move in row]
-        max_move_len = max([len(label) for label in labels] + [1])
-        max_key_len = max([len(str(label)) for label in key_labels] + [3])
-        self.c_dist = max(20, min(72, max_move_len * 7 + 10))
+    def _configure_layout(self, scramble_state, move_rows):
         self.state_c_dist = max(12, min(28, max([len(str(sticker)) for sticker in scramble_state] + [1]) * 7 + 5))
-        self.key_width = max(90, min(180, max_key_len * 7 + 24))
         self.c_start = self.key_width + 35
         self.value_start = self.c_size - self.value_width * 0.5
         move_area_width = max(self.c_dist * self.min_move_columns, self.value_start - self.value_width * 0.5 - self.c_start - 8)

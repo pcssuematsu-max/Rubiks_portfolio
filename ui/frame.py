@@ -876,10 +876,11 @@ class Frame(Tk.Frame):
         self.grad_viewer_negative_panel.grid(row = 2,column = 1,sticky = 'nsew')
         self.grad_viewer_positive.grid(row = 1,column = 0)
         self.grad_viewer_negative.grid(row = 1,column = 0)
-        self.MV = MoveViewer(self)
+        display_move_keys = self._display_move_keys(self.move_keys)
+        self.MV = MoveViewer(self, display_move_keys)
         self.MV.grid(row = 1,column = 2,columnspan = 2)
 
-        self.PV = ProbViewer(self,self._display_move_keys(self.move_keys))
+        self.PV = ProbViewer(self,display_move_keys)
         self.PV.grid(row = 2,column = 2,sticky = 'nw')
         self.success_viewer = SuccessViewer(self,self.AInum)
         self.success_viewer.grid(row = 2,column = 3,sticky = 'nsew')
