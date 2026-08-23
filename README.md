@@ -1,6 +1,7 @@
 # Twisty Puzzle AI Lab
 
 [![Tests](https://github.com/pcssuematsu-max/Rubiks_portfolio/actions/workflows/tests.yml/badge.svg)](https://github.com/pcssuematsu-max/Rubiks_portfolio/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Twisty Puzzle AI Lab は、ツイストパズルを対象にした探索・学習実験用の Tkinter GUI アプリケーションです。
 Rubik's Cube 系を中心に、複数パズルの状態表示、手動操作、自動ソルブ、学習データ収集、ニューラルネットワーク学習、解析ビューアをまとめて扱います。
@@ -283,6 +284,10 @@ reports/                 ツールが生成する解析レポートの説明
 ## Git 管理上の注意
 
 仮想環境、キャッシュ、OS・エディタ生成ファイル、学習データ、モデルパラメータ、生成レポートは Git 管理しません。特に `.npy` を大量に含む `AIdatas*/` などは、リポジトリサイズを急増させるためコミットしないでください。
+
+## ライセンス
+
+このプロジェクトは [MIT License](LICENSE) のもとで公開しています。
 
 ## 開発メモ
 
