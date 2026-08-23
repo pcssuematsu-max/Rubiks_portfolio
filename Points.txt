@@ -1,0 +1,152 @@
+###Cube
+#Corners
+UFR:2 UFL:2 UBR:1 UBL:1 DFR:1 DFL:1 DBR:0.5 DBL:0.5
+
+#MidEdge:
+FR:50 FL:50 BR:40 BL:40 UF:20 UB:20 UL:20 UR:20 DF:10 DB:10 DL:10 DR:10
+
+#Wing:
+FR@U:500 FR@D:420 FL@U:500 FL@D:420 BR@U:400 BR@D:320 BL@U:400 BL@D:320
+UF@R:200 UF@L:200 UB@R:200 UB@L:200 UL@F:200 UL@B:200 UR@F:200 UR@B:200
+DF@R:100 DF@L:100 DB@R:100 DB@L:100 DL@F:100 DL@B:100 DR@F:100 DR@B:100
+
+#XCenter:
+R@2F.2U:2000 R@2F.2D:1900 R@2B.2U:2000 R@2B.2D:1900
+L@2F.2U:1900 L@2F.2D:1800 L@2B.2U:1900 L@2B.2D:1800
+F@2R.2U:1700 F@2R.2D:1600 F@2L.2U:1700 F@2L.2D:1600
+B@2R.2U:1500 B@2R.2D:1400 B@2L.2U:1500 B@2L.2D:1400
+U@2R.2F:1300 U@2R.2B:1300 U@2L.2F:1300 U@2L.2B:1300
+D@2R.2F:1000 D@2R.2B:1000 D@2L.2F:1000 D@2L.2B:1000
+Others:0
+
+#PlusCenter:
+R@2F.E:2000 R@2B.E:2000 R@S.2U:1900 R@S.2D:1900
+L@2F.E:1900 L@2B.E:1900 L@S.2U:1800 L@S.2D:1800
+F@2R.E:1700 F@2L.E:1700 F@M.2U:1600 F@M.2D:1600
+B@2R.E:1500 B@2L.E:1500 B@M.2U:1400 B@M.2D:1400
+U@2R.S:1300 U@2L.S:1300 U@M.2F:1300 U@M.2B:1300
+D@2R.S:1000 D@2L.S:1000 D@M.2F:1000 D@M.2B:1000
+Others:0
+
+#ObliqueCenter:
+R@2F.3U:2000 R@3F.2D:1900 R@3B.2U:2000 R@2B.3D:1900
+L@3F.2U:1900 L@2F.3D:1800 L@2B.3U:1900 L@3B.2D:1800
+F@3R.2U:1700 F@2R.3D:1600 F@2L.3U:1700 F@3L.2D:1600
+B@2R.3U:1500 B@3R.2D:1400 B@3L.2U:1500 B@2L.3D:1400
+U@2R.3F:1300 U@3R.2B:1300 U@3L.2F:1300 U@2L.3B:1300
+D@3R.2F:1000 D@2R.3B:1000 D@2L.3F:1000 D@3L.2B:1000
+Others:0
+
+#CoreCenter:
+F:1 B:1 L:1 R:1 U:0 D:0
+
+###megaminx
+#Corners
+(U,F,R):40 (U,R,bR):34 (U,bR,bL):22 (U,bL,L):26 (U,L,F):38
+(F,R,dR):20 (R,bR,sR):17 (bR,bL,B):11 (bL,L,sL):13 (L,F,dL):19
+(F,dR,dL):10 (R,sR,dR):10 (bR,B,sR):10 (bL,sL,B):10 (L,dL,sL):10
+Others:5
+
+#Edges
+(U,F):2000 (U,R):1900 (U,bR):1100 (U,bL):1300 (U,L):1700
+(F,R):1000 (R,bR):950 (bR,bL):550 (bL,L):650 (L,F):850
+(F,dR):500 (R,dR):500 (R,sR):500 (bR,sR):500 (bR,B):500
+(bL,B):500 (bL,sL):500 (L,sL):500 (L,dL):500 (F,dL):500
+(dR,dL):250 (dL,sL):250 (sL,B):250 (B,sR):250 (sR,dR):250
+Others:100
+
+###Pyraminx
+#Corners
+ULR:1 ULB:2 URB:2 LRB:4
+Others:0
+
+#Edges
+UL:20 UR:20 UB:16 LR:10 LB:8 RB:8
+Others:0
+
+#Ctr
+U@L:2 U@R:2 U@B:1
+L@U:5 L@B:1 L@R:2
+R@U:5 R@L:2 R@B:1
+B@U:5 B@R:2 B@L:2
+Others:0
+
+###MasterPyraminx
+#Corners
+ULR:1 ULB:2 URB:2 LRB:4
+Others:0
+
+#OuterEdge
+UL@R:20 UL@B:20 UR@L:20 UR@B:20 UB@L:16 UB@R:16
+LR@U:10 LR@B:10 LB@U:8 LB@R:8 RB@U:8 RB@L:8
+Others:0
+
+#MidEdge
+UL:200 UR:200 UB:160 LR:100 LB:80 RB:80
+Others:0
+
+#Ctr
+U@L:2 U@R:2 U@C:100 U@B:1
+L@U:5 L@B:1 L@C:200 L@R:2
+R@U:5 R@L:2 R@C:200 R@B:1
+B@U:5 B@R:2 B@C:500 B@L:2
+Others:0
+
+###Skewb
+#Corners
+URF:0 UFL:500 URB:500 ULB:0
+RFD:500 FDL:0 RDB:0 DLB:250
+Others:0
+
+#Ctr
+U:100 R:70 F:70 L:50 B:0 D:0
+Others:0
+
+###FTO
+#Corners
+U:1000 R:700 F:700 L:500 B:0 D:0
+Others:0
+
+#Edges
+UF:20 UR:20 UL:20 UB:20
+FR:50 FL:50 BR:40 BL:40
+DF:10 DR:10 DL:10 DB:10
+Others:0
+
+#CtrA
+URF@F:550 URF@U:525 URF@R:500
+ULB@B:200 ULB@U:200 ULB@L:200
+DLF@F:100 DLF@D:200 DLF@L:200
+DRB@B:100 DRB@D:100 DRB@R:100
+Others:0
+
+#CtrB
+UFL@F:0 UFL@U:0 UFL@L:0
+UBR@B:0 UBR@U:0 UBR@R:0
+DFR@F:0 DFR@D:0 DFR@R:0
+DBL@B:0 DBL@D:0 DBL@L:0
+Others:0
+
+###CTO
+#Corners
+U:10 R:7 F:7 L:5 B:0 D:0
+Others:0
+
+#Edges
+UF:20 UR:20 UL:20 UB:20
+FR:50 FL:50 BR:40 BL:40
+DF:10 DR:10 DL:10 DB:10
+Others:0
+
+#Ctr
+U:1000 R:700 F:700 L:500 B:0 D:0
+Others:0
+
+
+各mypermsに対して「myperms_point」を設定したい。
+そのポジションのパーツが移動した際に上記のポイントを加算していき、
+transformで移り合える同じ系列のmypermsについて、最もポイントの高いものにtransformして#00として設定したい。
+
+1.まずはこのポイントを計算する関数を作ってほしい
+2.順次、プログラムのソースファイルのmypermsを上記のルールで置き換えたい
+3.last_permsに表示されるGroup名もこのポイントが最も高いもので統一させたい

@@ -1,0 +1,176 @@
+import unittest
+
+from cto.cube import CtoCube
+from core.myperm_points import (
+    MypermPointCalculator,
+    load_myperm_points,
+    parse_myperm_points_text,
+    point_representative_transform,
+)
+from core.myperm_effects import MypermEffectAnalyzer
+from core.myperm_keys import make_myperm_key, resolve_myperm_key
+from cube.rubiks_cube import Rubiks_3
+from megaminx.cube import MegaminxCube
+from pyraminx.cube import MasterPyraminxCube, PyraminxCube
+
+
+class MypermPointTableTest(unittest.TestCase):
+    def test_parser_normalizes_corner_midedge_and_wing_positions(self):
+        table = parse_myperm_points_text(
+            """
+            #Corners
+            UFR:2 DBL:0.5
+            #MidEdge
+            UF:20 DB:10 FR:50
+            #OuterEdge
+            UL:7 UR@B:9
+            #Wing
+            FR@U:500 DB@L:100 BL@D:320
+            #XCenter
+            R@2F.2U:2000
+            Others:0
+            """
+        )
+
+        self.assertEqual(table.point_for_part("C", "URF"), 2)
+        self.assertEqual(table.point_for_part("C", "LDB"), 0.5)
+        self.assertEqual(table.point_for_part("ME", "UF@M"), 20)
+        self.assertEqual(table.point_for_part("ME", "RF@M"), 50)
+        self.assertEqual(table.point_for_part("OE", "UL"), 7)
+        self.assertEqual(table.point_for_part("OE", "LU"), 7)
+        self.assertEqual(table.point_for_part("OE", "UR@B"), 9)
+        self.assertEqual(table.point_for_part("OE", "RU@B"), 9)
+        self.assertEqual(table.point_for_part("OE", "UR@L"), 0)
+        self.assertEqual(table.point_for_part("W2", "FR@2U"), 500)
+        self.assertEqual(table.point_for_part("W2", "RF@2U"), 500)
+        self.assertEqual(table.point_for_part("W2", "LB@2D"), 320)
+        self.assertEqual(table.point_for_part("CtrX", "R@2F.2U"), 2000)
+        self.assertEqual(table.point_for_part("CtrX", "R@2U.2F"), 2000)
+        self.assertEqual(table.point_for_part("CtrX", "R@2F.2D"), 0)
+
+    def test_current_points_file_scores_a_real_wing_myperm(self):
+        cube = Rubiks_3(size = 7)
+        table = load_myperm_points()
+        calculator = MypermPointCalculator(cube, table)
+        key = resolve_myperm_key(cube, "W2-6p[3x2][BR@D>FL@D>RF@U;BR@U>FL@U>RF@D]")
+
+        self.assertEqual(calculator.point_for_key(key), 2560)
+        self.assertIn("BR@D>FL@D>RF@U", key[0])
+
+    def test_edge_bundle_scores_mid_edge_and_each_wing_layer(self):
+        cube = Rubiks_3(size = 7)
+        table = load_myperm_points()
+
+        self.assertEqual(table.edge_bundle_point(cube, "UF@M"), 820)
+
+    def test_parser_can_load_megaminx_points_separately(self):
+        text = """
+        #Corners
+        UFR:2
+        ###megaminx
+        #Corners
+        (U,F,R):40
+        #Edges
+        (U,bR):1100
+        """
+        rubik_table = parse_myperm_points_text(text)
+        megaminx_table = parse_myperm_points_text(text, puzzle = "megaminx")
+
+        self.assertEqual(rubik_table.point_for_part("C", "UFR"), 2)
+        self.assertEqual(rubik_table.point_for_part("C", "URF"), 2)
+        self.assertEqual(megaminx_table.point_for_part("C", "UFR"), 40)
+        self.assertEqual(megaminx_table.point_for_part("E", "U.bR"), 1100)
+        self.assertEqual(megaminx_table.point_for_part("E", "bR.U"), 1100)
+
+    def test_megaminx_source_names_are_point_representative_effect_names(self):
+        cube = MegaminxCube()
+        analyzer = MypermEffectAnalyzer(cube)
+        calculator = MypermPointCalculator(cube, load_myperm_points(puzzle = "megaminx"))
+
+        for name in cube.myperms2:
+            with self.subTest(name = name):
+                key = make_myperm_key(name, 0)
+                self.assertEqual(name.split("~v", 1)[0], analyzer.proposed_name(key))
+                current_point = calculator.point_for_key(key)
+                best_point = max(
+                    calculator.point_for_key(make_myperm_key(name, transform_index))
+                    for transform_index in range(len(cube.transformation_keys))
+                )
+                self.assertEqual(current_point, best_point)
+
+    def test_pyraminx_source_names_are_point_representative_effect_names(self):
+        cube = PyraminxCube()
+        analyzer = MypermEffectAnalyzer(cube)
+        calculator = MypermPointCalculator(cube, load_myperm_points(puzzle = "pyraminx"))
+
+        self.assertEqual(cube.myperm_point_puzzle, "pyraminx")
+        self.assertEqual(cube.myperm_name_aliases, {})
+        for name in cube.myperms2:
+            with self.subTest(name = name):
+                key = make_myperm_key(name, 0)
+                self.assertEqual(name.split("~v", 1)[0], analyzer.proposed_name(key))
+                current_point = calculator.point_for_key(key)
+                best_point = max(
+                    calculator.point_for_key(make_myperm_key(name, transform_index))
+                    for transform_index in range(len(cube.transformation_keys))
+                )
+                self.assertEqual(current_point, best_point)
+
+    def test_master_pyraminx_source_names_are_point_representative_effect_names(self):
+        cube = MasterPyraminxCube()
+        analyzer = MypermEffectAnalyzer(cube)
+        calculator = MypermPointCalculator(cube, load_myperm_points(puzzle = "masterpyraminx"))
+
+        self.assertEqual(cube.myperm_point_puzzle, "masterpyraminx")
+        self.assertEqual(cube.myperm_name_aliases, {})
+        for name in cube.myperms2:
+            with self.subTest(name = name):
+                key = make_myperm_key(name, 0)
+                self.assertEqual(name.split("~v", 1)[0], analyzer.proposed_name(key))
+                current_point = calculator.point_for_key(key)
+                best_point = max(
+                    calculator.point_for_key(make_myperm_key(name, transform_index))
+                    for transform_index in range(len(cube.transformation_keys))
+                )
+                self.assertEqual(current_point, best_point)
+
+    def test_cto_source_names_are_point_representative_effect_names(self):
+        cube = CtoCube()
+        analyzer = MypermEffectAnalyzer(cube)
+        calculator = MypermPointCalculator(cube, load_myperm_points(puzzle = "cto"))
+
+        self.assertEqual(cube.myperm_point_puzzle, "cto")
+        self.assertEqual(cube.myperm_name_aliases, {})
+        for name in cube.myperms2:
+            with self.subTest(name = name):
+                key = make_myperm_key(name, 0)
+                self.assertEqual(name.split("~v", 1)[0], analyzer.proposed_name(key))
+                current_point = calculator.point_for_key(key)
+                best_point = max(
+                    calculator.point_for_key(make_myperm_key(name, transform_index))
+                    for transform_index in range(len(cube.transformation_keys))
+                )
+                self.assertEqual(current_point, best_point)
+
+    def test_megaminx_lp_transform_uses_megaminx_points(self):
+        cube = MegaminxCube()
+        moves = ("L2'", "U'", "R", "U", "L2", "U'", "R'", "U")
+        calculator = MypermPointCalculator(cube, load_myperm_points(puzzle = "megaminx"))
+
+        row = point_representative_transform(cube, moves)
+        representative_name = MypermEffectAnalyzer(cube).analyze(row.moves).concise_name()
+
+        self.assertEqual(row.transform_index, 56)
+        self.assertEqual(row.point, 85)
+        self.assertEqual(representative_name, "C3[U.bR.R>L.sL.bL>LUF]")
+        self.assertEqual(
+            calculator.point_for_moves(row.moves),
+            max(
+                calculator.point_for_moves(cube.transform(moves, transform_index))
+                for transform_index in range(len(cube.transformation_keys))
+            ),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

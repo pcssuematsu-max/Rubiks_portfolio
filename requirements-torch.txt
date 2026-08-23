@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Optional: Transformer inference and training
+torch>=2.1
