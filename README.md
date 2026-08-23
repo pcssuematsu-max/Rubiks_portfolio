@@ -1,14 +1,40 @@
 # Twisty Puzzle AI Lab
 
+[![Tests](https://github.com/pcssuematsu-max/Rubiks_portfolio/actions/workflows/tests.yml/badge.svg)](https://github.com/pcssuematsu-max/Rubiks_portfolio/actions/workflows/tests.yml)
+
 Twisty Puzzle AI Lab は、ツイストパズルを対象にした探索・学習実験用の Tkinter GUI アプリケーションです。
 Rubik's Cube 系を中心に、複数パズルの状態表示、手動操作、自動ソルブ、学習データ収集、ニューラルネットワーク学習、解析ビューアをまとめて扱います。
+
+## プロジェクト概要
+
+- **目的:** ツイストパズルの状態表現、探索、学習、解析を一つのGUI上で比較・実験する
+- **開発形態:** 個人開発
+- **主な技術:** Python、Tkinter、NumPy、PyTorch（任意）
+- **公開版:** 3×3 Rubik's Cube、Search2 1体、NumPyのみで起動できる軽量構成
 
 ![Twisty Puzzle AI Lab のGUI画面](assets/gui-overview.png)
 
 *多分割 Rubik's Cube の状態表示、探索候補、Policy / Value、Grad解析を同時に表示した実行画面。*
 
-`main.py` は、ポートフォリオ閲覧者向けの軽量な `public` プロファイルを既定で起動します。
-従来の `cube_size = 7`, `puzzle_type = 'cto'`, AI 20体の構成は `experiment` プロファイルとして残しています。
+## 設計と実装の見どころ
+
+- **複数パズルへの対応:** Rubik's Cube 系だけでなく、Megaminx、Pyraminx、Skewb、Square-1、FTO、CTO、有限群パズルを共通のGUIと探索処理へ接続
+- **探索方式の比較:** Policy / Value を使う優先度探索の Search2 と、PUCT 型探索木を使う Search3 を実装
+- **学習過程の可視化:** Grad、Integrated Gradients、Occlusion、Attention、Embedding などをGUIから解析
+- **実験条件の分離:** 閲覧者向けの `public` と、探索・学習用の `experiment` を同じ起動入口から切り替え可能
+- **検証可能性:** パズル状態、手順命名、有限群、起動プロファイルを自動テストし、GitHub Actionsでも継続的に確認
+
+## 公開版について
+
+`python3 main.py` は、ポートフォリオ閲覧者向けの軽量な `public` プロファイルを既定で起動します。従来の `cube_size = 7`, `puzzle_type = 'cto'`, AI 20体の構成は `experiment` プロファイルとして残しています。
+
+このリポジトリには、学習時に生成されるデータや学習済みパラメータを含めていません。そのため、公開版ではGUI操作、パズルの状態遷移、探索・学習・解析機能の構成を確認できますが、初期状態のAIによる解法性能は学習済みモデルの性能を示すものではありません。
+
+## 開発体制とAI支援について
+
+本プロジェクトの着想、パズル実装、探索・学習ロジック、および実験は作者が行いました。
+
+公開用リポジトリの整理、READMEの改善、起動設定のリファクタリング、自動テスト追加の一部では、OpenAI Codexを開発支援ツールとして使用しています。提案された変更内容は作者が確認し、動作テストを行った上で採用しています。
 
 ## 主な機能
 
