@@ -7,8 +7,8 @@ Rubik's Cube 系を中心に、複数パズルの状態表示、手動操作、�
 
 *多分割 Rubik's Cube の状態表示、探索候補、Policy / Value、Grad解析を同時に表示した実行画面。*
 
-現在の `main.py` の既定設定は `cube_size = 7`, `puzzle_type = 'cto'` です。
-実験対象や AI 設定は `build_default_frame_config()` から変更します。
+`main.py` は、ポートフォリオ閲覧者向けの軽量な `public` プロファイルを既定で起動します。
+従来の `cube_size = 7`, `puzzle_type = 'cto'`, AI 20体の構成は `experiment` プロファイルとして残しています。
 
 ## 主な機能
 
@@ -48,6 +48,16 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 python3 main.py
 ```
+
+引数なしでは、3×3 Rubik's Cube、Search2 1体、PyTorch不使用の公開用構成で起動します。
+
+従来の探索・学習実験用構成は、次のように明示して起動します。
+
+```bash
+python3 main.py --profile experiment
+```
+
+`--profile test` も `experiment` の別名として利用できます。自動テストを置く `tests/` と区別しやすいため、READMEでは `experiment` を推奨表記にしています。
 
 Python 3.10 以降に対応し、Python 3.14 で動作確認しています。Tkinter の GUI が起動します。macOS などで Tkinter が入っていない Python を使っている場合は、Tk 対応の Python を使ってください。
 
@@ -127,7 +137,13 @@ GitHub Actions では Python 3.10 と3.14の両方で同じテストを実行し
 
 ## 設定の変更
 
-基本設定は `main.py` の `build_default_frame_config()` で行います。
+起動入口と設定本体を分離しています。
+
+- `main.py`: コマンドライン引数の受付とGUI起動
+- `configs/profiles.py`: `public` / `experiment` の具体的な設定
+- `configs/__init__.py`: プロファイル名から設定を選ぶ窓口
+
+ポートフォリオの初回体験を変える場合は `build_public_frame_config()`、ローカルの探索・学習条件を変える場合は `build_experiment_frame_config()` を編集します。
 
 よく変更する項目:
 
@@ -204,7 +220,8 @@ GradViewer 系では以下の mode を切り替えられます。
 ## ディレクトリ構成
 
 ```text
-main.py                  起動設定とアプリ起動
+main.py                  プロファイル選択とアプリ起動
+configs/                 公開用・実験用の起動設定
 group_main.py            有限群パズルの起動入口
 group_experiment.py      有限群の編集可能な実験例
 ai/                      Original AI、layer、loss
@@ -244,4 +261,4 @@ reports/                 ツールが生成する解析レポートの説明
 ## 開発メモ
 
 このリポジトリは研究・実験用のコードです。
-パズル種別、探索方式、学習方式、解析機能が同時に入っているため、動作確認時は `main.py` の `FrameConfig` と現在の `puzzle_type` を必ず確認してください。
+公開確認では既定の `public`、探索・学習作業では `--profile experiment` を指定し、用途を混同しないようにしてください。
