@@ -173,8 +173,8 @@ class StateViewer(Tk.Canvas):
         return self.inside_size
 
     def _init_color_maps(self):
-        self.color = {'R':'#7F0000','W':'#BFBFBF','B':'#0000BF','G':'#007F3F','Y':'#DFDF00','O':'#FF7F00','':'#7F7F7F','X':'#7F7F7F'}
-        self.bd_color = {'R':'#5F0000','W':'#9F9F9F','B':'#00009F','G':'#005F2F','Y':'#BFBF00','O':'#BF5F00','':'#5F5F5F','X':'#5F5F5F'}
+        self.color = {'R':'#7F0000','W':'#BFBFBF','B':'#0000BF','G':'#005F2F','Y':'#DFDF00','O':'#FF7F00','':'#7F7F7F','X':'#7F7F7F'}
+        self.bd_color = {'R':'#5F0000','W':'#9F9F9F','B':'#00009F','G':'#003F1F','Y':'#BFBF00','O':'#BF5F00','':'#5F5F5F','X':'#5F5F5F'}
 
     def _init_surface_positions(self):
         self.C = np.zeros(6 * self.surface_num,dtype = 'i')
