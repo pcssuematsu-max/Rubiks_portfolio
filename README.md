@@ -3,6 +3,10 @@
 Twisty Puzzle AI Lab は、ツイストパズルを対象にした探索・学習実験用の Tkinter GUI アプリケーションです。
 Rubik's Cube 系を中心に、複数パズルの状態表示、手動操作、自動ソルブ、学習データ収集、ニューラルネットワーク学習、解析ビューアをまとめて扱います。
 
+![Twisty Puzzle AI Lab のGUI画面](assets/gui-overview.png)
+
+*多分割 Rubik's Cube の状態表示、探索候補、Policy / Value、Grad解析を同時に表示した実行画面。*
+
 現在の `main.py` の既定設定は `cube_size = 7`, `puzzle_type = 'cto'` です。
 実験対象や AI 設定は `build_default_frame_config()` から変更します。
 
