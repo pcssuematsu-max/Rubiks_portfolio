@@ -10,6 +10,7 @@ from core.myperm_points import (
 from core.myperm_effects import MypermEffectAnalyzer
 from core.myperm_keys import make_myperm_key, resolve_myperm_key
 from cube.rubiks_cube import Rubiks_3
+from fto.cube import FtoCube
 from megaminx.cube import MegaminxCube
 from pyraminx.cube import MasterPyraminxCube, PyraminxCube
 
@@ -140,6 +141,24 @@ class MypermPointTableTest(unittest.TestCase):
         calculator = MypermPointCalculator(cube, load_myperm_points(puzzle = "cto"))
 
         self.assertEqual(cube.myperm_point_puzzle, "cto")
+        self.assertEqual(cube.myperm_name_aliases, {})
+        for name in cube.myperms2:
+            with self.subTest(name = name):
+                key = make_myperm_key(name, 0)
+                self.assertEqual(name.split("~v", 1)[0], analyzer.proposed_name(key))
+                current_point = calculator.point_for_key(key)
+                best_point = max(
+                    calculator.point_for_key(make_myperm_key(name, transform_index))
+                    for transform_index in range(len(cube.transformation_keys))
+                )
+                self.assertEqual(current_point, best_point)
+
+    def test_fto_source_names_are_point_representative_effect_names(self):
+        cube = FtoCube()
+        analyzer = MypermEffectAnalyzer(cube)
+        calculator = MypermPointCalculator(cube, load_myperm_points(puzzle = "fto"))
+
+        self.assertEqual(cube.myperm_point_puzzle, "fto")
         self.assertEqual(cube.myperm_name_aliases, {})
         for name in cube.myperms2:
             with self.subTest(name = name):

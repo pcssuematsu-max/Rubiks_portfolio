@@ -51,6 +51,8 @@ FTO_LAYER_EPSILON = 1.0e-8
 class FtoCube:
     """3-layer Face Turning Octahedron model using the shared puzzle API."""
 
+    myperm_point_puzzle = "fto"
+
     def __init__(self, S = "", size = 3, F2L = False, OLL = False, Centers = False, Edges = False, Cross = False):
         self.size = 3
         self.order = 3
@@ -249,32 +251,43 @@ class FtoCube:
         self._expand_myperms2()
 
     def _register_myperms2(self):
-        self._add_myperm2("FTO-FaceCommutator-A", ("URF", "UFL", "URF'", "UFL'"))
-        self._add_myperm2("FTO-FaceCommutator-B", ("URF", "UFL'", "URF'", "UFL"))
-        self._add_myperm2("FTO-FaceCommutator-C", ("URF", "ULB", "URF'", "ULB'"))
-        self._add_myperm2("FTO-FaceCommutator-D", ("URF", "ULB'", "URF'", "ULB"))
+        self._add_myperm2('C4[2x2]+CtrA5+CtrB5+E3[3]~v01', ('URF', 'UFL', "URF'", "UFL'"), add_inverse = False)
+        self._add_myperm2('C4[2x2]+CtrA5+CtrB5+E3[3]~v02', ('UFL', 'URF', "UFL'", "URF'"), add_inverse = False)
+        self._add_myperm2('C4[2x2]+CtrA5+CtrB5+E3[3]~v03', ('UFL', "URF'", "UFL'", 'URF'), add_inverse = False)
+        self._add_myperm2('C4[2x2]+CtrA5+CtrB5+E3[3]~v04', ("URF'", 'UFL', 'URF', "UFL'"), add_inverse = False)
+        self._add_myperm2('C3[L>UFL.URF.ULB.UBR;R>DLF.DBL.UFL.ULB;U>DFR.DRB.UBR.URF]+CtrA6p[3x2][DLF@L>ULB@U>URF@R;DRB@R>ULB@L>URF@U]', ('UFL', 'UBR', "UFL'", "UBR'"), add_inverse = False)
+        self._add_myperm2('C3[L>DFR.DRB.URF.UBR;R>UBR.ULB.URF.UFL;U>ULB.UFL.DLF.DBL]+CtrA6p[3x2][DLF@L>URF@R>ULB@U;DRB@R>URF@U>ULB@L]', ('UBR', 'UFL', "UBR'", "UFL'"), add_inverse = False)
+        self._add_myperm2('C3[F>UBR.UFL.URF.ULB;R>URF.DFR.UFL.DLF;U>DFR.DRB.UBR.URF]+CtrA6p[3x2][DLF@F>URF@U>DRB@R;ULB@U>URF@R>URF@F]', ("UFL'", 'UBR', 'UFL', "UBR'"), add_inverse = False)
+        self._add_myperm2('C3[F>URF.DFR.UBR.DRB;R>UBR.ULB.URF.UFL;U>DFR.UFL.DLF.URF]+CtrA6p[3x2][DLF@F>DRB@R>URF@U;ULB@U>URF@F>URF@R]', ('UBR', "UFL'", "UBR'", 'UFL'), add_inverse = False)
+        self._add_myperm2('C3[L>UBR.URF.DRB.DFR;R>URF.UFL.UBR.ULB;U>ULB.UFL.DLF.DBL]+CtrA6p[3x2][DLF@L>DRB@R>ULB@U;ULB@L>URF@R>URF@U]', ('UFL', "DFR'", 'UFL', 'DFR', 'UFL'), add_inverse = False)
+        self._add_myperm2('C3[L>UFL.URF.ULB.UBR;R>ULB.UFL.DBL.DLF;U>URF.UBR.DRB.DFR]+CtrA6p[3x2][DLF@L>ULB@U>DRB@R;ULB@L>URF@U>URF@R]', ("UFL'", "DFR'", "UFL'", 'DFR', "UFL'"), add_inverse = False)
 
-        self._add_myperm2("FTO-FaceOutPerm-A", ('URF', "ULB'", 'URF', 'ULB', 'URF'))
+        self._add_myperm2('CtrA5[DLF@L>URF@U>ULB@L>URF@F>DRB@D]+CtrB3[DFR@R>UFL@F>UFL@U]+E5[DR>FL>FU>UL>RF]~v01', ("UFL'", 'mUBR', 'UFL', "mUBR'"), add_inverse = False)
+        self._add_myperm2('CtrA5[DLF@L>DRB@D>URF@F>ULB@L>URF@U]+CtrB3[DFR@R>UFL@U>UFL@F]+E5[DR>RF>UL>FU>FL]~v01', ('mUBR', "UFL'", "mUBR'", 'UFL'), add_inverse = False)
+        self._add_myperm2('CtrA5[DLF@L>URF@F>ULB@L>DRB@D>URF@U]+CtrB3[DBL@B>UFL@F>UFL@U]+E5[BL>LF>UF>LU>BD]~v01', ("UFL'", "mUBR'", 'UFL', 'mUBR'), add_inverse = False)
+        self._add_myperm2('CtrA5[DLF@L>URF@U>DRB@D>ULB@L>URF@F]+CtrB3[DBL@B>UFL@U>UFL@F]+E5[BL>BD>LU>UF>LF]~v01', ("mUBR'", "UFL'", 'mUBR', 'UFL'), add_inverse = False)
+        self._add_myperm2('CtrA5[DLF@L>URF@F>ULB@L>DRB@D>URF@U]+CtrB3[DBL@B>UFL@F>UFL@U]+E5[BL>LF>UF>LU>BD]~v02', ("UFL'", "mUBR'", 'UFL', 'mUBR'), add_inverse = False)
+        self._add_myperm2('CtrA5[DLF@L>URF@U>DRB@D>ULB@L>URF@F]+CtrB3[DBL@B>UFL@U>UFL@F]+E5[BL>BD>LU>UF>LF]~v02', ("mUBR'", "UFL'", 'mUBR', 'UFL'), add_inverse = False)
+        self._add_myperm2('CtrA5[DLF@L>URF@U>ULB@L>URF@F>DRB@D]+CtrB3[DFR@R>UFL@F>UFL@U]+E5[DR>FL>FU>UL>RF]~v02', ("UFL'", 'mUBR', 'UFL', "mUBR'"), add_inverse = False)
+        self._add_myperm2('CtrA5[DLF@L>DRB@D>URF@F>ULB@L>URF@U]+CtrB3[DFR@R>UFL@U>UFL@F]+E5[DR>RF>UL>FU>FL]~v02', ('mUBR', "UFL'", "mUBR'", 'UFL'), add_inverse = False)
 
-        self._add_myperm2("FTO-MiddleCommutator-A", ("URF", "mUFL", "URF'", "mUFL'"))
-        self._add_myperm2("FTO-MiddleCommutator-B", ("URF", "mUFL'", "URF'", "mUFL"))
-        self._add_myperm2("FTO-MiddleCommutator-C", ("URF", "mULB", "URF'", "mULB'"))
-        self._add_myperm2("FTO-MiddleCommutator-D", ("URF", "mULB'", "URF'", "mULB"))
+        self._add_myperm2('E6[BR>DF>RU;DL>LF>UB]', ('mURF', 'mUFL', "mURF'", "mUFL'"), add_inverse = False)
+        self._add_myperm2('E6[BR>RU>DF;DL>UB>LF]', ('mUFL', 'mURF', "mUFL'", "mURF'"), add_inverse = False)
+        self._add_myperm2('E6[BL>RB>FD;FL>BU>RF]', ('mURF', "mUFL'", "mURF'", 'mUFL'), add_inverse = False)
+        self._add_myperm2('E6[BL>FD>RB;FL>RF>BU]', ("mUFL'", 'mURF', 'mUFL', "mURF'"), add_inverse = False)
+        self._add_myperm2('E6[BL>LF>RD;BR>UL>RF]', ("mURF'", 'mUBR', 'mURF', "mUBR'"), add_inverse = False)
+        self._add_myperm2('E6[BL>RD>LF;BR>RF>UL]', ('mUBR', "mURF'", "mUBR'", 'mURF'), add_inverse = False)
+        self._add_myperm2('E6[BR>FU>UL;DB>DR>FL]', ('mURF', "mULB'", "mURF'", 'mULB'), add_inverse = False)
+        self._add_myperm2('E6[BR>UL>FU;DB>FL>DR]', ("mULB'", 'mURF', 'mULB', "mURF'"), add_inverse = False)
 
-        self._add_myperm2("FTO-InsideCommutator-A", ("mURF", "mUFL", "mURF'", "mUFL'"))
-        self._add_myperm2("FTO-InsideCommutator-B", ("mURF", "mUFL'", "mURF'", "mUFL"))
-        self._add_myperm2("FTO-InsideCommutator-C", ("mURF", "mULB", "mURF'", "mULB'"))
-        self._add_myperm2("FTO-InsideCommutator-D", ("mURF", "mULB'", "mURF'", "mULB"))
-
-
-        self._add_myperm2("FTO-EdgeCycle3-A", ("URF","ULB","URF'","ULB","URF","ULB","URF'","ULB"))
-
-        self._add_myperm2("FTO-CenterPerm-A", ("mUFL'","UBR","UFL'","UBR'","mUFL","UBR","UFL","UBR'"))
-        self._add_myperm2("FTO-CenterPerm-B", ("mUBR'", "DFR'", 'UBR', 'DFR', 'mUBR', "DFR'", "UBR'", 'DFR'))
-        self._add_myperm2("FTO-CenterPerm-C", ('mURF', 'DFR', "DBL'", "DFR'", "mURF'", 'DFR', 'DBL', "DFR'", "mURF'", "UBR'", 'DBL', 'UBR', 'mURF', "UBR'", "DBL'", 'UBR'))
-
-
-
+        self._add_myperm2('CtrA3[URF@F>URF@U>URF@R]+E3[FR>UF>UR]', ('ULB', 'URF', "ULB'", 'URF', 'ULB', 'URF', "ULB'", 'URF'), add_inverse = False)
+        self._add_myperm2('CtrA3[URF@F>URF@R>URF@U]+E3[FR>UR>UF]', ("URF'", 'ULB', "URF'", "ULB'", "URF'", 'ULB', "URF'", "ULB'"), add_inverse = False)
+        self._add_myperm2('CtrA3[DLF@L>URF@U>URF@F]', ("mULB'", "UBR'", 'DFR', 'UBR', 'mULB', "UBR'", "DFR'", 'UBR'), add_inverse = False)
+        self._add_myperm2('CtrA3[DLF@L>URF@F>URF@U]', ("UBR'", 'DFR', 'UBR', "mULB'", "UBR'", "DFR'", 'UBR', 'mULB'), add_inverse = False)
+        self._add_myperm2('CtrA3[ULB@B>URF@R>URF@F]', ('mUFL', 'UBR', "UFL'", "UBR'", "mUFL'", 'UBR', 'UFL', "UBR'"), add_inverse = False)
+        self._add_myperm2('CtrA3[ULB@B>URF@F>URF@R]', ('UBR', "UFL'", "UBR'", 'mUFL', 'UBR', 'UFL', "UBR'", "mUFL'"), add_inverse = False)
+        self._add_myperm2('CtrA5[DLF@D>URF@U>ULB@B>URF@R>URF@F]', ("mUFL'", 'UBR', "UFL'", "UBR'", 'mUFL', 'UBR', 'UFL', "UBR'", 'mUFL', "DFR'", 'UFL', 'DFR', "mUFL'", "DFR'", "UFL'", 'DFR'), add_inverse = False)
+        self._add_myperm2('CtrA5[DLF@D>URF@F>URF@R>ULB@B>URF@U]', ("DFR'", 'UFL', 'DFR', 'mUFL', "DFR'", "UFL'", 'DFR', "mUFL'", 'UBR', "UFL'", "UBR'", "mUFL'", 'UBR', 'UFL', "UBR'", 'mUFL'), add_inverse = False)
 
     def _add_myperm2(self, name, moves, add_inverse = True):
         name = normalize_myperm_name(name)
