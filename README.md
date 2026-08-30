@@ -23,7 +23,41 @@ Rubik's Cube 系を中心に、複数パズルの状態表示、手動操作、�
 
 ![Twisty Puzzle AI Lab のGUI画面](assets/gui-overview.png)
 
-*多分割 Rubik's Cube の状態表示、探索候補、Policy / Value、Grad解析を同時に表示した実行画面。*
+*多分割 Rubik's Cube の状態表示、探索候補、Policy / Value、Grad解析を同時に表示した実験用画面。*
+
+## GUI画面の見方
+
+メイン画面では、現在のパズル状態、探索で選ばれた手順、AIの出力、解析結果、実行ログを同時に追跡できます。上部の操作パネルからAI、解析mode、対象layerなどを選び、solveや解析を実行します。以下の画像は5×5 Rubik's Cubeと複数AIを使った実験構成の例です。既定の `public` プロファイルは3×3・Search2 1体の軽量構成ですが、各パネルの役割は同じです。
+
+### State Viewer
+
+![現在のパズル状態を表示するState Viewer](assets/gui-state_viewer.png)
+
+現在のパズル状態を展開図で表示します。solveの進行に合わせて更新され、スクランブルから完成状態へ変化する過程を目で追えます。Rubik's Cube以外の対応パズルでは、それぞれの形状に合わせた専用State Viewerへ切り替わります。灰色は、部分問題の実験などで評価対象から除外したステッカーを表します。
+
+### Move Viewer
+
+![探索結果と評価値を表示するMove Viewer](assets/gui-move_viewer.png)
+
+探索が採用した手順を時系列で表示します。上段はスクランブル手順、左上は成功数と試行番号です。各行の `Key` は探索結果の統計やmyperms名、`Moves` はその段階で適用した手順、`Value` は手順適用前後の評価値を表します。手順セルの色は、探索方式に応じた各move後の評価変化を示します。
+
+### Policy Probability / Success Viewer
+
+![Policy確率とAIごとの成功状況](assets/gui-prob_and_success_viewer.png)
+
+左側は現在状態に対するPolicy出力で、各moveの選択確率をパーセント表示します。色によって確率の大小を素早く比較できます。右側は現在の試行番号・AI番号・直近の成否、AIごとの累計成功数を表示します。下の小さな色付きブロックは直近のsolve履歴で、学習に伴う成功率の変化を確認できます。
+
+### Grad Viewer
+
+![AIが高く評価した箇所と低く評価した箇所を示すGrad Viewer](assets/gui-grad_viewer.png)
+
+選択したAIとlayerについて、入力のどの位置が評価へ強く影響したかをパズル上に重ねて表示します。左側が正方向または高い値、右側が負方向または低い値で、下部には抽出数と値域が表示されます。`Grad` のほか、Integrated Gradients、Occlusion、Attention、Embeddingなどへmodeを切り替え、異なる観点から判断根拠を比較できます。
+
+### Log Viewer
+
+![探索・学習・メモリ状況を表示するLog Viewer](assets/gui-log.png)
+
+探索結果、学習指標、パラメータ統計、データ件数、PyTorch利用状況、メモリ使用量などを時系列で表示します。長時間の実験でも最新行へ自動スクロールし、表示行数を制限してGUI側のログが増え続けないようにしています。
 
 ## 設計と実装の見どころ
 
