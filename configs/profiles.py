@@ -133,22 +133,16 @@ def _default_initial_scramble_groups(size,puzzle_type):
     if puzzle_type == "fto":
         return (
             [
-                ("URF",),
-                ("URF'",),
-                ("UFL",),
-                ("UFL'",),
-                ("mUFL'","UBR","UFL'","UBR'","mUFL","UBR","UFL","UBR'"),
-                ("mUBR'", "DFR'", 'UBR', 'DFR', 'mUBR', "DFR'", "UBR'", 'DFR'),
-                ("URF","ULB","URF'","ULB","URF","ULB","URF'","ULB"),
-                ("URF","UFL","URF'","UFL'"),
-                ("URF","UBR","URF'","UBR'"),
-
-
-
+                ("URF'","mUBR'","DLF'","UBR","DRB'","UFL'"),
+                ("UFL","mUBR'","URF","DLF","UBR'","DRB'"),
+                ("mUBR","UFL","URF","DRB'","DLF'","UBR'"),
             ],
             [
+                ("DFR'", 'UFL', "DFR'", "UFL'", 'DFR', "DLF'", "DFR'", 'UFL', 'DFR', "UFL'", 'DLF', 'DFR'),
             ],
-            [],
+            [
+                ("mULB'", "UBR'", 'DFR', 'UBR', 'mULB', "UBR'", "DFR'", 'UBR'),
+            ],
             [],
             [],
             [],
@@ -159,16 +153,8 @@ def _default_initial_scramble_groups(size,puzzle_type):
     if puzzle_type == "cto":
         return (
             [
-                ('U2', "F'", 'U', 'F', "U'", "F'", "U'", 'F', "U'", "F'", 'U', 'F', "u'"),
-                ('U', 'B', 'U', "B'", 'U2', 'B', 'U', "B'", "u'", 'F', 'U', 'F', "U'", 'F', 'U', 'F', "U'", 'F', "f'"),
-                ("L'", "F'", 'L', "F'", "L'", 'F2', 'L'),
-                ('U2', 'R', 'U2', "R'", 'U', 'R', 'U2', "R'", 'U2', 'u2', 'R', 'U', "R'"),
-                ('F2', 'L2', "F'", 'L', "D'", 'L2', 'D', "L'", "F'"),
-                ('F2', "L'", 'F', "U'", 'F2', 'U', "F'", 'L'),
-                ('U', 'L', 'F2', "L'", 'F2', "U'"),
-                ("u",),
-                ("u'",),
-                ("u2",),
+                ('U', 'L', 'U', "L'", 'U', 'L', 'U', "L'", 'U', "u'", 'U', 'L', 'U', "L'", "U'", 'L', "U'", "L'", "R'", "U'", "R'", 'U', "R'", "U'", "R'", 'U', "R'", 'r'),
+                ("U","F'","R2","D'","L2","B'","U2","R'","D","L'","F","B2","u","l","b","r'","d2","f'"),
             ],
             [
             ],
@@ -299,6 +285,7 @@ def _default_initial_scramble_groups(size,puzzle_type):
 def build_public_frame_config():
     """Return a lightweight configuration suitable for a public demo."""
     return FrameConfig(
+        control_panel_mode="simple",
         puzzle_type="rubiks",
         cube_size=3,
         ai_search_modes=("search2",),
@@ -325,7 +312,6 @@ def build_public_frame_config():
 
 
 def build_experiment_frame_config():
-    """Return the original CTO configuration used for local experiments."""
     ai_search_modes = [
         'search3'
         if ai_index in [2,3,4,5,6,7,10,11,18,19]
@@ -383,7 +369,7 @@ def build_experiment_frame_config():
     adam = weight_decay.copy()
 
     cube_size = 7
-    puzzle_type = 'cto'
+    puzzle_type = 'cube'
     if cube_size >= 6:
         transform_idx = [0,49,50,3,52,5,54,7,24,25] * 2
         flip_inside_idx = [False,True] * 10
@@ -443,6 +429,7 @@ def build_experiment_frame_config():
         bootstrap_search3_datas = None
 
     return FrameConfig(
+        control_panel_mode="advanced",
         puzzle_type = puzzle_type,
         cube_size = cube_size,
         ai_search_modes = ai_search_modes,

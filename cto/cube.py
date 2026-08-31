@@ -137,6 +137,14 @@ class CtoCube(FtoCube):
         self._add_myperm2('E3[FL>RF>BU]', ("U'", 'L', 'F2', "L'", 'F2', 'U'), add_inverse = False)
         self._add_myperm2('E3[FL>FU>RF]', ('U', 'F2', 'L', 'F2', "L'", "U'"), add_inverse = False)
         self._add_myperm2('E3[FL>RF>FU]', ('U', 'L', 'F2', "L'", 'F2', "U'"), add_inverse = False)
+        self._add_myperm2('E3[FL>FR>UR]', ("R'", 'F', "D'", 'F2', 'D', 'F', 'R'), add_inverse = False)
+        self._add_myperm2('E3[FL>RU>BU]', ("U'", "L'", 'B', "L'", "B'", 'L2', 'U'), add_inverse = False)
+        self._add_myperm2('E3[FL>FR>LU]', ('L', 'F', 'L', "D'", "L'", 'D', "L'", "F'"), add_inverse = False)
+        self._add_myperm2('E3[BL>UR>FR]', ("F'", 'U', 'F', 'U2', "B'", "U'", 'B', 'U2'), add_inverse = False)
+        self._add_myperm2('E3[FL>UR>FR]', ("F'", 'U', 'F', 'U', "L'", "U'", 'L', "U'"), add_inverse = False)
+        self._add_myperm2('E3[BL>RU>RF]', ("F'", 'U', 'F', 'U', 'L', "U'", "L'", "U'"), add_inverse = False)
+        self._add_myperm2('E3[FL>FR>RU]', ('F', 'R', "U'", "R'", 'U', "R'", "F'", 'R'), add_inverse = False)
+
 
         self._add_myperm2('Ctr1[U>U-]+E2s[FR<>UB]', ('R', "U'", "R'", 'u', "U'", 'R', "U'", "R'", 'U2'), add_inverse = False)
         self._add_myperm2('Ctr1[U>U+]+E2s[FR<>UB]', ('U2', 'R', 'U', "R'", 'U', "u'", 'R', 'U', "R'"), add_inverse = False)
@@ -144,7 +152,7 @@ class CtoCube(FtoCube):
         self._add_myperm2('Ctr1[U>U-]+E2s[UB<>UL]', ("U'", 'R2', "U'", 'R2', 'U2', 'R2', "U'", 'R2', 'u'), add_inverse = False)
         self._add_myperm2('Ctr1[U>U+]+E2s[FR<>UF]', ("u'", 'R', 'U', "R'", 'U', 'R', 'U', "R'", 'U2'), add_inverse = False)
         self._add_myperm2('Ctr1[U>U-]+E2s[FR<>UF]', ('U2', 'R', "U'", "R'", "U'", 'R', "U'", "R'", 'u'), add_inverse = False)
-        self._add_myperm2('Ctr1[U>U+]+E2[UL>RU]', ('U2', "F'", 'U', 'F', "U'", "F'", "U'", 'F', "U'", "F'", 'U', 'F', "u'"), add_inverse = False)
+        self._add_myperm2('Ctr1[U>U+]+E2[UL>RU]', ('R', "U'", "R'", 'U', 'R', 'U', "R'", 'U', 'R', "U'", "R'", "u'"), add_inverse = False)
         self._add_myperm2('Ctr1[U>U-]+E2[UL>RU]', ('u', "F'", "U'", 'F', 'U', "F'", 'U', 'F', 'U', "F'", "U'", 'F', 'U2'), add_inverse = False)
         self._add_myperm2('Ctr1[U>U-]+E2s[FL<>UR]', ('U', "L'", "U'", 'L', "U'", "L'", "U'", 'L', 'U', 'u'), add_inverse = False)
         self._add_myperm2('Ctr1[U>U+]+E2s[FL<>UR]', ("u'", "U'", "L'", 'U', 'L', 'U', "L'", 'U', 'L', "U'"), add_inverse = False)
@@ -154,13 +162,16 @@ class CtoCube(FtoCube):
         self._add_myperm2('Ctr1[U>U-]+E2[DL>BU]', ('U2', 'L2', "U'", 'L2', "U'", 'u', 'L2', "U'", 'L2'), add_inverse = False)
         self._add_myperm2('Ctr1[U>U+]+E2s[DL<>UR]', ('U', "u'", 'B', 'L2', 'U', 'L2', "B'", 'U2', 'B', 'U', "B'"), add_inverse = False)
         self._add_myperm2('Ctr1[U>U-]+E2s[DL<>UR]', ('B', "U'", "B'", 'U2', 'B', 'L2', "U'", 'L2', "B'", 'u', "U'"), add_inverse = False)
-        self._add_myperm2('Ctr1[U>U-]+E2[DF>RF]', ('U', "F'", 'R', "U'", "R'", 'F', "U'", 'u', "F'", "U'", 'F', 'U'), add_inverse = False)
+        self._add_myperm2('Ctr1[U>U-]+E2[DF>RF]', ('U2', "B'", "R'", 'B', 'U2', 'r', 'R', 'F', "R'", "F'"), add_inverse = False)
         self._add_myperm2('Ctr1[U>U+]+E2[DF>RF]', ("U'", "F'", 'U', 'F', "u'", 'U', "F'", 'R', 'U', "R'", 'F', "U'"), add_inverse = False)
+        self._add_myperm2('Ctr1[U>U+]+E2[FL>RF]', ('U2', "L'", 'U', 'L', 'R', 'U', "R'", "L'", 'U', 'L', "u'"), add_inverse = False)
+        self._add_myperm2('Ctr1[U>U+]+E2s[DR<>FR]', ("u'", 'U', "F'", 'U', 'F', 'U', "F'", 'U', 'F', 'U', 'R', 'F', "R'", "F'"), add_inverse = False)
+
+
 
         self._add_myperm2('Ctr1[U>U2]~v01', ('U2', 'R', 'U2', "R'", 'U', 'R', 'U2', "R'", 'U2', 'u2', 'R', 'U', "R'"), add_inverse = False)
-        self._add_myperm2('Ctr1[U>U2]~v02', ('R', "U'", "R'", 'u2', 'U2', 'R', 'U2', "R'", "U'", 'R', 'U2', "R'", 'U2'), add_inverse = False)
-        self._add_myperm2('Ctr2[F>F+;U>U+]', ('U', 'B', 'U', "B'", 'U2', 'B', 'U', "B'", "u'", 'F', 'U', 'F', "U'", 'F', 'U', 'F', "U'", 'F', "f'"), add_inverse = False)
-        self._add_myperm2('Ctr2[F>F-;U>U-]', ('f', "F'", 'U', "F'", "U'", "F'", 'U', "F'", "U'", "F'", 'u', 'B', "U'", "B'", 'U2', 'B', "U'", "B'", "U'"), add_inverse = False)
+        self._add_myperm2('Ctr2[F>F+;U>U+]', ("f'", "U'", 'F', 'U', 'F', "U'", 'F', 'U', 'F', 'U', 'F', "u'", 'U', "F'", 'U', 'F', 'U2'), add_inverse = False)
+        self._add_myperm2('Ctr2[R>R-;U>U+]', ("F'", 'U', 'F', "u'", 'U2', "F'", 'U', 'F', 'U', 'R', 'U', "R'", "U'", "F'", 'R2', 'F', "R'", "F'", "R'", 'F', "R'", 'r'), add_inverse = False)
 
     def _init_groups(self):
         self.corner_index = self._piece_indices_at_vertices()

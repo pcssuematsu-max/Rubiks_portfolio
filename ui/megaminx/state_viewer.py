@@ -31,7 +31,7 @@ class MegaminxStateViewer(Tk.Canvas):
                       'X':"#007FFF",
                       'G':"#FFDF7F",
                       'H':"#FF007F",
-                      'Y':"#7FFF00",
+                      'Y':"#5FBF00",
                       'D':"#000000",
                       '':"#7F7F7F"}
 

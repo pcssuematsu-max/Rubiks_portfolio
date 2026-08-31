@@ -18,7 +18,7 @@ class FtoStateViewer(Tk.Canvas):
         self._shift_net_to_margin()
         width, height = self._canvas_size()
         self.color = {
-            "A":"#7FFF00",
+            "A":"#5FBF00",
             "B":"#3F007F",
             "C":"#FF7F00",
             "D":"#0000BF",

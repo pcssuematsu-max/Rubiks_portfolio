@@ -13,6 +13,10 @@ UpdateScale = Tuple[float, float, float]
 class FrameConfig:
     """Frame 起動時に渡す実験設定をまとめた dataclass。"""
 
+    # Control panel presentation.  Public demos start in the simpler view,
+    # while development profiles can expose every control immediately.
+    control_panel_mode: str = 'advanced'
+
     # Cube mode selection.
     puzzle_type: str = 'rubiks'
     cube_size: int = 3
@@ -88,6 +92,10 @@ class FrameConfig:
 
     def __post_init__(self):
         """AI 数に依存する設定長の整合性を確認する。"""
+        if self.control_panel_mode not in ('simple', 'advanced'):
+            raise ValueError(
+                "control_panel_mode must be 'simple' or 'advanced'."
+            )
         ai_count = self._ai_count()
         self._validate_ai_sequence_length('lrs', self.lrs, ai_count)
         self._validate_ai_sequence_length('wdlrs', self.wdlrs, ai_count)

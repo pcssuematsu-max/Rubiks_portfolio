@@ -27,6 +27,7 @@ from ui.control_panel import ControlPanel
 from ui.cto.state_viewer import CtoStateViewer
 from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, LpShowKeyButton, ParamEditorDialog, ToolsDialog, W1EmbeddingDialog
 from ui.frame_config import FrameConfig
+from ui.move_controls import MoveControlProxy, square1_manual_move, update_square1_manual_status
 from ui.fto.state_viewer import FtoStateViewer
 from ui.group_puzzle.state_viewer import GroupStateViewer
 from ui.megaminx.state_viewer import MegaminxStateViewer
@@ -43,17 +44,6 @@ from ui.viewers import (
 )
 
 np.set_printoptions(suppress=True)
-
-
-class MoveControlProxy:
-    """Proxy used when one compact control represents many internal moves."""
-
-    def __init__(self, widgets):
-        self.widgets = widgets
-
-    def configure(self, **kwargs):
-        for widget in self.widgets:
-            widget.configure(**kwargs)
 
 
 def build_default_bootstrap_datas(cube_size):
@@ -721,7 +711,11 @@ class Frame(Tk.Frame):
 
     def _build_control_panel(self):
         """上部 control panel を生成して alias を束縛する。"""
-        self.control_panel = ControlPanel(self,self)
+        self.control_panel = ControlPanel(
+            self,
+            self,
+            initial_mode = self.config.control_panel_mode,
+        )
         self.control_buttons = self.control_panel
         self.control_panel.grid(row = 0,column = 0,columnspan = 4,sticky = 'ew')
         self._bind_control_panel_aliases()
@@ -789,10 +783,7 @@ class Frame(Tk.Frame):
         self._update_square1_manual_status()
 
     def _square1_manual_move_from_vars(self):
-        u = int(self.square1_u_var.get())
-        d = int(self.square1_d_var.get())
-        slash = "/" if self.square1_slash_var.get() else None
-        return self.cube.normalize_move_key((u, d, slash))
+        return square1_manual_move(self)
 
     def _apply_square1_manual_move(self):
         try:
@@ -818,17 +809,10 @@ class Frame(Tk.Frame):
         self._update_square1_manual_status()
 
     def _update_square1_manual_status(self):
-        try:
-            move = self._square1_manual_move_from_vars()
-            status = self.cube.format_move(move)
-            if not self.cube.is_legal_move(move):
-                status += '  illegal'
-        except Exception:
-            status = 'invalid'
-        self.square1_status_label.configure(text = status)
+        update_square1_manual_status(self)
 
     def _build_viewers(self, cube_size):
-        """state/move/prob/success viewer を生成して配置する。"""
+        """state/move/prob/log viewer を生成して配置する。"""
         self._build_grad_viewer_panels()
         if self.puzzle_type in ('group', 'symmetric_group', 'linear_group'):
             viewer_class = GroupStateViewer
@@ -880,13 +864,17 @@ class Frame(Tk.Frame):
         self.MV = MoveViewer(self, display_move_keys)
         self.MV.grid(row = 1,column = 2,columnspan = 2)
 
-        self.PV = ProbViewer(self,display_move_keys)
-        self.PV.grid(row = 2,column = 2,sticky = 'nw')
-        self.success_viewer = SuccessViewer(self,self.AInum)
-        self.success_viewer.grid(row = 2,column = 3,sticky = 'nsew')
+        self.solve_summary_panel = Tk.Frame(self)
+        self.solve_summary_panel.grid(row = 2,column = 2,sticky = 'nw')
+        self.PV = ProbViewer(self.solve_summary_panel,display_move_keys)
+        self.PV.grid(row = 0,column = 0,sticky = 'nw')
+        self.success_viewer = SuccessViewer(self.solve_summary_panel,self.AInum)
+        self.success_viewer.grid(row = 1,column = 0,sticky = 'ew')
         self.success_viewer.put_summary(self.success,self.N,self.AI_idx)
-        self.log_viewer = LogViewer(self)
-        self.log_viewer.grid(row = 3,column = 2,columnspan = 2,sticky = 'nsew')
+        # Keep the log in the right column: it shares the lower row with the
+        # analysis and summary panels instead of requiring another full row.
+        self.log_viewer = LogViewer(self,width = 48,height = 12)
+        self.log_viewer.grid(row = 2,column = 3,sticky = 'nsew')
 
     def _build_grad_viewer_panels(self):
         """GradViewerをPositive/Negativeラベルとrange表示付きで配置する。"""
@@ -1032,6 +1020,7 @@ class Frame(Tk.Frame):
             'reset_button',
             'stopper_button',
             'my_solve_button',
+            'open_move_pad_button',
             'loadparams_all_button',
             'saveparams_all_button',
             'tools_button',
@@ -1104,7 +1093,7 @@ class Frame(Tk.Frame):
     def show_debug_viewer_from_entry(self):
         self.debug_analysis_manager.update_viewer_settings(
             self.grad_index_var.get(),
-            self.grad_mode_var.get(),
+            self.control_panel.selected_grad_mode(),
             self.grad_layer_var.get(),
         )
         ai_index = self._debug_viewer_ai_index()

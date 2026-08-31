@@ -286,8 +286,8 @@ class FtoCube:
         self._add_myperm2('CtrA3[DLF@L>URF@F>URF@U]', ("UBR'", 'DFR', 'UBR', "mULB'", "UBR'", "DFR'", 'UBR', 'mULB'), add_inverse = False)
         self._add_myperm2('CtrA3[ULB@B>URF@R>URF@F]', ('mUFL', 'UBR', "UFL'", "UBR'", "mUFL'", 'UBR', 'UFL', "UBR'"), add_inverse = False)
         self._add_myperm2('CtrA3[ULB@B>URF@F>URF@R]', ('UBR', "UFL'", "UBR'", 'mUFL', 'UBR', 'UFL', "UBR'", "mUFL'"), add_inverse = False)
-        self._add_myperm2('CtrA5[DLF@D>URF@U>ULB@B>URF@R>URF@F]', ("mUFL'", 'UBR', "UFL'", "UBR'", 'mUFL', 'UBR', 'UFL', "UBR'", 'mUFL', "DFR'", 'UFL', 'DFR', "mUFL'", "DFR'", "UFL'", 'DFR'), add_inverse = False)
-        self._add_myperm2('CtrA5[DLF@D>URF@F>URF@R>ULB@B>URF@U]', ("DFR'", 'UFL', 'DFR', 'mUFL', "DFR'", "UFL'", 'DFR', "mUFL'", 'UBR', "UFL'", "UBR'", "mUFL'", 'UBR', 'UFL', "UBR'", 'mUFL'), add_inverse = False)
+        self._add_myperm2('CtrA3[ULB@U>URF@F>URF@U]', ("mUBR'", 'DFR', "UBR'", "DFR'", 'mUBR', 'DFR', 'UBR', "DFR'", 'mUBR', "DBL'", 'UBR', 'DBL', "mUBR'", "DBL'", "UBR'", 'DBL'), add_inverse = False)
+
 
         self._add_myperm2('E3[FR>UR>UF]', ("URF'", 'ULB', "URF'", "ULB'", "URF'", 'ULB', "URF'", "ULB'", 'mUFL', 'DLF', "UBR'", 'DFR', 'UBR', "mULB'", "UBR'", "DFR'", 'UBR', 'mULB', "DLF'", "mUFL'"), add_inverse = False)
         self._add_myperm2('E3[FL>RF>RU]', ("UFL'", "URF'", 'ULB', "URF'", "ULB'", "URF'", 'ULB', "URF'", "ULB'", 'mUFL', 'DLF', "UBR'", 'DFR', 'UBR', "mULB'", "UBR'", "DFR'", 'UBR', 'mULB', "DLF'", "mUFL'", 'UFL'), add_inverse = False)
@@ -302,6 +302,15 @@ class FtoCube:
 
         self._add_myperm2('E3[DR>BU>FL]', ("DRB'", "ULB'", "DLF'", 'DBL', "DFR'", 'DBL', 'DFR', 'DBL', "DFR'", 'DBL', 'DFR', 'mUFL', "UBR'", 'DLF', "ULB'", "DLF'", "mULB'", 'DLF', 'ULB', "DLF'", 'mULB', 'UBR', "mUFL'", 'DLF', 'ULB', 'DRB'), add_inverse = False)
         self._add_myperm2('E3[FR>UB>LU]', ("DFR'", 'DLF', "DBL'", 'ULB', "DLF'", 'ULB', 'DLF', 'ULB', "DLF'", 'ULB', 'DLF', 'mURF', "DRB'", 'UFL', "UBR'", "UFL'", "mUBR'", 'UFL', 'UBR', "UFL'", 'mUBR', 'DRB', "mURF'", 'DBL', "DLF'", 'DFR'), add_inverse = False)
+        self._add_myperm2('E3[BL>FR>LF]', ('URF', 'UFL', "UBR'", 'UFL', 'UBR', 'UFL', "UBR'", 'UFL', 'UBR', "mURF'", "DFR'", 'ULB', "DLF'", "ULB'", 'mUBR', 'ULB', 'DLF', "ULB'", "mUBR'", 'DFR', 'mURF', 'URF', 'UBR', 'ULB', "DRB'", 'ULB', 'DRB', 'ULB', "DRB'", 'ULB', 'DRB', "mUBR'", "URF'", 'DBL', "UFL'", "DBL'", "mUFL'", 'DBL', 'UFL', "DBL'", 'mUFL', 'URF', 'mUBR', "UBR'", 'URF'), add_inverse = False)
+
+
+        self._add_myperm2('C2A',('UBR', "DRB'", 'URF', 'DRB', "URF'", "UBR'", 'mUFL', 'URF', "DRB'", "URF'", "mUFL'", 'DLF', 'DRB', 'mUBR', "DRB'", "DLF'", 'DRB', "mUBR'"), add_inverse = False)
+        self._add_myperm2('C2B',('DRB', "ULB'", "DRB'", 'UBR', 'UFL', "UBR'", "UFL'", 'DRB', 'ULB', "DRB'", 'UFL', 'UBR', 'UFL', "UBR'", 'mUFL', 'UBR', 'UFL', "UBR'", "mUFL'", 'DLF', "URF'", "DLF'", 'UFL', 'UBR', "UFL'", "UBR'", 'DLF', 'URF', "DLF'", 'UBR', 'UFL', 'UBR', "UFL'", 'mUBR', 'UFL', 'UBR', "UFL'", "mUBR'"), add_inverse = False)
+        self._add_myperm2('C3A',("mULB'", "UFL'", 'DFR', 'UFL', 'mULB', "DFR'", "DBL'", "DFR'", 'DBL', 'UBR', 'DFR', 'mUBR', "DFR'", "UBR'", 'DFR', "mUBR'"),add_inverse = False)
+        self._add_myperm2('C3B',('DBL', "UBR'", 'DBL', 'UBR', 'DBL', "mUFL'", "DFR'", "UFL'", 'DFR', 'mUFL', "DFR'", 'UFL', 'DFR', 'mULB', "DBL'", 'DFR', 'DBL', "mULB'", "DBL'", "DFR'", 'DBL'),add_inverse = False)
+        self._add_myperm2('C3C',("DFR'", 'UFL', "DFR'", "UFL'", 'DFR', "DLF'", "DFR'", 'UFL', 'DFR', "UFL'", 'DLF', 'DFR'), add_inverse = False)
+
 
 
     def _add_myperm2(self, name, moves, add_inverse = True):

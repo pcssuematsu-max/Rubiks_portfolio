@@ -46,12 +46,12 @@ class LogViewer(Tk.Frame):
         self.text.delete('1.0', f'{excess + 1}.0')
         self.line_count -= excess
 
+
 class SuccessViewer(Tk.Frame):
-    """AIごとの成功数と、直近のソルブ結果を表示する。"""
+    """AIごとの成功数と直近のソルブ履歴をコンパクトに表示する。"""
 
     def __init__(self, master, ai_count):
         Tk.Frame.__init__(self,master,relief = Tk.RIDGE,bd = 4,bg = '#303030')
-        self.ai_count = ai_count
         self.history = []
         self.history_limit = 200
         self.history_columns = 40
@@ -60,7 +60,6 @@ class SuccessViewer(Tk.Frame):
         self._build_widgets()
 
     def _build_widgets(self):
-        """成功数・現在回数・履歴表示用のWidgetを作る。"""
         self.title_label = Tk.Label(self,text = 'Success',font = self.font,fg = '#F0F0F0',bg = '#303030')
         self.title_label.grid(row = 0,column = 0,sticky = 'w')
         self.current_label = Tk.Label(self,text = '',font = self.font,fg = '#F0F0F0',bg = '#303030')
@@ -75,12 +74,10 @@ class SuccessViewer(Tk.Frame):
             self.grid_columnconfigure(column_index, weight = 1)
 
     def put_summary(self, success_counts, solve_index, ai_index):
-        """成功数配列と現在のソルブ位置を表示する。"""
         self._update_labels(success_counts,solve_index,ai_index,None)
         self._draw_history()
 
     def put_result(self, success_counts, solve_index, ai_index, succeeded):
-        """1回分のソルブ結果を履歴へ追加し、成功数表示を更新する。"""
         self.history.append((solve_index,ai_index,bool(succeeded)))
         if len(self.history) > self.history_limit:
             self.history = self.history[-self.history_limit:]
@@ -88,47 +85,24 @@ class SuccessViewer(Tk.Frame):
         self._draw_history()
 
     def _update_labels(self, success_counts, solve_index, ai_index, succeeded):
-        """現在回数・直近結果・AIごとの成功数をLabelへ反映する。"""
-        result_text = self._result_text(succeeded)
+        result_text = '' if succeeded is None else ('  OK' if succeeded else '  NG')
         self.current_label.configure(text = 'N: ' + str(solve_index) + '  AI: ' + str(ai_index) + result_text)
         self.total_label.configure(text = 'total: ' + str(int(np.sum(success_counts))))
-        self.ai_label.configure(text = self._success_counts_text(success_counts))
-
-    def _result_text(self, succeeded):
-        """直近結果を表示用文字列へ変換する。"""
-        if succeeded is None:
-            return ''
-        if succeeded:
-            return '  OK'
-        return '  NG'
-
-    def _success_counts_text(self, success_counts):
-        """AIごとの成功数を横並びの短い文字列にする。"""
-        parts = []
-        for index,count in enumerate(success_counts):
-            parts.append(str(index) + ':' + str(int(count)))
-        return '  '.join(parts[:10]) + '\n' + '  '.join(parts[10:])
+        parts = [str(index) + ':' + str(int(count)) for index,count in enumerate(success_counts)]
+        self.ai_label.configure(text = '  '.join(parts[:10]) + '\n' + '  '.join(parts[10:]))
 
     def _draw_history(self):
-        """直近ソルブ履歴を色付きの小さいブロックで描画する。"""
         self.history_canvas.delete('history')
-        block_size = self.history_block
         margin = 4
         for index,result in enumerate(self.history[-self.history_limit:]):
             column_index = index % self.history_columns
             row_index = index // self.history_columns
-            x0 = margin + column_index * (block_size + 2)
-            y0 = margin + row_index * (block_size + 2)
-            x1 = x0 + block_size
-            y1 = y0 + block_size
-            color = self._history_color(result[2])
+            x0 = margin + column_index * (self.history_block + 2)
+            y0 = margin + row_index * (self.history_block + 2)
+            x1 = x0 + self.history_block
+            y1 = y0 + self.history_block
+            color = Red if result[2] else Blue
             self.history_canvas.create_rectangle(x0,y0,x1,y1,fill = color,outline = '#101010',tags = 'history')
-
-    def _history_color(self, succeeded):
-        """成功/失敗を履歴ブロック用の色に変換する。"""
-        if succeeded:
-            return Red
-        return Blue
 
 
 class StateViewer(Tk.Canvas):
@@ -462,7 +436,7 @@ Prob_viewer = ProbViewer
 Red = '#7F0000'
 Orange = '#FF7F00'
 Yellow = '#DFDF00'
-Lime = '#7FFF00'
+Lime = '#5FBF00'
 Green = '#005F2F'
 Aqua = '#007FFF'
 Blue = '#0000BF'

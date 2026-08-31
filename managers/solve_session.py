@@ -947,7 +947,12 @@ class SolveSessionManager:
                     self.frame.search_data_manager.store_search3_data(ai_index)
 
         if state.phase > 0:
-            self.frame.success_viewer.put_result(self.frame.success,self.frame.N,self.frame.AI_idx,result_recorded)
+            self.frame.success_viewer.put_result(
+                self.frame.success,
+                self.frame.N,
+                self.frame.AI_idx,
+                result_recorded,
+            )
 
         self.frame.N += 1
         self.frame.AI_idx += 1

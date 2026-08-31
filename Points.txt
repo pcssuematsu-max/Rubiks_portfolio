@@ -99,12 +99,12 @@ RFD:500 FDL:0 RDB:0 DLB:250
 Others:0
 
 #Ctr
-U:100 R:70 F:70 L:50 B:0 D:0
+U:100 R:80 F:70 L:50 B:0 D:0
 Others:0
 
 ###FTO
 #Corners
-U:1000 R:700 F:700 L:500 B:0 D:0
+U:1000 R:800 F:700 L:500 B:0 D:0
 Others:0
 
 #Edges
@@ -129,7 +129,7 @@ Others:0
 
 ###CTO
 #Corners
-U:10 R:7 F:7 L:5 B:0 D:0
+U:10 R:8 F:7 L:5 B:0 D:0
 Others:0
 
 #Edges
@@ -139,7 +139,7 @@ DF:10 DR:10 DL:10 DB:10
 Others:0
 
 #Ctr
-U:1000 R:700 F:700 L:500 B:0 D:0
+U:1000 R:800 F:700 L:500 B:0 D:0
 Others:0
 
 

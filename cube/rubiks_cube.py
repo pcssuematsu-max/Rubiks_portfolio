@@ -2,23 +2,16 @@
 
 import random
 from functools import reduce
-from pathlib import Path
 
 import numpy as np
 
 from core.cube_constants import AB, R_Nums
-from core.myperm_keys import (
-    format_myperm_key,
-    make_myperm_key,
-    myperm_base_key,
-    myperm_transform_index,
-    normalize_myperm_registry,
-    single_move_myperm_name,
-)
+from core.myperm_keys import myperm_base_key
 from core.myperm_effects import rename_myperms_by_effect
-from core.myperm_points import load_myperm_points, reindex_myperms_by_points
 from core.scramble_selector import ScrambleSelector
 from cube.move_sequence_ops import MoveSequenceOps
+from cube import myperm_registry
+from cube import myperm_parity
 
 
 RUBIKS_MOVE_FACE_LABELS_BY_INDEX = ('U', 'D', 'F', 'B', 'L', 'R')
@@ -56,18 +49,6 @@ RUBIKS_AXIS_FAMILY = {
     'D': 'UD',
     'E': 'UD',
 }
-
-
-def _build_group_indices_by_size():
-    """cube size ごとの group index 定義を返す。"""
-    return {
-        2: {'A':list(range(4)),'B':[],'C':[],'c':[],'D':[],'d':[],'E':[],'e':[],'F':[],'f':[],'G':[]},
-        3: {'A':list(range(4)),'B':list(range(4,8)),'C':[],'c':[],'D':[],'d':[],'E':[],'e':[],'F':[],'f':[],'G':[8]},
-        4: {'A':list(range(4)),'B':[],'C':list(range(4,12)),'c':[],'D':list(range(12,16)),'d':[],'E':[],'e':[],'F':[],'f':[],'G':[]},
-        5: {'A':list(range(4)),'B':list(range(4,8)),'C':list(range(8,16)),'c':[],'D':list(range(16,20)),'d':[],'E':list(range(20,24)),'e':[],'F':[],'f':[],'G':[24]},
-        6: {'A':list(range(4)),'B':[],'C':[4,5,6,7,8,9,10,11],'c':[12,13,14,15,16,17,18,19],'D':[20,21,22,23],'d':[32,33,34,35],'E':[],'e':[],'F':[24,25,26,27],'f':[28,29,30,31],'G':[]},
-        7: {'A':list(range(4)),'B':list(range(4,8)),'C':[8,9,10,11,12,13,14,15],'c':[16,17,18,19,20,21,22,23],'D':[24,25,26,27],'d':[40,41,42,43],'E':[28,29,30,31],'e':[44,45,46,47],'F':[32,33,34,35],'f':[36,37,38,39],'G':[48]},
-    }
 
 
 class Rubiks_3:
@@ -219,70 +200,25 @@ class Rubiks_3:
 
     def _init_myperm_containers(self):
         """myperm登録用の辞書とグループ情報を初期化する。"""
-        self.myperms = {}
-        self._add_single_moves_to_myperms()
-        self.myperms2 = {}
-        self._init_group_indices()
+        myperm_registry.initialize_containers(self)
 
     def _add_myperm2(self, name, moves):
         """Register one source myperm by its canonical source name."""
-        self.myperms2[name] = moves
-        return name
+        return myperm_registry.add_source(self, name, moves)
 
     def _moves_available_for_size(self, moves):
         """Drop inner-layer moves that do not exist for the current cube size."""
-        return self.simplify(
-            tuple(
-                move
-                for move in moves
-                if self._move_available_for_size(move)
-            )
-        )
+        return myperm_registry.moves_available_for_size(self, moves)
 
     def _move_available_for_size(self, move):
-        token = str(move).strip()
-        layer_digits = []
-        for character in token:
-            if not character.isdigit():
-                break
-            layer_digits.append(character)
-        if not layer_digits:
-            return True
-        layer = int("".join(layer_digits))
-        face_index = len(layer_digits)
-        if face_index < len(token) and token[face_index] in "UDFBLR":
-            return layer <= self.size // 2
-        return True
+        return myperm_registry.move_available_for_size(self, move)
 
     def _add_single_moves_to_myperms(self):
-        for m in self.move_keys:
-            self.myperms[make_myperm_key(single_move_myperm_name(m), 0)] = (m,)
-
-        self.myperms[make_myperm_key('Rotate6A-00', 0)] = (" x "," z ")
-        self.myperms[make_myperm_key('Rotate6A-01', 0)] = (" x "," z'")
-        self.myperms[make_myperm_key('Rotate6A-02', 0)] = (" x'"," z ")
-        self.myperms[make_myperm_key('Rotate6A-03', 0)] = (" x'"," z'")
-        self.myperms[make_myperm_key('Rotate6A-04', 0)] = (" z "," x ")
-        self.myperms[make_myperm_key('Rotate6A-05', 0)] = (" z "," x'")
-        self.myperms[make_myperm_key('Rotate6A-06', 0)] = (" z'"," x ")
-        self.myperms[make_myperm_key('Rotate6A-07', 0)] = (" z'"," x'")
-
-        self.myperms[make_myperm_key('Rotate6B-00', 0)] = (" y "," x2")
-        self.myperms[make_myperm_key('Rotate6B-01', 0)] = (" y "," z2")
-        self.myperms[make_myperm_key('Rotate6B-02', 0)] = (" x "," y2")
-        self.myperms[make_myperm_key('Rotate6B-03', 0)] = (" x'"," y2")
-        self.myperms[make_myperm_key('Rotate6B-04', 0)] = (" z "," y2")
-        self.myperms[make_myperm_key('Rotate6B-05', 0)] = (" z'"," y2")
+        myperm_registry.add_single_moves(self)
 
     def _init_group_indices(self):
         """group index 定義を読み込み、意味名ベースの受け口を作る。"""
-        short_group_indices = _build_group_indices_by_size()[self.size]
-        group_names = self._group_name_map()
-        self.group_indices = {}
-        for short_key, indices in short_group_indices.items():
-            index_list = list(indices)
-            self.group_indices[short_key] = index_list
-            self.group_indices[group_names[short_key]] = index_list
+        myperm_registry.initialize_group_indices(self)
 
 
     def _register_myperms2(self):
@@ -297,31 +233,7 @@ class Rubiks_3:
 
     def _register_myperms2_base(self):
         """基本パターンと大分類の手順を登録する。"""
-        # 命名メモ:
-        # - X-Center / Plus-Center / Oblique-Center は動かす center の配置族。
-        # - 4 / 6 は見た目上で動く center 数、末尾の英字は variant を表す。
-
-        self._add_myperm2('EAll12s', (' U2', ' D2', ' F2', ' B2', ' R2', ' L2'))
-        self._add_myperm2('EAll12[2x6][XY>YX]', (' U ', ' R2', ' F ', ' B ', ' R ', ' B2', ' R ', ' U2', ' L ', ' B2', ' R ', " U'", " D'", ' R2', ' F ', " L'", ' R ', ' U2', ' D2', ' B2', ' D2', ' B2'))
-        self._add_myperm2('EAll12[XY>YX]', (' U ', ' R2', ' F ', ' B ', ' R ', ' B2', ' R ', ' U2', ' L ', ' B2', ' R ', " U'", " D'", ' R2', ' F ', " R'", ' L ', ' B2', ' U2', ' F2'))
-        self._add_myperm2('C8~v01', (' U2', ' B2', ' D ', ' L2', " F'", " B'", ' R2', ' D ', ' F2', ' D2', ' B ', ' R2', " U'", " D'", ' L2', ' B '))
-        self._add_myperm2('C8~v02', (" D'", ' L ', ' D ', ' R2', " D'", " L'", ' D ', ' R2', ' U2', " B'", ' D ', ' B ', ' U2', " B'", " D'", ' B ', " R'", ' U ', ' R ', ' D2', " R'", " U'", ' R ', ' D2', ' L2', " F'", ' R ', ' F ', ' L2', " F'", " R'", ' F ', ' R ', ' B2', " R'", ' D ', ' F2', " D'", ' R ', ' B2', " R'", ' D ', ' F2', " D'"))
-        self._add_myperm2('C8[3x2]+EAll12[3x4]', (" L'"," R "," U "," D'"," F'"," B "," L'"," R "))
-        self._add_myperm2('C8s+EAll12[2x6]', (" L'"," R "," U2"," D2"," L'"," R "," F2"," B2"))
-
-        self._add_myperm2('EAll12[3x4]', (' F ', ' B2', " R'", ' D2', ' B ', ' R ', ' U ', " D'", ' R ', " L'", " D'", " F'", ' R2', ' D ', ' F2', " B'"))
-        self._add_myperm2('EAll12[6x2]', (' F ', ' B2', " R'", ' D2', ' B ', ' R ', ' U ', " D'", ' R ', " L'", " D'", " F'", ' R2', ' D ', ' F2', " B'", ' L2', ' R2', ' U2', ' D2', ' F2', ' B2'))
-        self._add_myperm2('C8[2x4]+EAll8[2x2]', (' L ', ' U ', ' F2', ' R ', " L'", ' U2', " B'", ' U ', ' D ', ' B2', ' L ', ' F ', " B'", " R'", ' L ', " F'", ' R '))
-        self._add_myperm2('C8p[4x2]', (' R2', ' L2', " U'", ' R2', ' L2', ' U2', ' B2', ' F2', ' D ', ' B2', ' F2', ' U2'))
-        self._add_myperm2('C8s~v01', (' L2', ' U2', ' D2', ' F2', ' U2', ' D2', ' L2', ' R2', ' B2', ' R2'))
-        self._add_myperm2('C8[3x2]~v01', (" R'", ' F2', ' B2', ' R ', ' D ', ' F2', ' B2', " D'", " U'", ' F2', ' B2', ' D ', ' B2', ' F2', ' R ', ' B2', ' F2', " L'"))
-        self._add_myperm2('C8s~v02', (' U ', ' R2', ' U2', ' D2', ' B2', ' F2', ' L2', ' B2', ' F2', ' U ', ' D2'))
-        self._add_myperm2('C8[4x2]', (' R2', ' L2', " U'", ' R2', ' L2', ' U2', ' B2', ' F2', ' D ', ' B2', ' F2', ' U2', ' U2', ' B2', ' D ', ' L2', " F'", " B'", ' R2', ' D ', ' F2', ' D2', ' B ', ' R2', " U'", " D'", ' L2', ' B '))
-        self._add_myperm2('C8[2x4]~v01', (' L2', ' U2', ' D2', ' F2', ' U2', ' D2', ' L2', ' R2', ' B2', ' R2', ' U2', ' B2', ' D ', ' L2', " F'", " B'", ' R2', ' D ', ' F2', ' D2', ' B ', ' R2', " U'", " D'", ' L2', ' B '))
-        self._add_myperm2('C8[3x2]~v02', (" R'", ' F2', ' B2', ' R ', ' D ', ' F2', ' B2', " D'", " U'", ' F2', ' B2', ' D ', ' B2', ' F2', ' R ', ' B2', ' F2', " L'", ' U2', ' B2', ' D ', ' L2', " F'", " B'", ' R2', ' D ', ' F2', ' D2', ' B ', ' R2', " U'", " D'", ' L2', ' B '))
-        self._add_myperm2('C8[2x4]~v02', (' U ', ' R2', ' U2', ' D2', ' B2', ' F2', ' L2', ' B2', ' F2', ' U ', ' D2', ' U2', ' B2', ' D ', ' L2', " F'", " B'", ' R2', ' D ', ' F2', ' D2', ' B ', ' R2', " U'", " D'", ' L2', ' B '))
-        self._add_myperm2('C6[DBL>FLU>RDF;DRB>BUL>RFU]+EAll6[DB>LU>FR;DR>LB>FU]', (' F ', ' R ', ' F ', " D'", ' L ', ' D ', ' F2', ' R2', " D'", " R'", ' B ', " U'", " B'", ' R2', ' D '))
-        self._add_myperm2('C8s+EAll4s[BR<>RF;FL<>LB]', (' F ', ' U ', ' F ', ' R ', ' L2', ' B ', " D'", ' R ', ' D2', ' L ', " D'", ' B ', ' R2', ' L ', ' F ', ' U ', ' F '))
+        myperm_registry.register_foundational_algorithms(self)
 
 
         self._add_myperm2('CtrCore4[B>R>F>L]+CtrObl32p[4x8]+CtrPlus32p[4x8]+CtrX32p[4x8]+EAll2[FL>FR]', (' y ', ' L2', " U'", ' D ', ' F ', " D'", " B'", " D'", ' B ', " U'", ' D ', " L'", ' D ', ' L ', ' U ', " R'", " U'", ' R ', ' U2', ' R2', " U'", " D'", " F'", ' U ', ' F ', ' D ', ' R2', " U'", ' F '))
@@ -351,108 +263,20 @@ class Rubiks_3:
         # - ParitySwap-* は corner 2つ + midedge 2つの同時 swap。
         # - ParityCycle-* は corner 4つ + edge 2つの置換。
         # - A/B/F/J/K は corner 配置 family、末尾番号は family 内 variant。
-        PLLParity = self._moves_available_for_size(
-            ("2F2", "3F2", " R2", " U2", "2F2", "3F2", " U2", " R2", "2F2", "3F2")
-        )
+        parity_bases = myperm_parity.bases(self)
+        PLLParity = parity_bases['swap']
+
+        parity_swap_moves = myperm_parity.basic_swap_moves(PLLParity)
+
+        myperm_parity.register_cycle_algorithms(self, parity_bases)
 
 
-        parity_swap_moves = {}
-        parity_swap_moves['ParitySwap-A0-'] = (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F2', ' R ') + PLLParity
-        parity_swap_moves['ParitySwap-A1-'] = (" R'", ' F2', ' D2', " B'", " L'", ' B ', ' D2', " F'", ' R ', " F'") + PLLParity
-        parity_swap_moves['ParitySwap-A2-'] = PLLParity + (" R'", ' F2', ' D2', " B'", " L'", ' B ', ' L ', ' D2', " L'", " F'", ' R ', ' F2', " L'", " F'", ' L ', ' F2')
-        parity_swap_moves['ParitySwap-A3-'] = PLLParity + (' F2', " R'", ' F2', ' D2', " B'", " L'", ' B ', ' L ', ' D2', " L'", " F'", ' R ', ' F2', " L'", " F'", ' L ')
-        parity_swap_moves['ParitySwap-A4-'] = PLLParity + (' F2', ' U2', ' F2', ' U2', ' F ', ' R ', " L'", ' U2', " R'", ' L ', " F'", ' B ', ' U ', " B'", ' U ', ' R2', " D'", ' F ', ' D ', ' R2')
-        parity_swap_moves['ParitySwap-A5-'] = PLLParity + (' U2', ' F2', ' U2', ' F ', ' R ', " L'", ' U2', " R'", ' L ', " F'", ' B ', ' U ', " B'", ' U ', ' R2', " D'", ' F ', ' D ', ' R2', " F2")
-        
-        
-        parity_swap_moves['ParitySwap-B0-'] = PLLParity + (" L2"," F2"," U2"," L'"," U2"," L2"," F2"," L'"," U2"," L2"," U2"," F2"," L'"," F2")
-        parity_swap_moves['ParitySwap-B1-'] = PLLParity + (" F2"," L "," F2"," U2"," L2"," U2"," L "," F2"," L2"," U2"," L "," U2"," F2"," L2")
-        
-        parity_swap_moves['ParitySwap-B2-'] = (" R2", " U2", " B2", " R'", " B2", " R2", " U2", " R ", " B2", " R2", " B2", " U2", " R ", " U2") + PLLParity
-        parity_swap_moves['ParitySwap-B3-'] = (" U2", " R'", " U2", " B2", " R2", " B2", " R'", " U2", " R2", " B2", " R ", " B2", " U2", " R2") + PLLParity
-
-        parity_swap_moves['ParitySwap-F0-'] = PLLParity + (" R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F2', ' R ', " F ")
-        parity_swap_moves['ParitySwap-F1-'] = PLLParity + (" F'", " R'", " F2", " D2", " B'", " L'", " B ", " D2", " F'", " R ")      
-        parity_swap_moves['ParitySwap-F2-'] = (" B ", " L'", ' B2', ' D2', " F'", " R'", ' F ', ' D2', " B'", ' L ', " B2") + PLLParity
-        parity_swap_moves['ParitySwap-F3-'] = (' B2', " L'", ' B ', ' D2', " F'", ' R ', ' F ', ' D2', ' B2', ' L ', " B'") + PLLParity
-        parity_swap_moves['ParitySwap-F4-'] = (" U2", " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F2', ' R ', " F ", " U2") + PLLParity
-        parity_swap_moves['ParitySwap-F5-'] = (" U2", " F'", " R'", " F2", " D2", " B'", " L'", " B ", " D2", " F'", " R ", " U2") + PLLParity
-
-
-
-
-        
-        parity_swap_moves['ParitySwap-J0-'] = (' B2', " L'", ' B2', ' D2', " F'", " R'", ' F ', ' D2', " B'", ' L ', ' B ') + PLLParity
-        parity_swap_moves['ParitySwap-J1-'] = (" B'", " L'", ' B ', ' D2', " F'", ' R ', ' F ', ' D2', ' B2', ' L ', ' B2') + PLLParity
-
-        parity_swap_moves['ParitySwap-J2-'] = (' F2', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F ', " L'", ' F ', ' R ', " F'", ' L ') + PLLParity
-        parity_swap_moves['ParitySwap-J3-'] = (" L'", ' F ', " R'", " F'", ' L ', " F'", ' D2', " B'", " L'", ' B ', ' D2', " F'", ' R ', ' F2') + PLLParity
-
-        parity_swap_moves['ParitySwap-J4-'] = (' B2', ' L2', ' D2', ' F2', ' D2', ' L2', " B'", ' U2', ' L2', ' D ', ' F ', " D'", ' L2', ' U ', " B'", " U'") + PLLParity
-        parity_swap_moves['ParitySwap-J5-'] = (' U ', ' B ', " U'", ' L2', ' D ', " F'", " D'", ' L2', ' U2', ' B ', ' L2', ' D2', ' F2', ' D2', ' L2', ' B2') + PLLParity
-    
-        parity_swap_moves['ParitySwap-K0-'] = (" R'", ' U2', ' L ', ' F2', " L'", ' F2', ' R2', ' U2', ' R ', ' U2', " R'", ' U2', ' F2', ' R2', ' F2') + PLLParity
-        parity_swap_moves['ParitySwap-K1-'] = (' R2', ' F2', ' U2', ' R ', ' U2', " R'", ' U2', ' R2', ' F2', ' L ', ' F2', " L'", ' U2', ' R ', ' F2') + PLLParity
-
-        ParityCycleU = self._moves_available_for_size(
-            ('2U2', '3U2', ' R2', ' F2', '2U2', '3U2', ' F2', ' R2', '2U2', '3U2')
-        )
-        ParityCycleD = self._moves_available_for_size(
-            ('2D2', '3D2', ' L2', ' F2', '2D2', '3D2', ' F2', ' L2', '2D2', '3D2')
-        )
-
-        self._add_myperm2('C4[DFR>FUR>LFD>LUF]+ME2[FL>FR]', (" U'", " R'", " F'", ' R ', ' F ', " R'", ' F ', ' R ', ' F ', " R'", " F'", ' R ', ' U ') + ParityCycleU)
-        self._add_myperm2('C4[DFR>LUF>LFD>FUR]+ME2[FL>FR]', (" U'", " R'", ' F ', ' R ', " F'", " R'", " F'", ' R ', " F'", " R'", ' F ', ' R ', ' U ') + ParityCycleU)
-        self._add_myperm2('C4[DBL>FLU>DRB>FUR]+ME2[FL>FR]', (' D ', " L'", " F'", ' L ', ' F ', " L'", ' F ', ' L ', ' F ', " L'", " F'", ' L ', " D'") + ParityCycleD)
-        self._add_myperm2('C4[DBL>FUR>DRB>FLU]+ME2[FL>FR]', (' D ', " L'", ' F ', ' L ', " F'", " L'", " F'", ' L ', " F'", " L'", ' F ', ' L ', " D'") + ParityCycleD)
-        self._add_myperm2('C4[DBL>FUR>DLF>FLU]+ME2[FL>FR]', (" L'", " F'", ' L ', ' F ', " L'", ' F ', ' L ', ' F ', " L'", " F'", ' L ') + ParityCycleD)
-        self._add_myperm2('C4[DBL>FLU>DLF>FUR]+ME2[FL>FR]', (" L'", ' F ', ' L ', " F'", " L'", " F'", ' L ', " F'", " L'", ' F ', ' L ') + ParityCycleD)
-
- 
-
-
-        if self.size % 2 == 1:
-            self._add_myperm2('CtrCore6p[3x2][B>R>D;F>L>U]', (" M "," E "," M'"," E'"))
-            self._add_myperm2('CtrCore4s[B<>F;L<>R]', (' E ', ' S2', " E'", ' S2'))
-
-
-        parity_swap_moves['ParitySwap-XB-'] = (' U ', " F'", ' R ') + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', " F'", " U'")
-        parity_swap_moves['ParitySwap-XC-'] = (' F2', ' R ') + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2')
-        parity_swap_moves['ParitySwap-XD-'] = (' F ', ' R ') + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F ')
-        parity_swap_moves['ParitySwap-XE-'] = (' R ',) + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', " F2")
-        parity_swap_moves['ParitySwap-XF-'] = (" F'", ' R ') + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', " F'")
-        parity_swap_moves['ParitySwap-XG-'] = self.conjugate((" R2",),parity_swap_moves['ParitySwap-A0-'])
-        parity_swap_moves['ParitySwap-XH-'] = self.conjugate((" U'"," F'"," R "),parity_swap_moves['ParitySwap-A0-'])
-        
-
-        parity_swap_moves['ParitySwap-YA-'] = PLLParity + (" R "," U "," R'"," U'"," R'"," F "," R2"," U'"," R'"," U'"," R "," U "," R'"," F'")
-        parity_swap_moves['ParitySwap-YB-'] = self.conjugate((" U "," F'"," R "),parity_swap_moves['ParitySwap-YA-'])
-        parity_swap_moves['ParitySwap-YC-'] = self.conjugate((" F2"," R "),parity_swap_moves['ParitySwap-YA-'])
-        parity_swap_moves['ParitySwap-YD-'] = self.conjugate((" F "," R "),parity_swap_moves['ParitySwap-YA-'])
-        parity_swap_moves['ParitySwap-YE-'] = self.conjugate((" R ",),parity_swap_moves['ParitySwap-YA-'])
-        parity_swap_moves['ParitySwap-YF-'] = self.conjugate((" F'"," R "),parity_swap_moves['ParitySwap-YA-'])
-        parity_swap_moves['ParitySwap-YG-'] = self.conjugate((" R2",),parity_swap_moves['ParitySwap-YA-'])
-        parity_swap_moves['ParitySwap-YH-'] = self.conjugate((" R'"," U'"," F "," U "),parity_swap_moves['ParitySwap-YA-'])
-
-
-        
-        parity_swap_moves['ParitySwap-ZA-'] = PLLParity + (' U2', " B'", ' U2', ' B ', ' U2',' D2', " R'", " B'", ' R ', ' D2', " L'", ' F ', " L'", " F'", ' L2')
-        parity_swap_moves['ParitySwap-ZB-'] = self.conjugate((" F'"," U "," L'"),parity_swap_moves['ParitySwap-ZA-'])
-        parity_swap_moves['ParitySwap-ZC-'] = self.conjugate((" U2"," L "),parity_swap_moves['ParitySwap-ZA-'])
-        parity_swap_moves['ParitySwap-ZD-'] = self.conjugate((" U "," L "),parity_swap_moves['ParitySwap-ZA-'])
-        parity_swap_moves['ParitySwap-ZE-'] = self.conjugate((" L ",),parity_swap_moves['ParitySwap-ZA-'])
-        parity_swap_moves['ParitySwap-ZF-'] = self.conjugate((" U'"," L "),parity_swap_moves['ParitySwap-ZA-'])
-        parity_swap_moves['ParitySwap-ZG-'] = self.conjugate((" L2",),parity_swap_moves['ParitySwap-ZA-'])
-        parity_swap_moves['ParitySwap-ZH-'] = self.conjugate((" F "," U "," L'"),parity_swap_moves['ParitySwap-ZA-'])
-
-        
-        parity_swap_moves['ParitySwap-JXB-'] = (" R2", ' U ', " F'", ' R ') + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', " F'", " U'", " R2")
-        parity_swap_moves['ParitySwap-JYB-'] = (" R2", ' U ', " F'", ' R ') + PLLParity + (' R ', ' U ', " R'", " U'", " R'", ' F ', ' R2', " U'", " R'", " U'", ' R ', ' U ', " R'", " F'", " R'", ' F ', " U'", " R2")
-        parity_swap_moves['ParitySwap-JZB-'] = (" U'", ' B ', " R'") + PLLParity + (" B'", ' R ', " B'", ' D2', ' F ', " L'", " F'", ' D2', ' B ', ' U ', ' L ', ' U2', " L'", ' D ', ' L ', ' U2', " L'", " D'")
+        myperm_parity.add_x_prefix_swaps(parity_swap_moves, PLLParity)
+        myperm_parity.add_derived_swaps(self, parity_swap_moves, PLLParity)
 
         self._parity_swap_basis_moves = parity_swap_moves
         def add_parity_swap(name, moves):
-            self._add_myperm2(name, self._moves_available_for_size(moves))
+            myperm_parity.register_size_filtered(self, name, moves)
 
         add_parity_swap('C2[DFR>RFU]+ME2[FL>FR]~v01', (" U'", ' R ', " U'", ' B2', ' D ', " L'", " D'", ' B2', ' U2', " R'", '2U2', '3U2', ' R2', ' F2', '2U2', '3U2', ' F2', ' R2', '2U2', '3U2'))
         add_parity_swap('C2[DFR>RFU]+ME2[FL>FR]~v02', (' R ', ' U2', ' B2', ' D ', ' L ', " D'", ' B2', ' U ', " R'", ' U ', '2U2', '3U2', ' R2', ' F2', '2U2', '3U2', ' F2', ' R2', '2U2', '3U2'))
@@ -515,15 +339,7 @@ class Rubiks_3:
             self._add_myperm2('C2[DLF>BRU]+ME2s[FL<>UB]', (' U2', ' L ', ' D ', '2L2', '3L2', ' D2', ' F2', '2L2', '3L2', ' F2', ' D2', '2L2', '3L2', ' L ', " D'", ' L ', ' B2', " R'", ' U ', ' R ', ' B2', ' L ', ' U2'))
             self._add_myperm2('C2[DBL>FUR]+ME2s[FL<>UB]', (" x'", " L'", ' R ', ' y ', " U'", ' D ', ' U2', " L'", " D'", '2L2', '3L2', ' D2', ' B2', '2L2', '3L2', ' B2', ' D2', '2L2', '3L2', " L'", ' D ', " L'", ' F2', ' R ', " U'", " R'", ' F2', " L'", ' U2', " D'", ' U ', " y'", " R'", ' L ', ' x '))
         else:
-            self.myperms2['SuperParitySwap-JC00-'] = (" D2",' F2', ' R ') + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ')
-            self.myperms2['SuperParitySwap-JE00-'] = (" U2",' F2', ' R ') + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B '," D2"," U2")
-            self.myperms2['SuperParitySwap-JD00-'] = (" R2",' F ', ' R ') + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F '," R2")
-            self.myperms2['SuperParitySwap-JF00-'] = (" L2",' F ', ' R ') + PLLParity + (' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F '," L2")
-
-            self.myperms2['SuperParitySwap-JC01-'] = self.conjugate((" z'"," F "," B'"," y "," U'"," D "),self.myperms2['SuperParitySwap-JC00-'])
-            self.myperms2['SuperParitySwap-JD01-'] = self.conjugate((" z "," F'"," B "," x "," L "," R'"),self.myperms2['SuperParitySwap-JD00-'])
-            self.myperms2['SuperParitySwap-JE01-'] = self.conjugate((" z "," F'"," B "," y "," U'"," D "),self.myperms2['SuperParitySwap-JE00-'])
-            self.myperms2['SuperParitySwap-JF01-'] = self.conjugate((" z'"," F "," B'"," x "," L "," R'"),self.myperms2['SuperParitySwap-JF00-'])
+            myperm_parity.register_super_swaps(self, PLLParity)
 
 
     def _register_myperms2_odd_size(self):
@@ -2214,40 +2030,15 @@ class Rubiks_3:
 
     def _expand_registered_myperms(self, names = None):
         """登録済みmyperms2を対称変換展開してmypermsへ写す。"""
-        self.myperms2 = normalize_myperm_registry(self.myperms2)
-        keys = tuple(self.myperms2.keys()) if names is None else tuple(names)
-        for key in keys:
-            if key not in self.myperms2:
-                continue
-            L = self.make_transformations(self.myperms2[key],tuple())
-            if self.size < 6:
-                Num = 48
-            elif len([x for x in self.myperms2[key] if x[0] in ['2','3']]) != 0:
-                Num = 96
-            else:
-                Num = 48
-            for i in range(Num):
-                self.myperms[make_myperm_key(key, i)] = L[0][i]
+        myperm_registry.expand_registered(self, names = names)
 
     def _reindex_myperms_by_points(self, names = None):
         """point最大の対称変換を各myperm系列の#00へ割り当てる。"""
-        points_path = Path(__file__).resolve().parent.parent / "Points.txt"
-        if not points_path.exists():
-            self.myperm_transform_key_aliases = {}
-            self.myperm_transform_points = {}
-            return
-        point_table = load_myperm_points(points_path)
-        reindex_myperms_by_points(self, point_table, names = names)
+        myperm_registry.reindex_by_points(self, names = names)
 
     def apply_point_reindex(self, point_table = None):
         """Apply point-based transform reindexing to the current myperm registry."""
-        if point_table is None:
-            points_path = Path(__file__).resolve().parent.parent / "Points.txt"
-            point_table = load_myperm_points(points_path)
-        reindex_myperms_by_points(self, point_table)
-        rename_myperms_by_effect(self)
-        self._init_myperms_index()
-        self._init_single_move_and_rotate()
+        myperm_registry.apply_point_reindex(self, point_table = point_table)
 
     
     def _init_single_move_and_rotate(self):
