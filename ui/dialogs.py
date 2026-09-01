@@ -8,11 +8,7 @@ import numpy as np
 from cube.rubiks_cube import Rubiks_3
 from core.puzzle_registry import get_puzzle_adapter
 from megaminx.cube import MegaminxCube
-from pyraminx.cube import MasterPyraminxCube, PyraminxCube
-from skewb.cube import SkewbCube
 from ui.megaminx.state_viewer import MegaminxStateViewer
-from ui.pyraminx.state_viewer import PyraminxStateViewer
-from ui.skewb.state_viewer import SkewbStateViewer
 from ui.viewers import StateViewer
 
 class MakeMypermOkButton(Tk.Button):
@@ -827,33 +823,6 @@ class DatasetSampleReplayDialog(Tk.Toplevel):
                 Edges = self.frame.config.Edges,
                 Cross = self.frame.config.Cross,
             )
-        if self.frame.puzzle_type == 'master_pyraminx':
-            return MasterPyraminxCube(
-                size = self.frame.config.cube_size,
-                F2L = self.frame.config.F2L,
-                OLL = self.frame.config.OLL,
-                Centers = self.frame.config.Centers,
-                Edges = self.frame.config.Edges,
-                Cross = self.frame.config.Cross,
-            )
-        if self.frame.puzzle_type == 'pyraminx':
-            return PyraminxCube(
-                size = self.frame.config.cube_size,
-                F2L = self.frame.config.F2L,
-                OLL = self.frame.config.OLL,
-                Centers = self.frame.config.Centers,
-                Edges = self.frame.config.Edges,
-                Cross = self.frame.config.Cross,
-            )
-        if self.frame.puzzle_type == 'skewb':
-            return SkewbCube(
-                size = self.frame.config.cube_size,
-                F2L = self.frame.config.F2L,
-                OLL = self.frame.config.OLL,
-                Centers = self.frame.config.Centers,
-                Edges = self.frame.config.Edges,
-                Cross = self.frame.config.Cross,
-            )
         return Rubiks_3(
             size = self.frame.config.cube_size,
             F2L = self.frame.config.F2L,
@@ -869,10 +838,6 @@ class DatasetSampleReplayDialog(Tk.Toplevel):
             return adapter.create_viewer(self, self.replay_cube, mini_mode = True)
         if self.frame.puzzle_type == 'megaminx':
             return MegaminxStateViewer(self, mini_mode = True)
-        if self.frame.puzzle_type in ('pyraminx', 'master_pyraminx'):
-            return PyraminxStateViewer(self, self.frame.cube_size, mini_mode = True)
-        if self.frame.puzzle_type == 'skewb':
-            return SkewbStateViewer(self, mini_mode = True)
         return StateViewer(self, self.frame.cube_size, mini_mode = True)
 
     def _build_widgets(self):

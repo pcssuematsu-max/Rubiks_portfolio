@@ -106,6 +106,45 @@ def _create_cto_cube(config):
     )
 
 
+def _create_pyraminx_cube(config):
+    from pyraminx.cube import PyraminxCube
+
+    return PyraminxCube(
+        size = config.cube_size,
+        F2L = config.F2L,
+        OLL = config.OLL,
+        Centers = config.Centers,
+        Edges = config.Edges,
+        Cross = config.Cross,
+    )
+
+
+def _create_master_pyraminx_cube(config):
+    from pyraminx.cube import MasterPyraminxCube
+
+    return MasterPyraminxCube(
+        size = config.cube_size,
+        F2L = config.F2L,
+        OLL = config.OLL,
+        Centers = config.Centers,
+        Edges = config.Edges,
+        Cross = config.Cross,
+    )
+
+
+def _create_skewb_cube(config):
+    from skewb.cube import SkewbCube
+
+    return SkewbCube(
+        size = config.cube_size,
+        F2L = config.F2L,
+        OLL = config.OLL,
+        Centers = config.Centers,
+        Edges = config.Edges,
+        Cross = config.Cross,
+    )
+
+
 def _create_fto_viewer(master, cube, mini_mode):
     from ui.fto.state_viewer import FtoStateViewer
 
@@ -118,6 +157,18 @@ def _create_cto_viewer(master, cube, mini_mode):
     return CtoStateViewer(master, mini_mode = mini_mode)
 
 
+def _create_pyraminx_viewer(master, cube, mini_mode):
+    from ui.pyraminx.state_viewer import PyraminxStateViewer
+
+    return PyraminxStateViewer(master, cube.size, mini_mode = mini_mode)
+
+
+def _create_skewb_viewer(master, cube, mini_mode):
+    from ui.skewb.state_viewer import SkewbStateViewer
+
+    return SkewbStateViewer(master, mini_mode = mini_mode)
+
+
 PUZZLE_REGISTRY = PuzzleRegistry()
 PUZZLE_REGISTRY.register(
     PuzzleAdapter(
@@ -127,6 +178,34 @@ PUZZLE_REGISTRY.register(
         cube_factory = _create_fto_cube,
         viewer_factory = _create_fto_viewer,
         default_priority_groups = ("Corner", "Edge", "CenterA", "CenterB"),
+    )
+)
+PUZZLE_REGISTRY.register(
+    PuzzleAdapter(
+        key = "pyraminx",
+        title = "Pyraminx",
+        cube_factory = _create_pyraminx_cube,
+        viewer_factory = _create_pyraminx_viewer,
+        default_priority_groups = ("Corner", "Edge", "Center"),
+    )
+)
+PUZZLE_REGISTRY.register(
+    PuzzleAdapter(
+        key = "master_pyraminx",
+        aliases = ("master-pyraminx",),
+        title = "Master Pyraminx",
+        cube_factory = _create_master_pyraminx_cube,
+        viewer_factory = _create_pyraminx_viewer,
+        default_priority_groups = ("Corner", "Edge", "MidEdge", "Center"),
+    )
+)
+PUZZLE_REGISTRY.register(
+    PuzzleAdapter(
+        key = "skewb",
+        title = "Skewb",
+        cube_factory = _create_skewb_cube,
+        viewer_factory = _create_skewb_viewer,
+        default_priority_groups = ("Corner", "Center"),
     )
 )
 PUZZLE_REGISTRY.register(
