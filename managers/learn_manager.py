@@ -15,19 +15,29 @@ class LearnManager:
     def __init__(self, frame):
         self.frame = frame
 
+    def _set_status(self, message):
+        """Frameが対応している場合だけ、学習段階を固定表示へ送る。"""
+        setter = getattr(self.frame, 'set_activity_status', None)
+        if callable(setter):
+            setter(message)
+
     def learn_all(self):
         """登録されている全AIを学習する。"""
         self.learn_indices(range(self.frame.AInum))
 
     def learn_indices(self, indices):
         """指定されたAI index群だけを順番に学習する。"""
-        for index in indices:
+        indices = tuple(indices)
+        for position,index in enumerate(indices,1):
             if self.should_learn(index):
+                self._set_status(f'学習中: AI {index} ({position}/{len(indices)})')
                 result = self.learn_one(index)
                 self.log_result(index,result)
+        self._set_status('学習後処理中')
         self.prune_training_data()
         self.release_memory()
         self.frame.append_log(self.memory_status_text())
+        self._set_status('学習完了')
 
     def should_learn(self, index):
         """指定AIを学習対象にするか判定する。現状は既存条件をそのまま維持する。"""
@@ -187,4 +197,5 @@ class LearnManager:
 
     def log_progress(self, index, message):
         """学習途中の進捗を GUI ログへ表示する。"""
+        self._set_status(f'学習中: AI {index} — {message}')
         self.frame.append_log(f'AI {index}: {message}')

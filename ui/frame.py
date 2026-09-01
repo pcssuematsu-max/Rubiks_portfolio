@@ -836,6 +836,7 @@ class Frame(Tk.Frame):
         self.solve_state.reset_session()
         self.data_len = len(self.AIs[0].datas)
         self.data_search3_len = self.current_search3_data_len()
+        self.set_activity_status('待機中')
 
     def current_search3_data_len(self):
         """Return the largest Search3 dataset length among AIs."""
@@ -881,6 +882,10 @@ class Frame(Tk.Frame):
             message = self.cube.format_moves(message)
         self.log_viewer.append_line(message)
         self.update()
+
+    def set_activity_status(self, message):
+        """ログ欄上部の固定表示へ、現在のAI処理段階を設定する。"""
+        self.log_viewer.set_status(message)
 
     def initialize(self,N):
         #for key in ['W1','W2','W3','W4','W5','W6','W7','W8','WM_P','WM_V']:
@@ -1140,8 +1145,10 @@ class Frame(Tk.Frame):
             self.my_solve_button.configure(state = Tk.NORMAL)
             for k in self.move_keys:
                 self.movebuttons[k].configure(state = Tk.NORMAL)
+            self.set_activity_status('停止中（再開待ち）')
         else:
             self.stopper_button.configure(text = 'stop')
+            self.set_activity_status('待機中')
                     
     def loadparams(self,N,keylis = None):
         self.param_manager.load(N, keylis = keylis)

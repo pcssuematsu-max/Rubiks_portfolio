@@ -15,6 +15,16 @@ class LogViewer(Tk.Frame):
         Tk.Frame.__init__(self, master, relief = Tk.RIDGE, bd = 4, bg = '#303030')
         self.line_limit = max(1,int(line_limit))
         self.line_count = 0
+        self.status_var = Tk.StringVar(value = '状況: 待機中')
+        self.status_label = Tk.Label(
+            self,
+            textvariable = self.status_var,
+            font = ('Menlo', 10, 'bold'),
+            fg = '#F0F0F0',
+            bg = '#303030',
+            anchor = 'w',
+        )
+        self.status_label.pack(fill = 'x')
         self.text = scrolledtext.ScrolledText(
             self,
             width = width,
@@ -28,6 +38,13 @@ class LogViewer(Tk.Frame):
         )
         self.text.pack(fill = 'both', expand = True)
         self.text.configure(state = Tk.DISABLED)
+
+    def set_status(self, message):
+        """ログとは別に、現在の処理段階を1行で表示する。"""
+        message = str(message).strip() or '待機中'
+        self.status_var.set('状況: ' + message)
+        # 長い探索に入る前でも、直前に設定した状態を画面へ反映する。
+        self.update_idletasks()
 
     def append_line(self, message):
         """末尾へ 1 行追加し、自動スクロールする。"""

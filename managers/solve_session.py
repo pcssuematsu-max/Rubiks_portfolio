@@ -79,10 +79,23 @@ class SolveSessionManager:
     def __init__(self, frame):
         self.frame = frame
 
+    def _set_status(self, phase, detail = None):
+        """Frameが対応している場合だけ、現在のsolve段階を固定表示へ送る。"""
+        setter = getattr(self.frame, 'set_activity_status', None)
+        if not callable(setter):
+            return
+        message = str(phase)
+        if detail:
+            message += ': ' + str(detail)
+        message += f' | AI {getattr(self.frame, "AI_idx", "-")}'
+        message += f' | Solve {getattr(self.frame, "N", "-")}'
+        setter(message)
+
     def my_solve(self):
         """1ステップ分のsolve処理を進め、表示更新と終了判定まで行う。"""
         state = self.frame.solve_state
         if self.frame.stop:
+            self._set_status('停止中（再開待ち）')
             return
         succeeded = False
         self._disable_solve_controls()
@@ -113,6 +126,7 @@ class SolveSessionManager:
     def _start_new_solve(self, AI):
         """新しいスクランブルを用意してsolveセッションを開始する。"""
         state = self.frame.solve_state
+        self._set_status('スクランブル生成中')
         self.frame.cube.reset()
         self._reset_search_engine(AI)
         if self.frame.AI_idx != -1:
@@ -194,6 +208,7 @@ class SolveSessionManager:
         if len(state.val_lis) == 0:
             self._append_initial_value(AI)
 
+        self._set_status('探索中', getattr(AI, 'search_mode', 'search'))
         if self._uses_search3(AI):
             search_result = AI.search(progress_callback = lambda result: self._record_search_attempt_progress(AI, result))
         else:
@@ -210,6 +225,7 @@ class SolveSessionManager:
                     self._record_search_history(fallback_result, scramble = fallback_scramble)
                     self._commit_main_progress_to_scramble()
             state.search_TF = False
+            self._set_status('フォールバック中', 'myval greedy')
             return False
 
         self._record_search_history(search_result)
@@ -224,6 +240,7 @@ class SolveSessionManager:
             state.end_solve = True
             simplified_lis = self._store_perfect_key(simplified_lis)
             
+        self._set_status('手順適用中', f'{len(reduced_lis[0])} moves')
         for move in reduced_lis[0]:
             self.frame.cube.make_move(move)
             self._advance_search_engine(AI, move)
@@ -309,6 +326,11 @@ class SolveSessionManager:
 
     def _record_search_attempt_progress(self, AI, attempt_result):
         """Search3のattempt結果を表示ログへ反映し、MoveViewerを即時更新する。"""
+        attempt_index = getattr(attempt_result, 'attempt_index', None)
+        detail = getattr(AI, 'search_mode', 'search3')
+        if attempt_index is not None:
+            detail += f' attempt {attempt_index}'
+        self._set_status('探索中', detail)
         self._record_search_display(AI, attempt_result)
         self._refresh_search_attempt_display(
             AI,
@@ -580,8 +602,10 @@ class SolveSessionManager:
         """myvalベースのgreedy選択で次の手順を進める。"""
         state = self.frame.solve_state
         if not self._supports_myperms_greedy():
+            self._set_status('終了処理中', 'greedy 非対応')
             state.end_solve = True
             return False
+        self._set_status('フォールバック中', 'myval greedy')
         W = self._myperms_sort_weights(AI)
         if self.frame.AI_idx in list(range(self.frame.AInum)):
             AI = self.frame.myval_AI
@@ -894,6 +918,7 @@ class SolveSessionManager:
     def _finalize_solve_step(self, succeeded):
         """1回のsolve終了時に成功集計・学習データ追加・次AI準備を行う。"""
         state = self.frame.solve_state
+        self._set_status('結果を記録中')
         result_recorded = False
         if state.phase > 0 and succeeded:
             if state.search_TF:
@@ -983,6 +1008,7 @@ class SolveSessionManager:
                 self.frame.learn()
 
         state.phase = -1
+        self._set_status('完了', '成功' if result_recorded else '未解決')
 
     def _store_connected_myloss_training_sample(self):
         """Pairwise Search2成功時に、MyLoss向けの連結手順データを追加する。"""
