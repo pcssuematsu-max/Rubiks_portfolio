@@ -3,7 +3,9 @@ import unittest
 from core.puzzle_registry import PUZZLE_REGISTRY, get_puzzle_adapter
 from cto.cube import CtoCube
 from fto.cube import FtoCube
+from megaminx.cube import MegaminxCube
 from pyraminx.cube import MasterPyraminxCube, PyraminxCube
+from square1.cube import Square1Cube
 from skewb.cube import SkewbCube
 from ui.frame_config import FrameConfig
 
@@ -13,9 +15,10 @@ class PuzzleRegistryTest(unittest.TestCase):
         self.assertIs(get_puzzle_adapter('fto'), get_puzzle_adapter('face_turning_octahedron'))
         self.assertIs(get_puzzle_adapter('cto'), get_puzzle_adapter('corner_turning_octahedron'))
         self.assertIs(get_puzzle_adapter('master_pyraminx'), get_puzzle_adapter('master-pyraminx'))
+        self.assertIs(get_puzzle_adapter('square1'), get_puzzle_adapter('square-1'))
         self.assertEqual(
             {adapter.key for adapter in PUZZLE_REGISTRY.adapters()},
-            {'fto', 'cto', 'pyraminx', 'master_pyraminx', 'skewb'},
+            {'fto', 'cto', 'pyraminx', 'master_pyraminx', 'skewb', 'megaminx', 'square1'},
         )
 
     def test_registered_adapters_create_the_expected_models(self):
@@ -25,6 +28,8 @@ class PuzzleRegistryTest(unittest.TestCase):
         self.assertIsInstance(get_puzzle_adapter('pyraminx').create_cube(config), PyraminxCube)
         self.assertIsInstance(get_puzzle_adapter('master_pyraminx').create_cube(config), MasterPyraminxCube)
         self.assertIsInstance(get_puzzle_adapter('skewb').create_cube(config), SkewbCube)
+        self.assertIsInstance(get_puzzle_adapter('megaminx').create_cube(config), MegaminxCube)
+        self.assertIsInstance(get_puzzle_adapter('square1').create_cube(config), Square1Cube)
 
     def test_registered_adapters_share_notation_and_effect_hooks(self):
         adapter = get_puzzle_adapter('fto')
@@ -40,6 +45,10 @@ class PuzzleRegistryTest(unittest.TestCase):
         self.assertEqual(
             get_puzzle_adapter('master_pyraminx').default_priority_groups,
             ('Corner', 'Edge', 'MidEdge', 'Center'),
+        )
+        self.assertEqual(
+            get_puzzle_adapter('square1').default_priority_groups,
+            ('Corner', 'Edge', 'Shape'),
         )
 
 

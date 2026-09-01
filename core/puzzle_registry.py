@@ -145,6 +145,32 @@ def _create_skewb_cube(config):
     )
 
 
+def _create_megaminx_cube(config):
+    from megaminx.cube import MegaminxCube
+
+    return MegaminxCube(
+        size = config.cube_size,
+        F2L = config.F2L,
+        OLL = config.OLL,
+        Centers = config.Centers,
+        Edges = config.Edges,
+        Cross = config.Cross,
+    )
+
+
+def _create_square1_cube(config):
+    from square1.cube import Square1Cube
+
+    return Square1Cube(
+        size = config.cube_size,
+        F2L = config.F2L,
+        OLL = config.OLL,
+        Centers = config.Centers,
+        Edges = config.Edges,
+        Cross = config.Cross,
+    )
+
+
 def _create_fto_viewer(master, cube, mini_mode):
     from ui.fto.state_viewer import FtoStateViewer
 
@@ -169,6 +195,18 @@ def _create_skewb_viewer(master, cube, mini_mode):
     return SkewbStateViewer(master, mini_mode = mini_mode)
 
 
+def _create_megaminx_viewer(master, cube, mini_mode):
+    from ui.megaminx.state_viewer import MegaminxStateViewer
+
+    return MegaminxStateViewer(master, mini_mode = mini_mode)
+
+
+def _create_square1_viewer(master, cube, mini_mode):
+    from ui.square1.state_viewer import Square1StateViewer
+
+    return Square1StateViewer(master, mini_mode = mini_mode)
+
+
 PUZZLE_REGISTRY = PuzzleRegistry()
 PUZZLE_REGISTRY.register(
     PuzzleAdapter(
@@ -178,6 +216,25 @@ PUZZLE_REGISTRY.register(
         cube_factory = _create_fto_cube,
         viewer_factory = _create_fto_viewer,
         default_priority_groups = ("Corner", "Edge", "CenterA", "CenterB"),
+    )
+)
+PUZZLE_REGISTRY.register(
+    PuzzleAdapter(
+        key = "megaminx",
+        title = "Megaminx",
+        cube_factory = _create_megaminx_cube,
+        viewer_factory = _create_megaminx_viewer,
+        default_priority_groups = ("Corner", "MidEdge"),
+    )
+)
+PUZZLE_REGISTRY.register(
+    PuzzleAdapter(
+        key = "square1",
+        aliases = ("square-1",),
+        title = "Square-1",
+        cube_factory = _create_square1_cube,
+        viewer_factory = _create_square1_viewer,
+        default_priority_groups = ("Corner", "Edge", "Shape"),
     )
 )
 PUZZLE_REGISTRY.register(

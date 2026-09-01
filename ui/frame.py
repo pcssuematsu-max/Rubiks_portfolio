@@ -9,8 +9,6 @@ import tkinter as Tk
 from ai.rubiks_ai import Rubiks_3_AI
 from core.puzzle_registry import get_puzzle_adapter
 from group_puzzle.cube import create_group_puzzle
-from megaminx.cube import MegaminxCube
-from square1.cube import Square1Cube
 from cube.rubiks_cube import Rubiks_3
 from managers.debug_analysis import DebugAnalysisManager, VIEWER_RANGE_TEXT_WIDTH
 from managers.last_perms_reporter import LastPermsReporter
@@ -25,8 +23,6 @@ from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, LpShowKeyBu
 from ui.frame_config import FrameConfig
 from ui.move_controls import MoveControlProxy, square1_manual_move, update_square1_manual_status
 from ui.group_puzzle.state_viewer import GroupStateViewer
-from ui.megaminx.state_viewer import MegaminxStateViewer
-from ui.square1.state_viewer import Square1StateViewer
 from ui.viewers import (
     LogViewer,
     MoveButton,
@@ -218,24 +214,6 @@ class Frame(Tk.Frame):
                 auto_add_inverses = config.group_auto_add_inverses,
                 display_name = config.group_name,
             )
-        if self.puzzle_type == 'megaminx':
-            return MegaminxCube(
-                size = config.cube_size,
-                F2L = config.F2L,
-                OLL = config.OLL,
-                Centers = config.Centers,
-                Edges = config.Edges,
-                Cross = config.Cross,
-            )
-        if self.puzzle_type == 'square1':
-            return Square1Cube(
-                size = config.cube_size,
-                F2L = config.F2L,
-                OLL = config.OLL,
-                Centers = config.Centers,
-                Edges = config.Edges,
-                Cross = config.Cross,
-            )
         return Rubiks_3(
             size = config.cube_size,
             F2L = config.F2L,
@@ -250,10 +228,6 @@ class Frame(Tk.Frame):
             return self.puzzle_adapter.title
         if self.puzzle_type in ('group', 'symmetric_group', 'linear_group'):
             return 'Finite Group Puzzle'
-        if self.puzzle_type == 'megaminx':
-            return 'Megaminx'
-        if self.puzzle_type == 'square1':
-            return 'Square-1'
         return 'Rubiks'
 
     def _init_stage_settings(self):
@@ -447,8 +421,6 @@ class Frame(Tk.Frame):
             return [list(self.puzzle_adapter.default_priority_groups)] * self.AInum
         if self.puzzle_type in ('group', 'symmetric_group', 'linear_group'):
             return [list(self.cube.group_val.keys())] * self.AInum
-        if self.puzzle_type == 'megaminx':
-            return [['Corner', 'MidEdge']] * self.AInum
         return [[
             'CoreCenter', 'ObliqueCenter-A', 'PlusCenter-Layer2',
             'XCenter-Layer2', 'ObliqueCenter-B', 'PlusCenter-Layer3',
@@ -764,16 +736,6 @@ class Frame(Tk.Frame):
             self.SV = viewer_class(self, self.cube)
             self.grad_viewer_positive = viewer_class(self.grad_viewer_positive_panel, self.cube, mini_mode = True)
             self.grad_viewer_negative = viewer_class(self.grad_viewer_negative_panel, self.cube, mini_mode = True)
-        elif self.puzzle_type == 'megaminx':
-            viewer_class = MegaminxStateViewer
-            self.SV = viewer_class(self)
-            self.grad_viewer_positive = viewer_class(self.grad_viewer_positive_panel, mini_mode = True)
-            self.grad_viewer_negative = viewer_class(self.grad_viewer_negative_panel, mini_mode = True)
-        elif self.puzzle_type == 'square1':
-            viewer_class = Square1StateViewer
-            self.SV = viewer_class(self)
-            self.grad_viewer_positive = viewer_class(self.grad_viewer_positive_panel, mini_mode = True)
-            self.grad_viewer_negative = viewer_class(self.grad_viewer_negative_panel, mini_mode = True)
         else:
             viewer_class = StateViewer
             self.SV = viewer_class(self,cube_size)
