@@ -150,7 +150,7 @@ class Frame(Tk.Frame):
 
         # Prepare myperm lookup tables and bootstrap training data.
         self._init_myperms_metadata()
-        if self.puzzle_type in ['rubiks', 'cube']:
+        if getattr(self.puzzle_adapter, 'key', None) == 'cube':
             self._append_bootstrap_datas(config.bootstrap_datas)
 
         self.grad_index = 0

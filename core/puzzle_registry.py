@@ -171,6 +171,19 @@ def _create_square1_cube(config):
     )
 
 
+def _create_rubiks_cube(config):
+    from cube.rubiks_cube import Rubiks_3
+
+    return Rubiks_3(
+        size = config.cube_size,
+        F2L = config.F2L,
+        OLL = config.OLL,
+        Centers = config.Centers,
+        Edges = config.Edges,
+        Cross = config.Cross,
+    )
+
+
 def _create_fto_viewer(master, cube, mini_mode):
     from ui.fto.state_viewer import FtoStateViewer
 
@@ -207,7 +220,28 @@ def _create_square1_viewer(master, cube, mini_mode):
     return Square1StateViewer(master, mini_mode = mini_mode)
 
 
+def _create_rubiks_viewer(master, cube, mini_mode):
+    from ui.viewers import StateViewer
+
+    return StateViewer(master, cube.size, mini_mode = mini_mode)
+
+
 PUZZLE_REGISTRY = PuzzleRegistry()
+PUZZLE_REGISTRY.register(
+    PuzzleAdapter(
+        key = "cube",
+        aliases = ("rubiks", "rubiks_cube"),
+        title = "Rubiks",
+        cube_factory = _create_rubiks_cube,
+        viewer_factory = _create_rubiks_viewer,
+        default_priority_groups = (
+            "CoreCenter", "ObliqueCenter-A", "PlusCenter-Layer2",
+            "XCenter-Layer2", "ObliqueCenter-B", "PlusCenter-Layer3",
+            "XCenter-Layer3", "Wing-Layer2", "Wing-Layer3",
+            "Corner", "MidEdge",
+        ),
+    )
+)
 PUZZLE_REGISTRY.register(
     PuzzleAdapter(
         key = "fto",
