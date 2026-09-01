@@ -6,13 +6,10 @@ from tkinter.scrolledtext import ScrolledText
 import numpy as np
 
 from cube.rubiks_cube import Rubiks_3
-from cto.cube import CtoCube
-from fto.cube import FtoCube
+from core.puzzle_registry import get_puzzle_adapter
 from megaminx.cube import MegaminxCube
 from pyraminx.cube import MasterPyraminxCube, PyraminxCube
 from skewb.cube import SkewbCube
-from ui.cto.state_viewer import CtoStateViewer
-from ui.fto.state_viewer import FtoStateViewer
 from ui.megaminx.state_viewer import MegaminxStateViewer
 from ui.pyraminx.state_viewer import PyraminxStateViewer
 from ui.skewb.state_viewer import SkewbStateViewer
@@ -818,6 +815,9 @@ class DatasetSampleReplayDialog(Tk.Toplevel):
         self._render_step()
 
     def _build_replay_cube(self):
+        adapter = get_puzzle_adapter(self.frame.puzzle_type)
+        if adapter is not None:
+            return adapter.create_cube(self.frame.config)
         if self.frame.puzzle_type == 'megaminx':
             return MegaminxCube(
                 size = self.frame.config.cube_size,
@@ -854,24 +854,6 @@ class DatasetSampleReplayDialog(Tk.Toplevel):
                 Edges = self.frame.config.Edges,
                 Cross = self.frame.config.Cross,
             )
-        if self.frame.puzzle_type == 'fto':
-            return FtoCube(
-                size = self.frame.config.cube_size,
-                F2L = self.frame.config.F2L,
-                OLL = self.frame.config.OLL,
-                Centers = self.frame.config.Centers,
-                Edges = self.frame.config.Edges,
-                Cross = self.frame.config.Cross,
-            )
-        if self.frame.puzzle_type == 'cto':
-            return CtoCube(
-                size = self.frame.config.cube_size,
-                F2L = self.frame.config.F2L,
-                OLL = self.frame.config.OLL,
-                Centers = self.frame.config.Centers,
-                Edges = self.frame.config.Edges,
-                Cross = self.frame.config.Cross,
-            )
         return Rubiks_3(
             size = self.frame.config.cube_size,
             F2L = self.frame.config.F2L,
@@ -882,16 +864,15 @@ class DatasetSampleReplayDialog(Tk.Toplevel):
         )
 
     def _build_viewer(self):
+        adapter = get_puzzle_adapter(self.frame.puzzle_type)
+        if adapter is not None:
+            return adapter.create_viewer(self, self.replay_cube, mini_mode = True)
         if self.frame.puzzle_type == 'megaminx':
             return MegaminxStateViewer(self, mini_mode = True)
         if self.frame.puzzle_type in ('pyraminx', 'master_pyraminx'):
             return PyraminxStateViewer(self, self.frame.cube_size, mini_mode = True)
         if self.frame.puzzle_type == 'skewb':
             return SkewbStateViewer(self, mini_mode = True)
-        if self.frame.puzzle_type == 'fto':
-            return FtoStateViewer(self, mini_mode = True)
-        if self.frame.puzzle_type == 'cto':
-            return CtoStateViewer(self, mini_mode = True)
         return StateViewer(self, self.frame.cube_size, mini_mode = True)
 
     def _build_widgets(self):

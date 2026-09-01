@@ -1,0 +1,146 @@
+"""Registry for puzzle-specific model, viewer, notation, and analysis adapters.
+
+The registry deliberately stores factories instead of eagerly imported classes.
+This keeps the core module independent from Tkinter and avoids import cycles while
+allowing every UI entry point to construct the same puzzle implementation.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable, Iterable, Tuple
+
+from core.myperm_effects import MypermEffectAnalyzer
+
+
+CubeFactory = Callable[[Any], Any]
+ViewerFactory = Callable[[Any, Any, bool], Any]
+MoveFormatter = Callable[[Any, Iterable[str]], Tuple[str, ...]]
+EffectAnalyzer = Callable[[Any, Iterable[str]], Any]
+
+
+def _default_format_moves(cube, moves):
+    """Format a move sequence through the puzzle's common display API."""
+    if hasattr(cube, "format_moves"):
+        return tuple(cube.format_moves(moves))
+    return tuple(moves)
+
+
+def _default_analyze_effect(cube, moves):
+    """Analyze a move sequence with the shared myperm effect analyzer."""
+    return MypermEffectAnalyzer(cube).analyze(tuple(moves))
+
+
+@dataclass(frozen = True)
+class PuzzleAdapter:
+    """One puzzle's construction, presentation, notation, and analysis hooks."""
+
+    key: str
+    title: str
+    cube_factory: CubeFactory
+    viewer_factory: ViewerFactory
+    default_priority_groups: tuple[str, ...]
+    aliases: tuple[str, ...] = ()
+    format_moves: MoveFormatter = _default_format_moves
+    analyze_effect: EffectAnalyzer = _default_analyze_effect
+
+    def create_cube(self, config):
+        """Build a new puzzle model from a FrameConfig-compatible object."""
+        return self.cube_factory(config)
+
+    def create_viewer(self, master, cube, mini_mode = False):
+        """Build this puzzle's normal or compact state viewer."""
+        return self.viewer_factory(master, cube, mini_mode)
+
+
+class PuzzleRegistry:
+    """Resolve stable puzzle identifiers to their adapter registrations."""
+
+    def __init__(self):
+        self._by_key = {}
+
+    def register(self, adapter):
+        """Register an adapter and all of its aliases exactly once."""
+        for key in (adapter.key,) + tuple(adapter.aliases):
+            normalized_key = self._normalize_key(key)
+            if normalized_key in self._by_key:
+                raise ValueError(f"puzzle adapter already registered: {key!r}")
+            self._by_key[normalized_key] = adapter
+
+    def get(self, key):
+        """Return an adapter for *key*, or None for legacy/unregistered puzzles."""
+        return self._by_key.get(self._normalize_key(key))
+
+    def adapters(self):
+        """Return every adapter once, in registration order."""
+        return tuple(dict.fromkeys(self._by_key.values()))
+
+    @staticmethod
+    def _normalize_key(key):
+        return str(key).strip().lower()
+
+
+def _create_fto_cube(config):
+    from fto.cube import FtoCube
+
+    return FtoCube(
+        size = config.cube_size,
+        F2L = config.F2L,
+        OLL = config.OLL,
+        Centers = config.Centers,
+        Edges = config.Edges,
+        Cross = config.Cross,
+    )
+
+
+def _create_cto_cube(config):
+    from cto.cube import CtoCube
+
+    return CtoCube(
+        size = config.cube_size,
+        F2L = config.F2L,
+        OLL = config.OLL,
+        Centers = config.Centers,
+        Edges = config.Edges,
+        Cross = config.Cross,
+    )
+
+
+def _create_fto_viewer(master, cube, mini_mode):
+    from ui.fto.state_viewer import FtoStateViewer
+
+    return FtoStateViewer(master, mini_mode = mini_mode)
+
+
+def _create_cto_viewer(master, cube, mini_mode):
+    from ui.cto.state_viewer import CtoStateViewer
+
+    return CtoStateViewer(master, mini_mode = mini_mode)
+
+
+PUZZLE_REGISTRY = PuzzleRegistry()
+PUZZLE_REGISTRY.register(
+    PuzzleAdapter(
+        key = "fto",
+        aliases = ("face_turning_octahedron",),
+        title = "Face Turning Octahedron",
+        cube_factory = _create_fto_cube,
+        viewer_factory = _create_fto_viewer,
+        default_priority_groups = ("Corner", "Edge", "CenterA", "CenterB"),
+    )
+)
+PUZZLE_REGISTRY.register(
+    PuzzleAdapter(
+        key = "cto",
+        aliases = ("corner_turning_octahedron",),
+        title = "Corner Turning Octahedron",
+        cube_factory = _create_cto_cube,
+        viewer_factory = _create_cto_viewer,
+        default_priority_groups = ("Corner", "Edge", "Center"),
+    )
+)
+
+
+def get_puzzle_adapter(key):
+    """Resolve a registered puzzle adapter by key or alias."""
+    return PUZZLE_REGISTRY.get(key)

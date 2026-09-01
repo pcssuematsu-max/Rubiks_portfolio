@@ -8,7 +8,6 @@ from functools import reduce
 import numpy as np
 import tkinter as Tk
 
-from core.myperm_effects import MypermEffectAnalyzer
 from core.myperm_keys import format_myperm_key, myperm_base_key, myperm_transform_index, resolve_myperm_key
 from core.myperm_points import point_representative_transform
 from model.search_result import SearchResult, data
@@ -518,7 +517,12 @@ class SolveSessionManager:
             group_key, perfect_changed_number = self._group_changed_info(x)
             if getattr(self.frame.cube, 'myperms', None) and len(simplified_lis) > 0:
                 simplified_lis = self._point_representative_last_perms(tuple(simplified_lis))
-                effect = MypermEffectAnalyzer(self.frame.cube).analyze(simplified_lis)
+                adapter = getattr(self.frame, 'puzzle_adapter', None)
+                if adapter is None:
+                    from core.myperm_effects import MypermEffectAnalyzer
+                    effect = MypermEffectAnalyzer(self.frame.cube).analyze(simplified_lis)
+                else:
+                    effect = adapter.analyze_effect(self.frame.cube, simplified_lis)
                 perfect_key = 'LP:' + effect.concise_name()
             else:
                 perfect_key = group_key

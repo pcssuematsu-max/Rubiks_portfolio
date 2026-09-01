@@ -7,8 +7,7 @@ import numpy as np
 import tkinter as Tk
 
 from ai.rubiks_ai import Rubiks_3_AI
-from cto.cube import CtoCube
-from fto.cube import FtoCube
+from core.puzzle_registry import get_puzzle_adapter
 from group_puzzle.cube import create_group_puzzle
 from megaminx.cube import MegaminxCube
 from pyraminx.cube import MasterPyraminxCube, PyraminxCube
@@ -24,11 +23,9 @@ from managers.search_data import SearchDataManager
 from managers.solve_session import SolveSessionManager, SolveSessionState
 from model.search_result import data
 from ui.control_panel import ControlPanel
-from ui.cto.state_viewer import CtoStateViewer
 from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, LpShowKeyButton, ParamEditorDialog, ToolsDialog, W1EmbeddingDialog
 from ui.frame_config import FrameConfig
 from ui.move_controls import MoveControlProxy, square1_manual_move, update_square1_manual_status
-from ui.fto.state_viewer import FtoStateViewer
 from ui.group_puzzle.state_viewer import GroupStateViewer
 from ui.megaminx.state_viewer import MegaminxStateViewer
 from ui.pyraminx.state_viewer import PyraminxStateViewer
@@ -110,6 +107,7 @@ class Frame(Tk.Frame):
 
         self.config = config
         self.puzzle_type = config.puzzle_type
+        self.puzzle_adapter = get_puzzle_adapter(self.puzzle_type)
         self.cube_size = config.cube_size
         Tk.Frame.__init__(self,None)
         self.master.title(self._window_title())
@@ -206,6 +204,8 @@ class Frame(Tk.Frame):
 
     def _create_cube(self, config):
         """puzzle type に応じた cube 実装を生成する。"""
+        if self.puzzle_adapter is not None:
+            return self.puzzle_adapter.create_cube(config)
         if self.puzzle_type in ('group', 'symmetric_group', 'linear_group'):
             group_kind = config.group_kind
             if self.puzzle_type == 'symmetric_group':
@@ -267,25 +267,6 @@ class Frame(Tk.Frame):
                 Edges = config.Edges,
                 Cross = config.Cross,
             )
-        if self.puzzle_type == 'fto':
-            return FtoCube(
-                size = config.cube_size,
-                F2L = config.F2L,
-                OLL = config.OLL,
-                Centers = config.Centers,
-                Edges = config.Edges,
-                Cross = config.Cross,
-            )
-        if self.puzzle_type == 'cto':
-            return CtoCube(
-                size = config.cube_size,
-                F2L = config.F2L,
-                OLL = config.OLL,
-                Centers = config.Centers,
-                Edges = config.Edges,
-                Cross = config.Cross,
-            )
-
         return Rubiks_3(
             size = config.cube_size,
             F2L = config.F2L,
@@ -296,6 +277,8 @@ class Frame(Tk.Frame):
         )
 
     def _window_title(self):
+        if self.puzzle_adapter is not None:
+            return self.puzzle_adapter.title
         if self.puzzle_type in ('group', 'symmetric_group', 'linear_group'):
             return 'Finite Group Puzzle'
         if self.puzzle_type == 'megaminx':
@@ -308,10 +291,6 @@ class Frame(Tk.Frame):
             return 'Skewb'
         if self.puzzle_type == 'square1':
             return 'Square-1'
-        if self.puzzle_type == 'fto':
-            return 'Face Turning Octahedron'
-        if self.puzzle_type == 'cto':
-            return 'Corner Turning Octahedron'
         return 'Rubiks'
 
     def _init_stage_settings(self):
@@ -501,6 +480,8 @@ class Frame(Tk.Frame):
 
     def _default_priority_list(self):
         """puzzle type ごとの既定 priority list を返す。"""
+        if self.puzzle_adapter is not None:
+            return [list(self.puzzle_adapter.default_priority_groups)] * self.AInum
         if self.puzzle_type in ('group', 'symmetric_group', 'linear_group'):
             return [list(self.cube.group_val.keys())] * self.AInum
         if self.puzzle_type == 'megaminx':
@@ -511,11 +492,6 @@ class Frame(Tk.Frame):
             return [['Corner', 'Edge', 'MidEdge', 'Center']] * self.AInum
         if self.puzzle_type == 'skewb':
             return [['Corner', 'Center']] * self.AInum
-        if self.puzzle_type == 'fto':
-            return [['Corner', 'Edge', 'CenterA', 'CenterB']] * self.AInum
-        if self.puzzle_type == 'cto':
-            return [['Corner', 'Edge', 'Center']] * self.AInum
-
         return [[
             'CoreCenter', 'ObliqueCenter-A', 'PlusCenter-Layer2',
             'XCenter-Layer2', 'ObliqueCenter-B', 'PlusCenter-Layer3',
@@ -814,7 +790,19 @@ class Frame(Tk.Frame):
     def _build_viewers(self, cube_size):
         """state/move/prob/log viewer を生成して配置する。"""
         self._build_grad_viewer_panels()
-        if self.puzzle_type in ('group', 'symmetric_group', 'linear_group'):
+        if self.puzzle_adapter is not None:
+            self.SV = self.puzzle_adapter.create_viewer(self, self.cube)
+            self.grad_viewer_positive = self.puzzle_adapter.create_viewer(
+                self.grad_viewer_positive_panel,
+                self.cube,
+                mini_mode = True,
+            )
+            self.grad_viewer_negative = self.puzzle_adapter.create_viewer(
+                self.grad_viewer_negative_panel,
+                self.cube,
+                mini_mode = True,
+            )
+        elif self.puzzle_type in ('group', 'symmetric_group', 'linear_group'):
             viewer_class = GroupStateViewer
             self.SV = viewer_class(self, self.cube)
             self.grad_viewer_positive = viewer_class(self.grad_viewer_positive_panel, self.cube, mini_mode = True)
@@ -836,16 +824,6 @@ class Frame(Tk.Frame):
             self.grad_viewer_negative = viewer_class(self.grad_viewer_negative_panel, mini_mode = True)
         elif self.puzzle_type == 'square1':
             viewer_class = Square1StateViewer
-            self.SV = viewer_class(self)
-            self.grad_viewer_positive = viewer_class(self.grad_viewer_positive_panel, mini_mode = True)
-            self.grad_viewer_negative = viewer_class(self.grad_viewer_negative_panel, mini_mode = True)
-        elif self.puzzle_type == 'fto':
-            viewer_class = FtoStateViewer
-            self.SV = viewer_class(self)
-            self.grad_viewer_positive = viewer_class(self.grad_viewer_positive_panel, mini_mode = True)
-            self.grad_viewer_negative = viewer_class(self.grad_viewer_negative_panel, mini_mode = True)
-        elif self.puzzle_type == 'cto':
-            viewer_class = CtoStateViewer
             self.SV = viewer_class(self)
             self.grad_viewer_positive = viewer_class(self.grad_viewer_positive_panel, mini_mode = True)
             self.grad_viewer_negative = viewer_class(self.grad_viewer_negative_panel, mini_mode = True)
@@ -958,18 +936,24 @@ class Frame(Tk.Frame):
 
     def _display_move_keys(self, move_keys):
         """Return move labels in puzzle-specific display notation when available."""
+        if self.puzzle_adapter is not None:
+            return self.puzzle_adapter.format_moves(self.cube, move_keys)
         if hasattr(self.cube, 'format_moves'):
             return tuple(self.cube.format_moves(move_keys))
         return tuple(move_keys)
 
     def display_move_rows(self, move_rows):
         """Return move rows in puzzle-specific display notation when available."""
+        if self.puzzle_adapter is not None:
+            return [self.puzzle_adapter.format_moves(self.cube, moves) for moves in move_rows]
         if not hasattr(self.cube, 'format_moves'):
             return move_rows
         return [tuple(self.cube.format_moves(moves)) for moves in move_rows]
 
     def display_move_sequence(self, moves):
         """Return one move sequence in puzzle-specific display notation when available."""
+        if self.puzzle_adapter is not None:
+            return self.puzzle_adapter.format_moves(self.cube, moves)
         if hasattr(self.cube, 'format_moves'):
             return tuple(self.cube.format_moves(moves))
         return tuple(moves)
@@ -982,7 +966,9 @@ class Frame(Tk.Frame):
 
     def append_log(self, message):
         """GUI 上のログビューアへ 1 行追記する。"""
-        if isinstance(message, (tuple, list)) and hasattr(self.cube, 'format_moves'):
+        if isinstance(message, (tuple, list)) and self.puzzle_adapter is not None:
+            message = self.puzzle_adapter.format_moves(self.cube, message)
+        elif isinstance(message, (tuple, list)) and hasattr(self.cube, 'format_moves'):
             message = self.cube.format_moves(message)
         self.log_viewer.append_line(message)
         self.update()
