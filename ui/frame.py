@@ -1,6 +1,7 @@
 """Main Tkinter application frame."""
 
 import pickle
+import webbrowser
 from functools import reduce
 
 import numpy as np
@@ -8,6 +9,7 @@ import tkinter as Tk
 
 from ai.rubiks_ai import Rubiks_3_AI
 from core.puzzle_registry import get_puzzle_adapter
+from core.web_playback import build_web_playback_url, web_puzzle_key
 from group_puzzle.cube import create_group_puzzle
 from cube.rubiks_cube import Rubiks_3
 from managers.debug_analysis import DebugAnalysisManager, VIEWER_RANGE_TEXT_WIDTH
@@ -1067,6 +1069,28 @@ class Frame(Tk.Frame):
     def reset(self):
         self.cube.reset()
         self.set_color(self.cube.state)
+
+    def open_web_playback(self):
+        """Open the current solve session in the public 3D playback tool."""
+        puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)
+        if puzzle is None:
+            self.append_log('Web replay: このパズルは現在Web再生に未対応です。')
+            return
+
+        state = self.solve_state
+        setup = tuple(state.s or ())
+        moves = tuple(move for move_row in state.move_lis for move in move_row)
+        if not moves:
+            self.append_log('Web replay: 解法が表示された後に使えます。')
+            return
+
+        url = build_web_playback_url(
+            puzzle,
+            self.display_move_sequence(moves),
+            self.display_move_sequence(setup),
+        )
+        webbrowser.open_new_tab(url)
+        self.append_log('Web replay: 現在の解法をブラウザで開きました。')
 
     def make_myperm(self):
         self.myperm_manager.open_apply_dialog()

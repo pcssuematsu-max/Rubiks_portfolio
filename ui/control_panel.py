@@ -77,7 +77,8 @@ class ControlPanel(Tk.Frame):
         self.stopper_button = self._create_button(self.simple_controls,'停止', self.frame.stopper, row = 0, column = 1)
         self.my_solve_button = self._create_button(self.simple_controls,'AI に解かせる', self.frame.my_solve, row = 0, column = 2)
         self.open_move_pad_button = self._create_button(self.simple_controls,'手動操作', self.frame.toggle_move_pad, row = 0, column = 3)
-        for column in range(4):
+        self.open_web_playback_button = self._create_button(self.simple_controls,'Web で再生', self.frame.open_web_playback, row = 0, column = 4)
+        for column in range(5):
             self.simple_controls.grid_columnconfigure(column,weight = 1)
 
         self.loadparams_all_button = self._create_button(self.advanced_controls,'全AIの設定を読む', self.frame.loadparams_all, row = 0, column = 0)
