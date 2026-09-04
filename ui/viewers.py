@@ -8,6 +8,17 @@ import numpy as np
 from core.cube_constants import R_Nums, inside_size, outside_size
 
 
+def format_activity_status(message, width):
+    """Return a one-line activity status that never exceeds the viewer width."""
+    text = '状況: ' + (str(message).strip() or '待機中')
+    width = max(1, int(width))
+    if len(text) <= width:
+        return text
+    if width == 1:
+        return '…'
+    return text[:width - 1] + '…'
+
+
 class LogViewer(Tk.Frame):
     """学習ログなどの短いテキストを GUI 上に蓄積表示する。"""
 
@@ -15,10 +26,13 @@ class LogViewer(Tk.Frame):
         Tk.Frame.__init__(self, master, relief = Tk.RIDGE, bd = 4, bg = '#303030')
         self.line_limit = max(1,int(line_limit))
         self.line_count = 0
-        self.status_var = Tk.StringVar(value = '状況: 待機中')
+        self.status_width = max(1,int(width))
+        self.status_var = Tk.StringVar(value = format_activity_status('待機中', self.status_width))
         self.status_label = Tk.Label(
             self,
             textvariable = self.status_var,
+            width = self.status_width,
+            height = 1,
             font = ('Menlo', 10, 'bold'),
             fg = '#F0F0F0',
             bg = '#303030',
@@ -41,8 +55,7 @@ class LogViewer(Tk.Frame):
 
     def set_status(self, message):
         """ログとは別に、現在の処理段階を1行で表示する。"""
-        message = str(message).strip() or '待機中'
-        self.status_var.set('状況: ' + message)
+        self.status_var.set(format_activity_status(message, self.status_width))
         # 長い探索に入る前でも、直前に設定した状態を画面へ反映する。
         self.update_idletasks()
 

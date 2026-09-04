@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from managers.debug_analysis import DebugAnalysisManager, VIEWER_RANGE_TEXT_WIDTH
-from ui.viewers import MoveViewer
+from ui.viewers import MoveViewer, format_activity_status
 
 
 class _LayoutProbe:
@@ -49,6 +49,17 @@ class MoveViewerLayoutTests(unittest.TestCase):
         self.assertEqual(initial_move_width, 45)
         self.assertEqual(initial_key_width, 180)
         self.assertEqual(short_layout, long_layout)
+
+
+class ActivityStatusLayoutTests(unittest.TestCase):
+    def test_status_text_is_bounded_to_the_log_viewer_width(self):
+        status = format_activity_status('探索中: transformer attempt 999 | AI 12 | Solve 3456', 24)
+
+        self.assertEqual(len(status), 24)
+        self.assertTrue(status.endswith('…'))
+
+    def test_short_status_is_not_truncated(self):
+        self.assertEqual(format_activity_status('待機中', 24), '状況: 待機中')
 
 
 class DebugViewerRangeTextTests(unittest.TestCase):
