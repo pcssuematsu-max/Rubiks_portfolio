@@ -921,6 +921,9 @@ class SolveSessionManager:
         self._set_status('結果を記録中')
         result_recorded = False
         if state.phase > 0 and succeeded:
+            record_web_discovery = getattr(self.frame, 'record_web_discovery', None)
+            if callable(record_web_discovery):
+                record_web_discovery()
             if state.search_TF:
                 self.frame.perf_num[self.frame.stage] += 1
                 self.frame.success[self.frame.AI_idx] += 1

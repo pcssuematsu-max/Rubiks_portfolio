@@ -8,6 +8,7 @@ import numpy as np
 import tkinter as Tk
 
 from ai.rubiks_ai import Rubiks_3_AI
+from core.ai_discoveries import AiDiscoveryStore
 from core.puzzle_registry import get_puzzle_adapter
 from core.web_playback import build_web_playback_url, web_puzzle_key
 from group_puzzle.cube import create_group_puzzle
@@ -1091,6 +1092,33 @@ class Frame(Tk.Frame):
         )
         webbrowser.open_new_tab(url)
         self.append_log('Web replay: 現在の解法をブラウザで開きました。')
+
+    def record_web_discovery(self):
+        """Save the current successful solve to the web discovery feed."""
+        puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)
+        if puzzle is None:
+            return
+
+        state = self.solve_state
+        setup = tuple(state.s or ())
+        moves = tuple(move for move_row in state.move_lis for move in move_row)
+        if not moves:
+            return
+
+        try:
+            outcome = AiDiscoveryStore().save(
+                puzzle,
+                self.display_move_sequence(setup),
+                self.display_move_sequence(moves),
+            )
+        except (OSError, ValueError) as error:
+            self.append_log(f'Web discoveries: 保存できませんでした ({error})')
+            return
+
+        if outcome == 'added':
+            self.append_log('Web discoveries: 新しいAI成果を保存しました。')
+        elif outcome == 'shorter':
+            self.append_log('Web discoveries: より短いAI成果に更新しました。')
 
     def make_myperm(self):
         self.myperm_manager.open_apply_dialog()
