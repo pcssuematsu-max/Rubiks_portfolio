@@ -18,7 +18,7 @@ from cube.search2_engine import Search2Engine
 from cube.search3_engine import Search3Engine
 from cube.rubiks_cube import Rubiks_3
 from ai.layers import Affine, Batch_Normalization, Hard_Sigmoid, ReLU, ResidualBlock, Sigmoid, SiLU, Transformer_SelfAttention, PieceTokenSelfAttention
-from ai.losses import BCEWithLogits, MyLoss2, MyLoss2Pairwise, Myloss, Q_loss, Soft_Target_Cross_Entropy, Softmax_Cross_Entropy
+from ai.losses import BCEWithLogits, MyLoss2, MyLoss2Pairwise, Myloss, Soft_Target_Cross_Entropy, Softmax_Cross_Entropy
 
 
 

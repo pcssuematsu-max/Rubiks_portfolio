@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
-import random
 from functools import reduce
 
 import numpy as np
 import tkinter as Tk
+from dataclasses import dataclass
 
 from core.myperm_keys import format_myperm_key, myperm_base_key, myperm_transform_index, resolve_myperm_key
 from core.myperm_points import point_representative_transform
 from model.search_result import SearchResult, data
 
 PERFECT_VAL = 1.0e+8
+
+
+@dataclass(frozen=True)
+class RecentSolveRecord:
+    """One completed solve retained for the GUI's recent-history dialog."""
+
+    solve_index: int
+    ai_index: int
+    succeeded: bool
+    setup: tuple
+    moves: tuple
 
 
 def softmax(x):
@@ -45,6 +56,22 @@ class SolveSessionState:
         self.display_val_lis2 = []
         self.search_history = []
         self._search3_training_sample_cache = {}
+        self.recent_solve_history = []
+        self.recent_solve_history_limit = 10
+
+    def add_recent_solve(self, solve_index, ai_index, succeeded, setup, moves):
+        """Keep the newest completed solves for inspection in the GUI."""
+        self.recent_solve_history.append(
+            RecentSolveRecord(
+                solve_index=int(solve_index),
+                ai_index=int(ai_index),
+                succeeded=bool(succeeded),
+                setup=tuple(setup or ()),
+                moves=tuple(moves or ()),
+            )
+        )
+        if len(self.recent_solve_history) > self.recent_solve_history_limit:
+            del self.recent_solve_history[:-self.recent_solve_history_limit]
 
     def reset_tracking(self):
         """solve中に蓄積した手順・評価値・表示履歴を空に戻す。"""
@@ -99,6 +126,13 @@ class SolveSessionManager:
             return
         succeeded = False
         self._disable_solve_controls()
+        mark_parameters_ready_to_save = getattr(
+            self.frame,
+            'mark_parameters_ready_to_save',
+            None,
+        )
+        if callable(mark_parameters_ready_to_save):
+            mark_parameters_ready_to_save()
         AI = self._get_active_ai()
         if state.phase == -1:
             self._start_new_solve(AI)
@@ -979,6 +1013,13 @@ class SolveSessionManager:
                     self.frame.search_data_manager.store_search3_data(ai_index)
 
         if state.phase > 0:
+            state.add_recent_solve(
+                self.frame.N,
+                self.frame.AI_idx,
+                result_recorded,
+                state.s,
+                tuple(move for move_lis in state.move_lis for move in move_lis),
+            )
             self.frame.success_viewer.put_result(
                 self.frame.success,
                 self.frame.N,

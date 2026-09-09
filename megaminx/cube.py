@@ -1,6 +1,5 @@
 """Megaminx cube domain extracted from the legacy Megaminx GUI."""
 
-import random
 from functools import reduce
 from pathlib import Path
 

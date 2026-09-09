@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Static analysis
+ruff>=0.8,<1

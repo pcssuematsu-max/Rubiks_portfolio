@@ -8,7 +8,7 @@ import numpy as np
 import tkinter as Tk
 
 from ai.rubiks_ai import Rubiks_3_AI
-from core.ai_discoveries import AiDiscoveryStore
+from core.ai_discoveries import AiDiscoveryStore, point_canonical_discovery_sequences
 from core.puzzle_registry import get_puzzle_adapter
 from core.web_playback import build_web_playback_url, web_puzzle_key
 from group_puzzle.cube import create_group_puzzle
@@ -22,7 +22,7 @@ from managers.search_data import SearchDataManager
 from managers.solve_session import SolveSessionManager, SolveSessionState
 from model.search_result import data
 from ui.control_panel import ControlPanel
-from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, LpShowKeyButton, ParamEditorDialog, ToolsDialog, W1EmbeddingDialog
+from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, LpShowKeyButton, ParamEditorDialog, RecentSolveHistoryDialog, ToolsDialog, W1EmbeddingDialog
 from ui.frame_config import FrameConfig
 from ui.move_controls import MoveControlProxy, square1_manual_move, update_square1_manual_status
 from ui.group_puzzle.state_viewer import GroupStateViewer
@@ -758,7 +758,11 @@ class Frame(Tk.Frame):
         self.solve_summary_panel.grid(row = 2,column = 2,sticky = 'nw')
         self.PV = ProbViewer(self.solve_summary_panel,display_move_keys)
         self.PV.grid(row = 0,column = 0,sticky = 'nw')
-        self.success_viewer = SuccessViewer(self.solve_summary_panel,self.AInum)
+        self.success_viewer = SuccessViewer(
+            self.solve_summary_panel,
+            self.AInum,
+            on_open_history = self.show_recent_solve_history,
+        )
         self.success_viewer.grid(row = 1,column = 0,sticky = 'ew')
         self.success_viewer.put_summary(self.success,self.N,self.AI_idx)
         # Keep the log in the right column: it shares the lower row with the
@@ -1093,6 +1097,32 @@ class Frame(Tk.Frame):
         webbrowser.open_new_tab(url)
         self.append_log('Web replay: 現在の解法をブラウザで開きました。')
 
+    def can_replay_in_web(self):
+        return web_puzzle_key(self.puzzle_type, self.cube_size) is not None
+
+    def show_recent_solve_history(self):
+        if (
+            not hasattr(self, 'recent_solve_history_dialog')
+            or not self.recent_solve_history_dialog.winfo_exists()
+        ):
+            self.recent_solve_history_dialog = RecentSolveHistoryDialog(self)
+        self.recent_solve_history_dialog.refresh()
+        self.recent_solve_history_dialog.deiconify()
+        self.recent_solve_history_dialog.lift()
+
+    def open_recent_solve_web_playback(self, record):
+        puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)
+        if puzzle is None:
+            self.append_log('Web replay: このパズルは現在Web再生に未対応です。')
+            return
+        url = build_web_playback_url(
+            puzzle,
+            self.display_move_sequence(record.moves),
+            self.display_move_sequence(record.setup),
+        )
+        webbrowser.open_new_tab(url)
+        self.append_log(f'Web replay: 探索 #{record.solve_index} をブラウザで開きました。')
+
     def record_web_discovery(self):
         """Save the current successful solve to the web discovery feed."""
         puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)
@@ -1104,6 +1134,7 @@ class Frame(Tk.Frame):
         moves = tuple(move for move_row in state.move_lis for move in move_row)
         if not moves:
             return
+        setup, moves = point_canonical_discovery_sequences(self.cube, setup, moves)
 
         try:
             outcome = AiDiscoveryStore().save(
@@ -1177,6 +1208,10 @@ class Frame(Tk.Frame):
 
     def my_solve(self):
         self.solve_session_manager.my_solve()
+
+    def mark_parameters_ready_to_save(self):
+        """AIがsolveを開始した後は、現在のパラメータを保存対象にする。"""
+        self.control_panel.set_parameter_buttons_for_solve(True)
 
     def _schedule_next_solve(self):
         if self.cube.is_perfect():

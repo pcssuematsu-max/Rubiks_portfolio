@@ -41,6 +41,7 @@ class ControlPanel(Tk.Frame):
         self._build_param_controls()
         self._build_level_controls()
         self._build_debug_controls()
+        self.set_parameter_buttons_for_solve(False)
         self._apply_panel_mode()
 
     def _build_mode_controls(self):
@@ -120,6 +121,21 @@ class ControlPanel(Tk.Frame):
     def selected_grad_mode(self):
         """表示用の名称を既存の解析コード用の内部値へ戻す。"""
         return self.grad_mode_codes[self.grad_mode_var.get()]
+
+    def set_parameter_buttons_for_solve(self, has_solved):
+        """solve前後でパラメータの読込・保存操作を切り替える。"""
+        load_state = Tk.DISABLED if has_solved else Tk.NORMAL
+        save_state = Tk.NORMAL if has_solved else Tk.DISABLED
+        for button in (
+            self.loadparams_all_button,
+            self.loadparams_selected_button,
+        ):
+            button.configure(state = load_state)
+        for button in (
+            self.saveparams_all_button,
+            self.saveparams_selected_button,
+        ):
+            button.configure(state = save_state)
 
     def _create_button(self, master, text, command, row, column, columnspan = 1):
         """共通スタイルの Button を作って grid 配置する。"""

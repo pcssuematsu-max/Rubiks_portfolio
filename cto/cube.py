@@ -5,8 +5,7 @@ import math
 
 import numpy as np
 
-from core.myperm_keys import make_myperm_key
-from fto.cube import FTO_FACE_SIGNS, FtoCube
+from fto.cube import FtoCube
 
 
 CTO_MOVE_AXES = {

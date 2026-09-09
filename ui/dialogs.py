@@ -198,6 +198,94 @@ class ToolsDialog(Tk.Toplevel):
         self.grid_columnconfigure(0, weight = 1)
 
 
+class RecentSolveHistoryDialog(Tk.Toplevel):
+    """Show the latest completed solves and their replayable move sequences."""
+
+    def __init__(self, frame):
+        Tk.Toplevel.__init__(self, frame)
+        self.frame = frame
+        self.records = []
+        self.font = ('Century Gothic', 11, 'bold')
+        self.title('直近の探索履歴')
+        self.geometry('720x460')
+        self._build_widgets()
+
+    def _build_widgets(self):
+        header = Tk.Frame(self)
+        header.pack(fill = 'x', padx = 8, pady = (8, 4))
+        Tk.Label(header, text = '直近の完了した探索（新しい順）', font = self.font).pack(side = 'left')
+        Tk.Button(header, text = '更新', font = self.font, command = self.refresh).pack(side = 'right')
+
+        self.history_list = Tk.Listbox(self, height = 10, font = ('Menlo', 11), activestyle = 'none')
+        self.history_list.pack(fill = 'x', padx = 8)
+        self.history_list.bind('<<ListboxSelect>>', self._show_selected)
+
+        self.details = ScrolledText(self, height = 10, wrap = Tk.WORD, font = ('Menlo', 11))
+        self.details.pack(fill = 'both', expand = True, padx = 8, pady = 8)
+        self.details.configure(state = Tk.DISABLED)
+
+        controls = Tk.Frame(self)
+        controls.pack(fill = 'x', padx = 8, pady = (0, 8))
+        self.replay_button = Tk.Button(
+            controls,
+            text = 'Webで再生',
+            font = self.font,
+            state = Tk.DISABLED,
+            command = self._open_selected_replay,
+        )
+        self.replay_button.pack(side = 'right')
+
+    def refresh(self):
+        self.records = list(reversed(self.frame.solve_state.recent_solve_history))
+        self.history_list.delete(0, Tk.END)
+        for index, record in enumerate(self.records):
+            status = '成功' if record.succeeded else '失敗'
+            text = (
+                f'#{record.solve_index:03d}  AI {record.ai_index}  {status}  '
+                f'setup {len(record.setup)}手 / moves {len(record.moves)}手'
+            )
+            self.history_list.insert(Tk.END, text)
+            self.history_list.itemconfigure(index, fg = '#159447' if record.succeeded else '#B33A3A')
+        if self.records:
+            self.history_list.selection_set(0)
+            self._show_selected()
+        else:
+            self._set_details('まだ完了した探索はありません。')
+            self.replay_button.configure(state = Tk.DISABLED)
+
+    def _selected_record(self):
+        selection = self.history_list.curselection()
+        if not selection:
+            return None
+        return self.records[selection[0]]
+
+    def _show_selected(self, _event = None):
+        record = self._selected_record()
+        if record is None:
+            return
+        status = '成功' if record.succeeded else '失敗'
+        setup = ' '.join(self.frame.display_move_sequence(record.setup)) or '(なし)'
+        moves = ' '.join(self.frame.display_move_sequence(record.moves)) or '(手順なし)'
+        self._set_details(
+            f'探索 #{record.solve_index} / AI {record.ai_index}: {status}\n\n'
+            f'setup ({len(record.setup)}手)\n{setup}\n\n'
+            f'moves ({len(record.moves)}手)\n{moves}'
+        )
+        playable = bool(record.moves) and self.frame.can_replay_in_web()
+        self.replay_button.configure(state = Tk.NORMAL if playable else Tk.DISABLED)
+
+    def _set_details(self, text):
+        self.details.configure(state = Tk.NORMAL)
+        self.details.delete('1.0', Tk.END)
+        self.details.insert(Tk.END, text)
+        self.details.configure(state = Tk.DISABLED)
+
+    def _open_selected_replay(self):
+        record = self._selected_record()
+        if record is not None:
+            self.frame.open_recent_solve_web_playback(record)
+
+
 class AnalysisScoresDialog(Tk.Toplevel):
     """Occlusion などのスコア一覧を表示するダイアログ。"""
 

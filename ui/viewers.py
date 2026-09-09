@@ -80,8 +80,9 @@ class LogViewer(Tk.Frame):
 class SuccessViewer(Tk.Frame):
     """AIごとの成功数と直近のソルブ履歴をコンパクトに表示する。"""
 
-    def __init__(self, master, ai_count):
+    def __init__(self, master, ai_count, on_open_history = None):
         Tk.Frame.__init__(self,master,relief = Tk.RIDGE,bd = 4,bg = '#303030')
+        self.on_open_history = on_open_history
         self.history = []
         self.history_limit = 200
         self.history_columns = 40
@@ -96,12 +97,23 @@ class SuccessViewer(Tk.Frame):
         self.current_label.grid(row = 0,column = 1,sticky = 'w')
         self.total_label = Tk.Label(self,text = '',font = self.font,fg = '#F0F0F0',bg = '#303030')
         self.total_label.grid(row = 0,column = 2,sticky = 'w')
+        self.history_button = Tk.Button(
+            self,
+            text = '直近10件',
+            font = self.font,
+            command = self._open_history,
+        )
+        self.history_button.grid(row = 0,column = 3,sticky = 'e')
         self.ai_label = Tk.Label(self,text = '',font = self.font,fg = '#F0F0F0',bg = '#303030',anchor = 'w',justify = Tk.LEFT)
         self.ai_label.grid(row = 1,column = 0,columnspan = 3,sticky = 'ew')
         self.history_canvas = Tk.Canvas(self,width = 300,height = 28,bg = '#202020',highlightthickness = 0)
         self.history_canvas.grid(row = 2,column = 0,columnspan = 3,sticky = 'ew')
         for column_index in range(3):
             self.grid_columnconfigure(column_index, weight = 1)
+
+    def _open_history(self):
+        if callable(self.on_open_history):
+            self.on_open_history()
 
     def put_summary(self, success_counts, solve_index, ai_index):
         self._update_labels(success_counts,solve_index,ai_index,None)

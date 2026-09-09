@@ -1,0 +1,18 @@
+[tool.ruff]
+target-version = "py310"
+exclude = [
+    ".git",
+    ".venv",
+    "GroupAIdatas",
+]
+
+[tool.ruff.lint]
+# Start with correctness-oriented checks.  Formatting and broader style rules
+# can be adopted incrementally without blocking the existing codebase.
+select = ["E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# Package modules intentionally re-export their public classes.
+"**/__init__.py" = ["F401"]
+# These legacy move definitions are retained as commented-out reference data.
+"cube/rubiks_cube.py" = ["F841"]

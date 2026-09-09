@@ -1,7 +1,6 @@
 """Rubiks cube model and move/state utilities."""
 
 import random
-from functools import reduce
 
 import numpy as np
 

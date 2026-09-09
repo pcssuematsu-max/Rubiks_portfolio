@@ -13,6 +13,21 @@ Rubik's Cube 系を中心に、複数パズルの状態表示、手動操作、�
 - **主な技術:** Python、Tkinter、NumPy、PyTorch（任意）
 - **公開版:** 3×3 Rubik's Cube、Search2 1体、NumPyのみで起動できる軽量構成
 
+## 開発時のチェック
+
+開発用依存関係を入れると、未使用参照・未定義名・構文エラーをRuffで確認できます。
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+python3 -m ruff check .
+```
+
+同じチェックはGitHub Actionsでも実行されます。
+
+## AI discoveries のデータ形式
+
+AIが見つけた解法は `ai-discoveries.json` に保存します。rootの `schemaVersion` は現在 `1` で、各成果について `puzzle`、`setup`、`moves`、`moveCount`、`foundAt`、`updatedAt` を検証します。保存時には `myperms_point` が最大になる対称変換を選び、setupとmovesの両方を同じ向きへ正規化します。正式なJSON Schemaは [`schemas/ai-discoveries.schema.json`](schemas/ai-discoveries.schema.json) にあります。
+
 ## 制作背景
 
 作者はスピードキューブを趣味とし、さまざまな解法や手順を覚えてきました。一方、大学院では代数学を研究し、群論を中心とする代数的な考え方を学びました。大学院在学中には、ニューラルネットワークを利用したパズルやテーブルゲームのAI解析を独学で実験していました。
@@ -28,6 +43,8 @@ Rubik's Cube 系を中心に、複数パズルの状態表示、手動操作、�
 ## GUI画面の見方
 
 メイン画面では、現在のパズル状態、探索で選ばれた手順、AIの出力、解析結果、実行ログを同時に追跡できます。公開用の `public` プロファイルは初期状態で **Simple** 表示になり、リセット・AIによるsolve・停止・手動操作だけを表示します。`Advanced を表示` を選ぶと、AI設定、解析方法、対象layer、ツールを開けます。以下の画像は5×5 Rubik's Cubeと複数AIを使った実験構成の例です。既定の `public` プロファイルは3×3・Search2 1体の軽量構成ですが、各パネルの役割は同じです。
+
+Success Viewerの `直近10件` から、完了した探索を成功・失敗とともに一覧できます。各行を選ぶと、その探索のsetupとmovesを確認でき、対応するパズルではWeb再生を開けます。
 
 ### State Viewer
 

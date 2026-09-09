@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import math
 import os
 import random
 import sys
@@ -16,7 +15,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0,ROOT_DIR)
 
 from ai.rubiks_ai import Rubiks_3_AI
-from ai.losses import BCEWithLogits, Myloss, Soft_Target_Cross_Entropy, softmax
+from ai.losses import BCEWithLogits, Myloss, Soft_Target_Cross_Entropy
 from model.search_result import data_search3
 
 

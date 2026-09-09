@@ -1,6 +1,5 @@
 """Corner Turning Octahedron state viewer."""
 
-import numpy as np
 
 from ui.fto.state_viewer import FtoStateViewer
 
