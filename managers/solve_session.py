@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from functools import reduce
+from math import isfinite
+from time import perf_counter
 
 import numpy as np
 import tkinter as Tk
 from dataclasses import dataclass
 
+from core.experiment_log import ExperimentLogStore, completed_experiment_record
 from core.myperm_keys import format_myperm_key, myperm_base_key, myperm_transform_index, resolve_myperm_key
 from core.myperm_points import point_representative_transform
 from model.search_result import SearchResult, data
@@ -24,6 +27,11 @@ class RecentSolveRecord:
     succeeded: bool
     setup: tuple
     moves: tuple
+    timestamp: str = ''
+    puzzle_type: str = ''
+    search_mode: str = ''
+    elapsed_seconds: float = 0.0
+    score: float | None = None
 
 
 def softmax(x):
@@ -58,8 +66,24 @@ class SolveSessionState:
         self._search3_training_sample_cache = {}
         self.recent_solve_history = []
         self.recent_solve_history_limit = 10
+        self.solve_started_at = None
+        self.active_search_mode = ''
+        self.last_search_result = None
 
-    def add_recent_solve(self, solve_index, ai_index, succeeded, setup, moves):
+    def add_recent_solve(
+        self,
+        solve_index,
+        ai_index,
+        succeeded,
+        setup,
+        moves,
+        *,
+        timestamp = '',
+        puzzle_type = '',
+        search_mode = '',
+        elapsed_seconds = 0.0,
+        score = None,
+    ):
         """Keep the newest completed solves for inspection in the GUI."""
         self.recent_solve_history.append(
             RecentSolveRecord(
@@ -68,6 +92,11 @@ class SolveSessionState:
                 succeeded=bool(succeeded),
                 setup=tuple(setup or ()),
                 moves=tuple(moves or ()),
+                timestamp=str(timestamp),
+                puzzle_type=str(puzzle_type),
+                search_mode=str(search_mode),
+                elapsed_seconds=float(elapsed_seconds),
+                score=None if score is None else float(score),
             )
         )
         if len(self.recent_solve_history) > self.recent_solve_history_limit:
@@ -86,6 +115,7 @@ class SolveSessionState:
         self.display_val_lis2.clear()
         self.search_history.clear()
         self._search3_training_sample_cache.clear()
+        self.last_search_result = None
 
     def reset_session(self):
         """1回のsolveに紐づく状態をまとめて初期化する。"""
@@ -98,6 +128,8 @@ class SolveSessionState:
         self.last_top_group = ''
         self.last_perfect_changed_number = 0
         self.last_simplified_lis = tuple([])
+        self.solve_started_at = None
+        self.active_search_mode = ''
 
 
 class SolveSessionManager:
@@ -170,6 +202,8 @@ class SolveSessionManager:
         state.phase += 1
         state.search_TF = (self.frame.AI_idx != -1)
         self._reset_solve_tracking()
+        state.solve_started_at = perf_counter()
+        state.active_search_mode = str(getattr(AI, 'search_mode', 'myval'))
 
     def _scramble_with_ai_settings(self):
         """現在のAI設定に従ってスクランブルを生成する。"""
@@ -321,6 +355,7 @@ class SolveSessionManager:
     def _record_search_result(self, reduced_lis, search_result, value_deltas, key_label = None):
         """探索結果をmainログへ追加し、必要なら表示ログにも反映する。"""
         state = self.frame.solve_state
+        state.last_search_result = search_result
         if key_label is None:
             key_label = str(search_result.stats[0]) + '/' + str(search_result.stats[1])
 
@@ -420,6 +455,7 @@ class SolveSessionManager:
             'top_group': self.frame.solve_state.last_top_group,
             'perfect_key': self.frame.solve_state.last_perfect_key,
         })
+        self.frame.solve_state.last_search_result = search_result
 
     def _record_myval_history(self, scramble, root_value, succeeded):
         """greedy段階の結果もSearchResult形式にして履歴へ保存する。"""
@@ -446,6 +482,7 @@ class SolveSessionManager:
             'top_group': self.frame.solve_state.last_top_group,
             'perfect_key': self.frame.solve_state.last_perfect_key,
         })
+        self.frame.solve_state.last_search_result = search_result
 
     def _sync_display_tracking_from_main(self):
         """mainログをそのまま表示ログへコピーする。"""
@@ -953,6 +990,12 @@ class SolveSessionManager:
         """1回のsolve終了時に成功集計・学習データ追加・次AI準備を行う。"""
         state = self.frame.solve_state
         self._set_status('結果を記録中')
+        completed_setup = tuple(state.s or ())
+        completed_moves = tuple(
+            move for move_lis in state.move_lis for move in move_lis
+        )
+        started_at = state.solve_started_at
+        elapsed_seconds = 0.0 if started_at is None else perf_counter() - started_at
         result_recorded = False
         if state.phase > 0 and succeeded:
             if state.search_TF:
@@ -1013,12 +1056,23 @@ class SolveSessionManager:
                     self.frame.search_data_manager.store_search3_data(ai_index)
 
         if state.phase > 0:
+            experiment = self._record_experiment_log(
+                succeeded,
+                completed_setup,
+                completed_moves,
+                elapsed_seconds,
+            )
             state.add_recent_solve(
                 self.frame.N,
                 self.frame.AI_idx,
-                result_recorded,
-                state.s,
-                tuple(move for move_lis in state.move_lis for move in move_lis),
+                succeeded,
+                completed_setup,
+                completed_moves,
+                timestamp=experiment.timestamp,
+                puzzle_type=experiment.puzzle,
+                search_mode=experiment.search_mode,
+                elapsed_seconds=experiment.elapsed_seconds,
+                score=experiment.score,
             )
             self.frame.success_viewer.put_result(
                 self.frame.success,
@@ -1053,6 +1107,55 @@ class SolveSessionManager:
 
         state.phase = -1
         self._set_status('完了', '成功' if result_recorded else '未解決')
+
+    def _record_experiment_log(self, succeeded, setup, moves, elapsed_seconds):
+        """Persist a completed solve as a reproducible benchmark row."""
+        state = self.frame.solve_state
+        result = state.last_search_result
+        root_score = self._experiment_score(getattr(result, 'root_value', None))
+        best_score = self._experiment_score(getattr(result, 'best_value', None))
+        if root_score is None and state.val_lis:
+            root_score = self._experiment_score(state.val_lis[0])
+        if best_score is None and state.val_lis:
+            best_score = self._experiment_score(state.val_lis[-1])
+        display_setup = self.frame.display_move_sequence(setup)
+        display_moves = self.frame.display_move_sequence(moves)
+        experiment = completed_experiment_record(
+            puzzle_type = self.frame.puzzle_type,
+            cube_size = self.frame.cube_size,
+            search_mode = state.active_search_mode,
+            ai_index = self.frame.AI_idx,
+            solve_index = self.frame.N,
+            stage = self.frame.stage,
+            succeeded = succeeded,
+            elapsed_seconds = elapsed_seconds,
+            setup = display_setup,
+            moves = display_moves,
+            root_score = root_score,
+            best_score = best_score,
+            end_reason = getattr(result, 'end_reason', None),
+            stats = getattr(result, 'stats', ()),
+        )
+        try:
+            ExperimentLogStore().append(experiment)
+        except (OSError, TypeError, ValueError) as error:
+            self.frame.append_log(f'実験ログ: 保存できませんでした ({error})')
+        else:
+            self.frame.append_log(
+                f'実験ログ: {experiment.puzzle} / {experiment.search_mode} / '
+                f'{experiment.elapsed_seconds:.3f}s を保存しました。'
+            )
+        return experiment
+
+    @staticmethod
+    def _experiment_score(value):
+        if value is None:
+            return None
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            return None
+        return score if isfinite(score) else None
 
     def _store_connected_myloss_training_sample(self):
         """Pairwise Search2成功時に、MyLoss向けの連結手順データを追加する。"""

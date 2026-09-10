@@ -206,14 +206,14 @@ class RecentSolveHistoryDialog(Tk.Toplevel):
         self.frame = frame
         self.records = []
         self.font = ('Century Gothic', 11, 'bold')
-        self.title('直近の探索履歴')
+        self.title('実験ログ（直近10件）')
         self.geometry('720x460')
         self._build_widgets()
 
     def _build_widgets(self):
         header = Tk.Frame(self)
         header.pack(fill = 'x', padx = 8, pady = (8, 4))
-        Tk.Label(header, text = '直近の完了した探索（新しい順）', font = self.font).pack(side = 'left')
+        Tk.Label(header, text = '直近の完了した実験（新しい順）', font = self.font).pack(side = 'left')
         Tk.Button(header, text = '更新', font = self.font, command = self.refresh).pack(side = 'right')
 
         self.history_list = Tk.Listbox(self, height = 10, font = ('Menlo', 11), activestyle = 'none')
@@ -240,9 +240,12 @@ class RecentSolveHistoryDialog(Tk.Toplevel):
         self.history_list.delete(0, Tk.END)
         for index, record in enumerate(self.records):
             status = '成功' if record.succeeded else '失敗'
+            timestamp = record.timestamp.replace('T', ' ')[:19] or '--'
+            score = '--' if record.score is None else f'{record.score:.4g}'
             text = (
-                f'#{record.solve_index:03d}  AI {record.ai_index}  {status}  '
-                f'setup {len(record.setup)}手 / moves {len(record.moves)}手'
+                f'{timestamp}  {record.puzzle_type or "--"}  {record.search_mode or "--"}  '
+                f'#{record.solve_index:03d} AI {record.ai_index} {status}  '
+                f'{record.elapsed_seconds:.3f}s  {len(record.moves)}手  score {score}'
             )
             self.history_list.insert(Tk.END, text)
             self.history_list.itemconfigure(index, fg = '#159447' if record.succeeded else '#B33A3A')
@@ -266,8 +269,14 @@ class RecentSolveHistoryDialog(Tk.Toplevel):
         status = '成功' if record.succeeded else '失敗'
         setup = ' '.join(self.frame.display_move_sequence(record.setup)) or '(なし)'
         moves = ' '.join(self.frame.display_move_sequence(record.moves)) or '(手順なし)'
+        score = '--' if record.score is None else f'{record.score:.8g}'
         self._set_details(
-            f'探索 #{record.solve_index} / AI {record.ai_index}: {status}\n\n'
+            f'探索 #{record.solve_index} / AI {record.ai_index}: {status}\n'
+            f'時刻: {record.timestamp or "--"}\n'
+            f'Puzzle: {record.puzzle_type or "--"}\n'
+            f'探索方式: {record.search_mode or "--"}\n'
+            f'探索時間: {record.elapsed_seconds:.6f} 秒\n'
+            f'手数: {len(record.moves)} / score: {score}\n\n'
             f'setup ({len(record.setup)}手)\n{setup}\n\n'
             f'moves ({len(record.moves)}手)\n{moves}'
         )

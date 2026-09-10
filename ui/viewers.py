@@ -99,7 +99,7 @@ class SuccessViewer(Tk.Frame):
         self.total_label.grid(row = 0,column = 2,sticky = 'w')
         self.history_button = Tk.Button(
             self,
-            text = '直近10件',
+            text = '実験ログ',
             font = self.font,
             command = self._open_history,
         )
