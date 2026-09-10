@@ -1,6 +1,6 @@
 import unittest
 
-from core.puzzle_registry import PUZZLE_REGISTRY, get_puzzle_adapter
+from core.puzzle_registry import PUZZLE_REGISTRY, PuzzleAdapter, PuzzleRegistry, get_puzzle_adapter
 from cto.cube import CtoCube
 from cube.rubiks_cube import Rubiks_3
 from fto.cube import FtoCube
@@ -34,6 +34,31 @@ class PuzzleRegistryTest(unittest.TestCase):
         self.assertIsInstance(get_puzzle_adapter('skewb').create_cube(config), SkewbCube)
         self.assertIsInstance(get_puzzle_adapter('megaminx').create_cube(config), MegaminxCube)
         self.assertIsInstance(get_puzzle_adapter('square1').create_cube(config), Square1Cube)
+
+    def test_registry_rejects_malformed_adapter_metadata(self):
+        with self.assertRaises(TypeError):
+            PuzzleAdapter(
+                key = '',
+                title = 'Invalid',
+                cube_factory = lambda config: None,
+                viewer_factory = lambda master, cube, mini_mode: None,
+                default_priority_groups = (),
+            )
+
+        with self.assertRaises(TypeError):
+            PuzzleAdapter(
+                key = 'invalid',
+                title = 'Invalid',
+                cube_factory = lambda config: None,
+                viewer_factory = lambda master, cube, mini_mode: None,
+                default_priority_groups = ['Corner'],
+            )
+
+        registry = PuzzleRegistry()
+        adapter = get_puzzle_adapter('cube')
+        registry.register(adapter)
+        with self.assertRaises(ValueError):
+            registry.register(adapter)
 
     def test_registered_adapters_share_notation_and_effect_hooks(self):
         adapter = get_puzzle_adapter('cube')
