@@ -19,6 +19,7 @@ class RecentSolveHistoryTests(unittest.TestCase):
                 search_mode = "search3",
                 elapsed_seconds = 1.25,
                 score = 0.75,
+                outcome = "greedy_fallback_success",
             )
 
         self.assertEqual(len(state.recent_solve_history), 10)
@@ -30,3 +31,16 @@ class RecentSolveHistoryTests(unittest.TestCase):
         self.assertEqual(state.recent_solve_history[-1].search_mode, "search3")
         self.assertEqual(state.recent_solve_history[-1].elapsed_seconds, 1.25)
         self.assertEqual(state.recent_solve_history[-1].score, 0.75)
+        self.assertEqual(
+            state.recent_solve_history[-1].outcome,
+            "greedy_fallback_success",
+        )
+
+    def test_paused_time_is_not_counted_in_the_solve_timer(self):
+        state = SolveSessionState()
+        state.phase = 0
+        state.start_solve_timer(now = 10.0)
+        state.pause_solve_timer(now = 15.0)
+        self.assertEqual(state.elapsed_solve_seconds(now = 25.0), 5.0)
+        state.resume_solve_timer(now = 30.0)
+        self.assertEqual(state.elapsed_solve_seconds(now = 33.0), 8.0)

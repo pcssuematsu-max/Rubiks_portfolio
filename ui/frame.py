@@ -1228,6 +1228,7 @@ class Frame(Tk.Frame):
     def stopper(self):
         self.stop = not self.stop
         if self.stop:
+            self.solve_session_manager.pause_active_solve_timer()
             self.stopper_button.configure(text = 'restart')
             self.my_solve_button.configure(state = Tk.NORMAL)
             for k in self.move_keys:

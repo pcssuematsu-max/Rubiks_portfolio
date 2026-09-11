@@ -11,12 +11,13 @@ from pathlib import Path
 from typing import Any
 
 
-EXPERIMENT_LOG_SCHEMA_VERSION = 1
+EXPERIMENT_LOG_SCHEMA_VERSION = 2
 EXPERIMENT_LOG_FILE_NAME = "ai-experiments.jsonl"
 EXPERIMENT_CSV_FILE_NAME = "ai-experiments.csv"
 CSV_FIELDS = (
     "schemaVersion", "timestamp", "puzzleType", "cubeSize", "puzzle",
     "searchMode", "aiIndex", "solveIndex", "stage", "succeeded",
+    "searchSucceeded", "fallbackUsed", "outcome",
     "elapsedSeconds", "setupMoveCount", "moveCount", "score", "rootScore",
     "bestScore", "endReason", "stats", "setup", "moves",
 )
@@ -43,6 +44,9 @@ class ExperimentLogRecord:
     solve_index: int
     stage: int
     succeeded: bool
+    search_succeeded: bool
+    fallback_used: bool
+    outcome: str
     elapsed_seconds: float
     setup: tuple[str, ...]
     moves: tuple[str, ...]
@@ -65,6 +69,9 @@ class ExperimentLogRecord:
             "solveIndex": self.solve_index,
             "stage": self.stage,
             "succeeded": self.succeeded,
+            "searchSucceeded": self.search_succeeded,
+            "fallbackUsed": self.fallback_used,
+            "outcome": self.outcome,
             "elapsedSeconds": self.elapsed_seconds,
             "setupMoveCount": len(self.setup),
             "moveCount": len(self.moves),
@@ -119,7 +126,8 @@ class ExperimentLogStore:
 
 def completed_experiment_record(
     *, puzzle_type: str, cube_size: int, search_mode: str, ai_index: int,
-    solve_index: int, stage: int, succeeded: bool, elapsed_seconds: float,
+    solve_index: int, stage: int, succeeded: bool, search_succeeded: bool,
+    fallback_used: bool, elapsed_seconds: float,
     setup, moves, root_score: float | None, best_score: float | None,
     end_reason: str | None, stats = (),
 ) -> ExperimentLogRecord:
@@ -137,6 +145,13 @@ def completed_experiment_record(
         solve_index = int(solve_index),
         stage = int(stage),
         succeeded = bool(succeeded),
+        search_succeeded = bool(search_succeeded),
+        fallback_used = bool(fallback_used),
+        outcome = experiment_outcome(
+            search_succeeded = search_succeeded,
+            succeeded = succeeded,
+            fallback_used = fallback_used,
+        ),
         elapsed_seconds = round(max(0.0, float(elapsed_seconds)), 6),
         setup = tuple(str(move).strip() for move in setup if str(move).strip()),
         moves = tuple(str(move).strip() for move in moves if str(move).strip()),
@@ -146,6 +161,15 @@ def completed_experiment_record(
         end_reason = None if end_reason is None else str(end_reason),
         stats = tuple(_json_scalar(value) for value in normalized_stats),
     )
+
+
+def experiment_outcome(*, search_succeeded: bool, succeeded: bool, fallback_used: bool) -> str:
+    """Classify direct search results separately from greedy fallback results."""
+    if search_succeeded:
+        return "search_success"
+    if fallback_used:
+        return "greedy_fallback_success" if succeeded else "greedy_fallback_failed"
+    return "completed_without_search" if succeeded else "search_failed"
 
 
 def _json_scalar(value: Any) -> Any:

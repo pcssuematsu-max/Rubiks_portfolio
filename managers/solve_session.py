@@ -32,6 +32,7 @@ class RecentSolveRecord:
     search_mode: str = ''
     elapsed_seconds: float = 0.0
     score: float | None = None
+    outcome: str = 'search_failed'
 
 
 def softmax(x):
@@ -67,8 +68,10 @@ class SolveSessionState:
         self.recent_solve_history = []
         self.recent_solve_history_limit = 10
         self.solve_started_at = None
+        self.solve_elapsed_seconds = 0.0
         self.active_search_mode = ''
         self.last_search_result = None
+        self.fallback_used = False
 
     def add_recent_solve(
         self,
@@ -83,6 +86,7 @@ class SolveSessionState:
         search_mode = '',
         elapsed_seconds = 0.0,
         score = None,
+        outcome = 'search_failed',
     ):
         """Keep the newest completed solves for inspection in the GUI."""
         self.recent_solve_history.append(
@@ -97,6 +101,7 @@ class SolveSessionState:
                 search_mode=str(search_mode),
                 elapsed_seconds=float(elapsed_seconds),
                 score=None if score is None else float(score),
+                outcome=str(outcome),
             )
         )
         if len(self.recent_solve_history) > self.recent_solve_history_limit:
@@ -129,7 +134,35 @@ class SolveSessionState:
         self.last_perfect_changed_number = 0
         self.last_simplified_lis = tuple([])
         self.solve_started_at = None
+        self.solve_elapsed_seconds = 0.0
         self.active_search_mode = ''
+        self.fallback_used = False
+
+    def start_solve_timer(self, now = None):
+        """Start timing active solve work, excluding later paused intervals."""
+        self.solve_elapsed_seconds = 0.0
+        self.solve_started_at = perf_counter() if now is None else float(now)
+
+    def pause_solve_timer(self, now = None):
+        """Accumulate active time and leave the clock stopped while paused."""
+        if self.solve_started_at is None:
+            return
+        current = perf_counter() if now is None else float(now)
+        self.solve_elapsed_seconds += max(0.0, current - self.solve_started_at)
+        self.solve_started_at = None
+
+    def resume_solve_timer(self, now = None):
+        """Resume an active solve timer without discarding elapsed time."""
+        if self.solve_started_at is not None or self.phase < 0:
+            return
+        self.solve_started_at = perf_counter() if now is None else float(now)
+
+    def elapsed_solve_seconds(self, now = None):
+        """Return active solve time, never including a paused interval."""
+        if self.solve_started_at is None:
+            return self.solve_elapsed_seconds
+        current = perf_counter() if now is None else float(now)
+        return self.solve_elapsed_seconds + max(0.0, current - self.solve_started_at)
 
 
 class SolveSessionManager:
@@ -156,6 +189,7 @@ class SolveSessionManager:
         if self.frame.stop:
             self._set_status('停止中（再開待ち）')
             return
+        state.resume_solve_timer()
         succeeded = False
         self._disable_solve_controls()
         mark_parameters_ready_to_save = getattr(
@@ -202,8 +236,13 @@ class SolveSessionManager:
         state.phase += 1
         state.search_TF = (self.frame.AI_idx != -1)
         self._reset_solve_tracking()
-        state.solve_started_at = perf_counter()
+        state.start_solve_timer()
         state.active_search_mode = str(getattr(AI, 'search_mode', 'myval'))
+        state.fallback_used = False
+
+    def pause_active_solve_timer(self):
+        """Stop the active-time clock while the GUI solve is stopped."""
+        self.frame.solve_state.pause_solve_timer()
 
     def _scramble_with_ai_settings(self):
         """現在のAI設定に従ってスクランブルを生成する。"""
@@ -286,6 +325,7 @@ class SolveSessionManager:
         self._release_search_step_memory(AI)
 
         if self._should_fallback_from_search3(AI, search_result):
+            state.fallback_used = True
             if self.frame.search3_progress[self.frame.AI_idx]:
                 fallback_scramble = self._current_search_scramble()
                 fallback_result = self._advance_to_search3_fallback_state(AI, search_result)
@@ -661,6 +701,7 @@ class SolveSessionManager:
     def _handle_no_progress_search(self, AI):
         """探索で状態が進まなかったときにsearch段階を打ち切る。"""
         state = self.frame.solve_state
+        state.fallback_used = True
         state.search_TF = False
         if self.frame.AIs[self.frame.AI_idx].search_mode == 'search2':
             for moves in state.move_lis:
@@ -994,8 +1035,8 @@ class SolveSessionManager:
         completed_moves = tuple(
             move for move_lis in state.move_lis for move in move_lis
         )
-        started_at = state.solve_started_at
-        elapsed_seconds = 0.0 if started_at is None else perf_counter() - started_at
+        elapsed_seconds = state.elapsed_solve_seconds()
+        state.pause_solve_timer()
         result_recorded = False
         if state.phase > 0 and succeeded:
             if state.search_TF:
@@ -1058,6 +1099,7 @@ class SolveSessionManager:
         if state.phase > 0:
             experiment = self._record_experiment_log(
                 succeeded,
+                result_recorded,
                 completed_setup,
                 completed_moves,
                 elapsed_seconds,
@@ -1073,6 +1115,7 @@ class SolveSessionManager:
                 search_mode=experiment.search_mode,
                 elapsed_seconds=experiment.elapsed_seconds,
                 score=experiment.score,
+                outcome=experiment.outcome,
             )
             self.frame.success_viewer.put_result(
                 self.frame.success,
@@ -1106,9 +1149,24 @@ class SolveSessionManager:
                 self.frame.learn()
 
         state.phase = -1
-        self._set_status('完了', '成功' if result_recorded else '未解決')
+        if result_recorded:
+            detail = '探索成功'
+        elif state.fallback_used and succeeded:
+            detail = 'Fallback完了'
+        elif state.fallback_used:
+            detail = 'Fallback失敗'
+        else:
+            detail = '未解決'
+        self._set_status('完了', detail)
 
-    def _record_experiment_log(self, succeeded, setup, moves, elapsed_seconds):
+    def _record_experiment_log(
+        self,
+        succeeded,
+        search_succeeded,
+        setup,
+        moves,
+        elapsed_seconds,
+    ):
         """Persist a completed solve as a reproducible benchmark row."""
         state = self.frame.solve_state
         result = state.last_search_result
@@ -1128,6 +1186,8 @@ class SolveSessionManager:
             solve_index = self.frame.N,
             stage = self.frame.stage,
             succeeded = succeeded,
+            search_succeeded = search_succeeded,
+            fallback_used = state.fallback_used,
             elapsed_seconds = elapsed_seconds,
             setup = display_setup,
             moves = display_moves,

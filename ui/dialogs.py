@@ -239,7 +239,7 @@ class RecentSolveHistoryDialog(Tk.Toplevel):
         self.records = list(reversed(self.frame.solve_state.recent_solve_history))
         self.history_list.delete(0, Tk.END)
         for index, record in enumerate(self.records):
-            status = '成功' if record.succeeded else '失敗'
+            status, color = self._outcome_label(record)
             timestamp = record.timestamp.replace('T', ' ')[:19] or '--'
             score = '--' if record.score is None else f'{record.score:.4g}'
             text = (
@@ -248,7 +248,7 @@ class RecentSolveHistoryDialog(Tk.Toplevel):
                 f'{record.elapsed_seconds:.3f}s  {len(record.moves)}手  score {score}'
             )
             self.history_list.insert(Tk.END, text)
-            self.history_list.itemconfigure(index, fg = '#159447' if record.succeeded else '#B33A3A')
+            self.history_list.itemconfigure(index, fg = color)
         if self.records:
             self.history_list.selection_set(0)
             self._show_selected()
@@ -266,7 +266,7 @@ class RecentSolveHistoryDialog(Tk.Toplevel):
         record = self._selected_record()
         if record is None:
             return
-        status = '成功' if record.succeeded else '失敗'
+        status, _ = self._outcome_label(record)
         setup = ' '.join(self.frame.display_move_sequence(record.setup)) or '(なし)'
         moves = ' '.join(self.frame.display_move_sequence(record.moves)) or '(手順なし)'
         score = '--' if record.score is None else f'{record.score:.8g}'
@@ -282,6 +282,20 @@ class RecentSolveHistoryDialog(Tk.Toplevel):
         )
         playable = bool(record.moves) and self.frame.can_replay_in_web()
         self.replay_button.configure(state = Tk.NORMAL if playable else Tk.DISABLED)
+
+    @staticmethod
+    def _outcome_label(record):
+        outcomes = {
+            'search_success': ('探索成功', '#159447'),
+            'greedy_fallback_success': ('Fallback完了', '#B66A00'),
+            'greedy_fallback_failed': ('Fallback失敗', '#B33A3A'),
+            'completed_without_search': ('完了（探索外）', '#496A9E'),
+            'search_failed': ('探索失敗', '#B33A3A'),
+        }
+        return outcomes.get(
+            record.outcome,
+            ('成功' if record.succeeded else '失敗', '#159447' if record.succeeded else '#B33A3A'),
+        )
 
     def _set_details(self, text):
         self.details.configure(state = Tk.NORMAL)
