@@ -3,7 +3,15 @@ import unittest
 import numpy as np
 
 from managers.debug_analysis import DebugAnalysisManager, VIEWER_RANGE_TEXT_WIDTH
-from ui.viewers import MoveViewer, format_activity_status
+from ui.viewers import (
+    MoveViewer,
+    SUCCESS_FILTER_ALL,
+    SUCCESS_FILTER_DIRECT,
+    SUCCESS_FILTER_FAILED,
+    SUCCESS_FILTER_FALLBACK,
+    format_activity_status,
+    success_viewer_filter_matches,
+)
 
 
 class _LayoutProbe:
@@ -60,6 +68,42 @@ class ActivityStatusLayoutTests(unittest.TestCase):
 
     def test_short_status_is_not_truncated(self):
         self.assertEqual(format_activity_status('待機中', 24), '状況: 待機中')
+
+
+class SuccessViewerFilterTests(unittest.TestCase):
+    def test_direct_success_filter_excludes_fallback_results(self):
+        self.assertTrue(
+            success_viewer_filter_matches(
+                'search_success',
+                SUCCESS_FILTER_DIRECT,
+            )
+        )
+        self.assertFalse(
+            success_viewer_filter_matches(
+                'greedy_fallback_success',
+                SUCCESS_FILTER_DIRECT,
+            )
+        )
+
+    def test_fallback_and_failure_filters_are_explicit(self):
+        self.assertTrue(
+            success_viewer_filter_matches(
+                'greedy_fallback_success',
+                SUCCESS_FILTER_FALLBACK,
+            )
+        )
+        self.assertTrue(
+            success_viewer_filter_matches(
+                'greedy_fallback_failed',
+                SUCCESS_FILTER_FAILED,
+            )
+        )
+        self.assertTrue(
+            success_viewer_filter_matches(
+                'search_success',
+                SUCCESS_FILTER_ALL,
+            )
+        )
 
 
 class DebugViewerRangeTextTests(unittest.TestCase):

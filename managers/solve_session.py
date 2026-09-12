@@ -1122,6 +1122,7 @@ class SolveSessionManager:
                 self.frame.N,
                 self.frame.AI_idx,
                 result_recorded,
+                outcome = experiment.outcome,
             )
 
         self.frame.N += 1

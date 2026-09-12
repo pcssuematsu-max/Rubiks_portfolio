@@ -8,6 +8,12 @@ import numpy as np
 from core.cube_constants import R_Nums, inside_size, outside_size
 
 
+SUCCESS_FILTER_DIRECT = '自力成功のみ'
+SUCCESS_FILTER_ALL = 'すべて'
+SUCCESS_FILTER_FALLBACK = 'Fallbackのみ'
+SUCCESS_FILTER_FAILED = '失敗のみ'
+
+
 def format_activity_status(message, width):
     """Return a one-line activity status that never exceeds the viewer width."""
     text = '状況: ' + (str(message).strip() or '待機中')
@@ -78,7 +84,7 @@ class LogViewer(Tk.Frame):
 
 
 class SuccessViewer(Tk.Frame):
-    """AIごとの成功数と直近のソルブ履歴をコンパクトに表示する。"""
+    """AI自身が探索で見つけた成功と実験結果をコンパクトに表示する。"""
 
     def __init__(self, master, ai_count, on_open_history = None, on_open_summary = None):
         Tk.Frame.__init__(self,master,relief = Tk.RIDGE,bd = 4,bg = '#303030')
@@ -89,10 +95,11 @@ class SuccessViewer(Tk.Frame):
         self.history_columns = 40
         self.history_block = 4
         self.font = ('Futura',9,'bold')
+        self.result_filter = Tk.StringVar(value = SUCCESS_FILTER_DIRECT)
         self._build_widgets()
 
     def _build_widgets(self):
-        self.title_label = Tk.Label(self,text = 'Success',font = self.font,fg = '#F0F0F0',bg = '#303030')
+        self.title_label = Tk.Label(self,text = 'AI自力成功',font = self.font,fg = '#F0F0F0',bg = '#303030')
         self.title_label.grid(row = 0,column = 0,sticky = 'w')
         self.current_label = Tk.Label(self,text = '',font = self.font,fg = '#F0F0F0',bg = '#303030')
         self.current_label.grid(row = 0,column = 1,sticky = 'w')
@@ -112,11 +119,22 @@ class SuccessViewer(Tk.Frame):
             command = self._open_summary,
         )
         self.summary_button.grid(row = 0,column = 4,sticky = 'e')
+        self.filter_menu = Tk.OptionMenu(
+            self,
+            self.result_filter,
+            SUCCESS_FILTER_DIRECT,
+            SUCCESS_FILTER_ALL,
+            SUCCESS_FILTER_FALLBACK,
+            SUCCESS_FILTER_FAILED,
+            command = self._set_result_filter,
+        )
+        self.filter_menu.configure(font = self.font)
+        self.filter_menu.grid(row = 1,column = 0,sticky = 'w')
         self.ai_label = Tk.Label(self,text = '',font = self.font,fg = '#F0F0F0',bg = '#303030',anchor = 'w',justify = Tk.LEFT)
-        self.ai_label.grid(row = 1,column = 0,columnspan = 5,sticky = 'ew')
+        self.ai_label.grid(row = 1,column = 1,columnspan = 5,sticky = 'ew')
         self.history_canvas = Tk.Canvas(self,width = 300,height = 28,bg = '#202020',highlightthickness = 0)
-        self.history_canvas.grid(row = 2,column = 0,columnspan = 5,sticky = 'ew')
-        for column_index in range(5):
+        self.history_canvas.grid(row = 2,column = 0,columnspan = 6,sticky = 'ew')
+        for column_index in range(6):
             self.grid_columnconfigure(column_index, weight = 1)
 
     def _open_history(self):
@@ -131,32 +149,73 @@ class SuccessViewer(Tk.Frame):
         self._update_labels(success_counts,solve_index,ai_index,None)
         self._draw_history()
 
-    def put_result(self, success_counts, solve_index, ai_index, succeeded):
-        self.history.append((solve_index,ai_index,bool(succeeded)))
+    def put_result(self, success_counts, solve_index, ai_index, succeeded, outcome = None):
+        if outcome is None:
+            outcome = 'search_success' if succeeded else 'search_failed'
+        self.history.append((solve_index,ai_index,str(outcome)))
         if len(self.history) > self.history_limit:
             self.history = self.history[-self.history_limit:]
-        self._update_labels(success_counts,solve_index,ai_index,succeeded)
+        self._update_labels(success_counts,solve_index,ai_index,succeeded,outcome)
         self._draw_history()
 
-    def _update_labels(self, success_counts, solve_index, ai_index, succeeded):
-        result_text = '' if succeeded is None else ('  OK' if succeeded else '  NG')
+    def _update_labels(self, success_counts, solve_index, ai_index, succeeded, outcome = None):
+        result_text = self._result_text(succeeded,outcome)
         self.current_label.configure(text = 'N: ' + str(solve_index) + '  AI: ' + str(ai_index) + result_text)
-        self.total_label.configure(text = 'total: ' + str(int(np.sum(success_counts))))
+        self.total_label.configure(text = '自力 total: ' + str(int(np.sum(success_counts))))
         parts = [str(index) + ':' + str(int(count)) for index,count in enumerate(success_counts)]
         self.ai_label.configure(text = '  '.join(parts[:10]) + '\n' + '  '.join(parts[10:]))
+
+    @staticmethod
+    def _result_text(succeeded, outcome):
+        if succeeded is None:
+            return ''
+        if outcome == 'greedy_fallback_success':
+            return '  FB'
+        if outcome == 'greedy_fallback_failed':
+            return '  FB-NG'
+        return '  OK' if succeeded else '  NG'
+
+    def _set_result_filter(self, _selection = None):
+        self._draw_history()
 
     def _draw_history(self):
         self.history_canvas.delete('history')
         margin = 4
-        for index,result in enumerate(self.history[-self.history_limit:]):
+        visible_history = [
+            result for result in self.history
+            if success_viewer_filter_matches(result[2], self.result_filter.get())
+        ]
+        for index,result in enumerate(visible_history[-self.history_limit:]):
             column_index = index % self.history_columns
             row_index = index // self.history_columns
             x0 = margin + column_index * (self.history_block + 2)
             y0 = margin + row_index * (self.history_block + 2)
             x1 = x0 + self.history_block
             y1 = y0 + self.history_block
-            color = Red if result[2] else Blue
+            color = success_viewer_outcome_color(result[2])
             self.history_canvas.create_rectangle(x0,y0,x1,y1,fill = color,outline = '#101010',tags = 'history')
+
+
+def success_viewer_filter_matches(outcome, result_filter):
+    """Return whether an experiment outcome belongs in the selected filter."""
+    if result_filter == SUCCESS_FILTER_DIRECT:
+        return outcome == 'search_success'
+    if result_filter == SUCCESS_FILTER_FALLBACK:
+        return outcome in ('greedy_fallback_success', 'greedy_fallback_failed')
+    if result_filter == SUCCESS_FILTER_FAILED:
+        return outcome in ('search_failed', 'greedy_fallback_failed')
+    return True
+
+
+def success_viewer_outcome_color(outcome):
+    """Keep direct solves visually distinct from fallback and failed results."""
+    if outcome == 'search_success':
+        return Red
+    if outcome == 'greedy_fallback_success':
+        return '#B66A00'
+    if outcome == 'greedy_fallback_failed':
+        return '#6F3E85'
+    return Blue
 
 
 class StateViewer(Tk.Canvas):
