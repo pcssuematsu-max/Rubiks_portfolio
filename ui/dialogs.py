@@ -325,15 +325,23 @@ class ExperimentSummaryDialog(Tk.Toplevel):
         header = Tk.Frame(self)
         header.pack(fill = 'x', padx = 8, pady = (8, 4))
         Tk.Label(header, text = 'Search方式ごとの比較', font = self.font).pack(side = 'left')
+        self.source_var = Tk.StringVar(value = 'JSONL')
+        Tk.OptionMenu(
+            header,
+            self.source_var,
+            'JSONL',
+            'CSV',
+            command = lambda _source: self.refresh(),
+        ).pack(side = 'right', padx = 4)
         Tk.Button(header, text = '更新', font = self.font, command = self.refresh).pack(side = 'right')
-        Tk.Button(header, text = '集計JSONを保存', font = self.font, command = self.export).pack(side = 'right', padx = 4)
+        Tk.Button(header, text = '集計を保存', font = self.font, command = self.export).pack(side = 'right', padx = 4)
         self.text = ScrolledText(self, wrap = Tk.WORD, font = ('Menlo', 11))
         self.text.pack(fill = 'both', expand = True, padx = 8, pady = (0, 8))
         self.text.configure(state = Tk.DISABLED)
 
     def refresh(self):
         try:
-            summary = ExperimentLogStore().summarize()
+            summary = ExperimentLogStore().summarize(self._selected_source())
         except (OSError, ValueError) as error:
             self._set_text(f'実験ログを集計できませんでした。\n{error}')
             return
@@ -341,11 +349,11 @@ class ExperimentSummaryDialog(Tk.Toplevel):
 
     def export(self):
         try:
-            path = ExperimentLogStore().export_summary()
+            path = ExperimentLogStore().export_summary(source = self._selected_source())
         except (OSError, ValueError) as error:
             self.frame.append_log(f'実験ログ集計: 保存できませんでした ({error})')
             return
-        self.frame.append_log(f'実験ログ集計: {path} を保存しました。')
+        self.frame.append_log(f'実験ログ集計: JSON/CSV を {path.parent} に保存しました。')
         self.refresh()
 
     @staticmethod
@@ -353,7 +361,7 @@ class ExperimentSummaryDialog(Tk.Toplevel):
         total = summary['totalRuns']
         if total == 0:
             return 'まだ保存済みの実験ログはありません。'
-        lines = [f'全 {total} 件 / 方式別比較']
+        lines = [f"入力元: {summary['source'].upper()} / 全 {total} 件 / 方式別比較"]
         for group in summary['groups']:
             direct = ExperimentSummaryDialog._format_rate(group['directSearchSuccessRate'])
             fallback = ExperimentSummaryDialog._format_rate(group['fallbackCompletionRate'])
@@ -400,6 +408,9 @@ class ExperimentSummaryDialog(Tk.Toplevel):
         self.text.delete('1.0', Tk.END)
         self.text.insert(Tk.END, content)
         self.text.configure(state = Tk.DISABLED)
+
+    def _selected_source(self):
+        return self.source_var.get().lower()
 
 
 class AnalysisScoresDialog(Tk.Toplevel):

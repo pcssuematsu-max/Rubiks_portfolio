@@ -88,9 +88,26 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertEqual(search2["directSolutionMoves"]["minimum"], 14)
             self.assertEqual(search2["interestingDiscoveries"][0]["moveCount"], 14)
 
+            csv_summary = store.summarize("csv")
+            self.assertEqual(csv_summary["groups"], summary["groups"])
+
             summary_path = store.export_summary()
             exported = json.loads(summary_path.read_text(encoding = "utf-8"))
             self.assertEqual(exported["groups"], summary["groups"])
+            with summary_path.with_name("ai-experiment-summary.csv").open(
+                encoding = "utf-8", newline = ""
+            ) as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0]["directMovesMinimum"], "14")
+
+            csv_source_path = store.export_summary(
+                output_directory / "csv-source-summary.json",
+                source = "csv",
+            )
+            csv_exported = json.loads(csv_source_path.read_text(encoding = "utf-8"))
+            self.assertEqual(csv_exported["source"], "csv")
+            self.assertEqual(csv_exported["groups"], summary["groups"])
 
     @staticmethod
     def _record(search_mode, move_count, elapsed_seconds, search_succeeded, fallback_used):

@@ -16,6 +16,29 @@ EXPERIMENT_LOG_SCHEMA_VERSION = 2
 EXPERIMENT_LOG_FILE_NAME = "ai-experiments.jsonl"
 EXPERIMENT_CSV_FILE_NAME = "ai-experiments.csv"
 EXPERIMENT_SUMMARY_FILE_NAME = "ai-experiment-summary.json"
+EXPERIMENT_SUMMARY_CSV_FILE_NAME = "ai-experiment-summary.csv"
+SUMMARY_CSV_FIELDS = (
+    "puzzle",
+    "searchMode",
+    "runCount",
+    "classifiedRunCount",
+    "directSearchSuccessCount",
+    "directSearchSuccessRate",
+    "fallbackCompletedCount",
+    "fallbackCompletionRate",
+    "failedCount",
+    "legacyUnknownCount",
+    "elapsedMinimum",
+    "elapsedMedian",
+    "elapsedMean",
+    "directMovesMinimum",
+    "directMovesMedian",
+    "directMovesMean",
+    "completedMovesMinimum",
+    "completedMovesMedian",
+    "completedMovesMean",
+    "interestingDiscoveries",
+)
 CSV_FIELDS = (
     "schemaVersion", "timestamp", "puzzleType", "cubeSize", "puzzle",
     "searchMode", "aiIndex", "solveIndex", "stage", "succeeded",
@@ -119,9 +142,9 @@ class ExperimentLogStore:
                 writer.writeheader()
             writer.writerow(row)
 
-    def summarize(self) -> dict[str, Any]:
+    def summarize(self, source = "jsonl") -> dict[str, Any]:
         """Aggregate runs by puzzle and search mode for comparison or Web use."""
-        records = self._read_records()
+        records = self._read_records(source)
         groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
         for record in records:
             key = (record["puzzle"], record["searchMode"])
@@ -129,6 +152,7 @@ class ExperimentLogStore:
         return {
             "schemaVersion": 1,
             "generatedAt": datetime.now(timezone.utc).isoformat(timespec = "seconds"),
+            "source": source,
             "sourceSchemaVersions": sorted({record["schemaVersion"] for record in records}),
             "totalRuns": len(records),
             "groups": [
@@ -137,23 +161,31 @@ class ExperimentLogStore:
             ],
         }
 
-    def export_summary(self, path: Path | None = None) -> Path:
-        """Write a compact benchmark summary ready for a static Web page."""
+    def export_summary(self, path: Path | None = None, source = "jsonl") -> Path:
+        """Write compact JSON and CSV summaries ready for Web or spreadsheet use."""
         destination = (
             Path(path)
             if path is not None
             else self.path.with_name(EXPERIMENT_SUMMARY_FILE_NAME)
         )
         destination.parent.mkdir(parents = True, exist_ok = True)
-        payload = self.summarize()
+        payload = self.summarize(source)
         temporary_path = destination.with_suffix(destination.suffix + ".tmp")
         with temporary_path.open("w", encoding = "utf-8") as stream:
             json.dump(payload, stream, ensure_ascii = False, indent = 2)
             stream.write("\n")
         temporary_path.replace(destination)
+        self._write_summary_csv(
+            payload,
+            destination.with_name(EXPERIMENT_SUMMARY_CSV_FILE_NAME),
+        )
         return destination
 
-    def _read_records(self) -> list[dict[str, Any]]:
+    def _read_records(self, source: str) -> list[dict[str, Any]]:
+        if source == "csv":
+            return self._read_csv_records()
+        if source != "jsonl":
+            raise ValueError("Experiment summary source must be 'jsonl' or 'csv'")
         if not self.path.exists():
             return []
         records = []
@@ -169,6 +201,27 @@ class ExperimentLogStore:
                     ) from error
                 records.append(_normalize_experiment_record(payload, line_number))
         return records
+
+    def _read_csv_records(self) -> list[dict[str, Any]]:
+        if not self.csv_path.exists():
+            return []
+        records = []
+        with self.csv_path.open(encoding = "utf-8", newline = "") as stream:
+            for line_number, row in enumerate(csv.DictReader(stream), 2):
+                records.append(_normalize_experiment_record(
+                    _csv_row_to_payload(row),
+                    line_number,
+                ))
+        return records
+
+    @staticmethod
+    def _write_summary_csv(payload: dict[str, Any], path: Path) -> None:
+        path.parent.mkdir(parents = True, exist_ok = True)
+        with path.open("w", encoding = "utf-8", newline = "") as stream:
+            writer = csv.DictWriter(stream, fieldnames = SUMMARY_CSV_FIELDS)
+            writer.writeheader()
+            for group in payload["groups"]:
+                writer.writerow(_summary_csv_row(group))
 
     @staticmethod
     def _csv_value(value: Any) -> Any:
@@ -246,6 +299,8 @@ def _normalize_experiment_record(payload: Any, line_number: int) -> dict[str, An
     search_succeeded = payload.get("searchSucceeded") if schema_version >= 2 else None
     fallback_used = payload.get("fallbackUsed") if schema_version >= 2 else None
     outcome = payload.get("outcome") if schema_version >= 2 else "legacy_unknown"
+    if not outcome:
+        outcome = "legacy_unknown"
     return {
         "schemaVersion": schema_version,
         "timestamp": str(payload.get("timestamp", "")),
@@ -253,9 +308,9 @@ def _normalize_experiment_record(payload: Any, line_number: int) -> dict[str, An
         "searchMode": str(payload["searchMode"]),
         "aiIndex": _safe_int(payload.get("aiIndex")),
         "solveIndex": _safe_int(payload.get("solveIndex")),
-        "succeeded": bool(payload["succeeded"]),
-        "searchSucceeded": None if search_succeeded is None else bool(search_succeeded),
-        "fallbackUsed": None if fallback_used is None else bool(fallback_used),
+        "succeeded": _safe_bool(payload["succeeded"]),
+        "searchSucceeded": _safe_bool(search_succeeded),
+        "fallbackUsed": _safe_bool(fallback_used),
         "outcome": str(outcome),
         "elapsedSeconds": _safe_float(payload["elapsedSeconds"]),
         "moveCount": _safe_int(payload["moveCount"]),
@@ -350,3 +405,71 @@ def _safe_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _safe_bool(value: Any) -> bool | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ("true", "1", "yes"):
+            return True
+        if normalized in ("false", "0", "no"):
+            return False
+        return None
+    return bool(value)
+
+
+def _csv_row_to_payload(row: dict[str, str]) -> dict[str, Any]:
+    """Restore typed fields and JSON columns from the raw experiment CSV."""
+    return {
+        **row,
+        "setup": _parse_csv_json_list(row.get("setup")),
+        "moves": _parse_csv_json_list(row.get("moves")),
+        "stats": _parse_csv_json_list(row.get("stats")),
+    }
+
+
+def _parse_csv_json_list(value: str | None) -> list[Any]:
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _summary_csv_row(group: dict[str, Any]) -> dict[str, Any]:
+    """Flatten one Search2/Search3 comparison row for spreadsheet tools."""
+    elapsed = group["elapsedSeconds"]
+    direct_moves = group["directSolutionMoves"]
+    completed_moves = group["completedSolutionMoves"]
+    return {
+        "puzzle": group["puzzle"],
+        "searchMode": group["searchMode"],
+        "runCount": group["runCount"],
+        "classifiedRunCount": group["classifiedRunCount"],
+        "directSearchSuccessCount": group["directSearchSuccessCount"],
+        "directSearchSuccessRate": group["directSearchSuccessRate"],
+        "fallbackCompletedCount": group["fallbackCompletedCount"],
+        "fallbackCompletionRate": group["fallbackCompletionRate"],
+        "failedCount": group["failedCount"],
+        "legacyUnknownCount": group["legacyUnknownCount"],
+        "elapsedMinimum": elapsed["minimum"],
+        "elapsedMedian": elapsed["median"],
+        "elapsedMean": elapsed["mean"],
+        "directMovesMinimum": direct_moves["minimum"],
+        "directMovesMedian": direct_moves["median"],
+        "directMovesMean": direct_moves["mean"],
+        "completedMovesMinimum": completed_moves["minimum"],
+        "completedMovesMedian": completed_moves["median"],
+        "completedMovesMean": completed_moves["mean"],
+        "interestingDiscoveries": json.dumps(
+            group["interestingDiscoveries"],
+            ensure_ascii = False,
+            separators = (",", ":"),
+        ),
+    }
