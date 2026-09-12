@@ -6,6 +6,7 @@ from tkinter.scrolledtext import ScrolledText
 import numpy as np
 
 from cube.rubiks_cube import Rubiks_3
+from core.experiment_log import ExperimentLogStore
 from core.puzzle_registry import get_puzzle_adapter
 from ui.viewers import StateViewer
 
@@ -307,6 +308,98 @@ class RecentSolveHistoryDialog(Tk.Toplevel):
         record = self._selected_record()
         if record is not None:
             self.frame.open_recent_solve_web_playback(record)
+
+
+class ExperimentSummaryDialog(Tk.Toplevel):
+    """Compare persisted Search2/Search3 experiment outcomes."""
+
+    def __init__(self, frame):
+        Tk.Toplevel.__init__(self, frame)
+        self.frame = frame
+        self.font = ('Century Gothic', 11, 'bold')
+        self.title('実験ログ集計')
+        self.geometry('800x560')
+        self._build_widgets()
+
+    def _build_widgets(self):
+        header = Tk.Frame(self)
+        header.pack(fill = 'x', padx = 8, pady = (8, 4))
+        Tk.Label(header, text = 'Search方式ごとの比較', font = self.font).pack(side = 'left')
+        Tk.Button(header, text = '更新', font = self.font, command = self.refresh).pack(side = 'right')
+        Tk.Button(header, text = '集計JSONを保存', font = self.font, command = self.export).pack(side = 'right', padx = 4)
+        self.text = ScrolledText(self, wrap = Tk.WORD, font = ('Menlo', 11))
+        self.text.pack(fill = 'both', expand = True, padx = 8, pady = (0, 8))
+        self.text.configure(state = Tk.DISABLED)
+
+    def refresh(self):
+        try:
+            summary = ExperimentLogStore().summarize()
+        except (OSError, ValueError) as error:
+            self._set_text(f'実験ログを集計できませんでした。\n{error}')
+            return
+        self._set_text(self._format_summary(summary))
+
+    def export(self):
+        try:
+            path = ExperimentLogStore().export_summary()
+        except (OSError, ValueError) as error:
+            self.frame.append_log(f'実験ログ集計: 保存できませんでした ({error})')
+            return
+        self.frame.append_log(f'実験ログ集計: {path} を保存しました。')
+        self.refresh()
+
+    @staticmethod
+    def _format_summary(summary):
+        total = summary['totalRuns']
+        if total == 0:
+            return 'まだ保存済みの実験ログはありません。'
+        lines = [f'全 {total} 件 / 方式別比較']
+        for group in summary['groups']:
+            direct = ExperimentSummaryDialog._format_rate(group['directSearchSuccessRate'])
+            fallback = ExperimentSummaryDialog._format_rate(group['fallbackCompletionRate'])
+            direct_moves = ExperimentSummaryDialog._format_numbers(group['directSolutionMoves'])
+            completed_moves = ExperimentSummaryDialog._format_numbers(group['completedSolutionMoves'])
+            elapsed = ExperimentSummaryDialog._format_numbers(group['elapsedSeconds'])
+            lines += [
+                '',
+                f"[{group['puzzle']} / {group['searchMode']}] {group['runCount']} runs",
+                f"  直接探索成功: {group['directSearchSuccessCount']}/{group['classifiedRunCount']} ({direct})",
+                f"  Fallback完了: {group['fallbackCompletedCount']}/{group['classifiedRunCount']} ({fallback})  失敗: {group['failedCount']}",
+                f'  探索時間 秒: {elapsed}',
+                f'  直接探索の手数: {direct_moves}',
+                f'  解けた全結果の手数: {completed_moves}',
+            ]
+            if group['legacyUnknownCount']:
+                lines.append(f"  ※旧形式で結果種別不明: {group['legacyUnknownCount']} 件")
+            discoveries = group['interestingDiscoveries']
+            if discoveries:
+                lines.append('  面白い探索（短手数の直接探索・上位5件）:')
+                for row in discoveries:
+                    moves = ' '.join(row['moves']) or '(手順なし)'
+                    lines.append(
+                        f"    #{row['solveIndex']}  {row['moveCount']}手 / "
+                        f"{row['elapsedSeconds']:.3f}s / {moves}"
+                    )
+        return '\n'.join(lines)
+
+    @staticmethod
+    def _format_rate(value):
+        return '--' if value is None else f'{value * 100:.1f}%'
+
+    @staticmethod
+    def _format_numbers(values):
+        if values['count'] == 0:
+            return 'データなし'
+        return (
+            f"最短 {values['minimum']} / 中央 {values['median']} / "
+            f"平均 {values['mean']} (n={values['count']})"
+        )
+
+    def _set_text(self, content):
+        self.text.configure(state = Tk.NORMAL)
+        self.text.delete('1.0', Tk.END)
+        self.text.insert(Tk.END, content)
+        self.text.configure(state = Tk.DISABLED)
 
 
 class AnalysisScoresDialog(Tk.Toplevel):

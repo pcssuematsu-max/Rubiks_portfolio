@@ -28,3 +28,4 @@ reports/*.csv
 # Local, append-only solve experiment logs
 exports/ai-experiments.jsonl
 exports/ai-experiments.csv
+exports/ai-experiment-summary.json

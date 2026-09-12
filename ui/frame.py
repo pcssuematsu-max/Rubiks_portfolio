@@ -22,7 +22,7 @@ from managers.search_data import SearchDataManager
 from managers.solve_session import SolveSessionManager, SolveSessionState
 from model.search_result import data
 from ui.control_panel import ControlPanel
-from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, LpShowKeyButton, ParamEditorDialog, RecentSolveHistoryDialog, ToolsDialog, W1EmbeddingDialog
+from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, ExperimentSummaryDialog, LpShowKeyButton, ParamEditorDialog, RecentSolveHistoryDialog, ToolsDialog, W1EmbeddingDialog
 from ui.frame_config import FrameConfig
 from ui.move_controls import MoveControlProxy, square1_manual_move, update_square1_manual_status
 from ui.group_puzzle.state_viewer import GroupStateViewer
@@ -762,6 +762,7 @@ class Frame(Tk.Frame):
             self.solve_summary_panel,
             self.AInum,
             on_open_history = self.show_recent_solve_history,
+            on_open_summary = self.show_experiment_summary,
         )
         self.success_viewer.grid(row = 1,column = 0,sticky = 'ew')
         self.success_viewer.put_summary(self.success,self.N,self.AI_idx)
@@ -1109,6 +1110,16 @@ class Frame(Tk.Frame):
         self.recent_solve_history_dialog.refresh()
         self.recent_solve_history_dialog.deiconify()
         self.recent_solve_history_dialog.lift()
+
+    def show_experiment_summary(self):
+        if (
+            not hasattr(self, 'experiment_summary_dialog')
+            or not self.experiment_summary_dialog.winfo_exists()
+        ):
+            self.experiment_summary_dialog = ExperimentSummaryDialog(self)
+        self.experiment_summary_dialog.refresh()
+        self.experiment_summary_dialog.deiconify()
+        self.experiment_summary_dialog.lift()
 
     def open_recent_solve_web_playback(self, record):
         puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)

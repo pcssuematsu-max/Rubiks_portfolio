@@ -63,3 +63,52 @@ class ExperimentLogStoreTests(unittest.TestCase):
             ),
             "greedy_fallback_failed",
         )
+
+    def test_summarizes_search_modes_and_selects_short_direct_searches(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            store = ExperimentLogStore(
+                output_directory / "runs.jsonl",
+                output_directory / "runs.csv",
+            )
+            store.append(self._record("search2", 14, 2.0, True, False))
+            store.append(self._record("search2", 5, 1.0, False, True))
+            store.append(self._record("search2", 0, 0.5, False, False))
+            store.append(self._record("search3", 8, 3.0, True, False))
+
+            summary = store.summarize()
+            search2 = next(
+                group for group in summary["groups"]
+                if group["searchMode"] == "search2"
+            )
+            self.assertEqual(summary["totalRuns"], 4)
+            self.assertEqual(search2["directSearchSuccessCount"], 1)
+            self.assertEqual(search2["fallbackCompletedCount"], 1)
+            self.assertEqual(search2["failedCount"], 1)
+            self.assertEqual(search2["directSolutionMoves"]["minimum"], 14)
+            self.assertEqual(search2["interestingDiscoveries"][0]["moveCount"], 14)
+
+            summary_path = store.export_summary()
+            exported = json.loads(summary_path.read_text(encoding = "utf-8"))
+            self.assertEqual(exported["groups"], summary["groups"])
+
+    @staticmethod
+    def _record(search_mode, move_count, elapsed_seconds, search_succeeded, fallback_used):
+        succeeded = search_succeeded or fallback_used
+        return completed_experiment_record(
+            puzzle_type = "rubiks",
+            cube_size = 7,
+            search_mode = search_mode,
+            ai_index = 0,
+            solve_index = move_count,
+            stage = 0,
+            succeeded = succeeded,
+            search_succeeded = search_succeeded,
+            fallback_used = fallback_used,
+            elapsed_seconds = elapsed_seconds,
+            setup = ("R",),
+            moves = tuple("R" for _ in range(move_count)),
+            root_score = 0.1,
+            best_score = 0.2,
+            end_reason = "solved" if succeeded else "budget",
+        )
