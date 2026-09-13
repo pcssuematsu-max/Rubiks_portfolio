@@ -8,6 +8,9 @@ import resource
 import subprocess
 import sys
 from collections import Counter
+from time import perf_counter
+
+from core.learning_history import LearningHistoryStore, completed_learning_record
 
 class LearnManager:
     """FrameからAI学習の実行順序とSearch2/Search3の呼び分けを切り出す。"""
@@ -47,9 +50,28 @@ class LearnManager:
         """1つのAIを学習し、学習後処理を行って結果を返す。"""
         ai = self.frame.AIs[index]
         self.frame.append_log(f'AI {index} learn start ({ai.search_mode})')
+        started_at = perf_counter()
         result = self.run_learning(index,ai)
         self.after_learning(ai)
+        self.record_learning_history(index, ai, perf_counter() - started_at)
         return result
+
+    def record_learning_history(self, index, ai, elapsed_seconds):
+        """Persist one completed AI learning point without interrupting learning."""
+        record = completed_learning_record(index, ai, elapsed_seconds)
+        try:
+            LearningHistoryStore().append(record)
+        except (OSError, ValueError) as error:
+            self.frame.append_log(f'学習履歴: 保存できませんでした ({error})')
+            return
+        policy_loss = record['policyLoss']
+        value_loss = record['valueLoss']
+        self.frame.append_log(
+            f"学習履歴: AI {index} {record['searchMode']} "
+            f"P={policy_loss if policy_loss is not None else '-'} "
+            f"V={value_loss if value_loss is not None else '-'} "
+            f"updates={record['updatesDuringSolve']} を保存しました。"
+        )
 
     def run_learning(self, index, ai):
         """AIのsearch_modeに応じてSearch2型またはSearch3型の学習を呼び分ける。"""

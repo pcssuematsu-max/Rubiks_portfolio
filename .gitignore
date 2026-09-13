@@ -30,3 +30,4 @@ exports/ai-experiments.jsonl
 exports/ai-experiments.csv
 exports/ai-experiment-summary.json
 exports/ai-experiment-summary.csv
+exports/ai-learning-history.json

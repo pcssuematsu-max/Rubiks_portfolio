@@ -22,7 +22,7 @@ from managers.search_data import SearchDataManager
 from managers.solve_session import SolveSessionManager, SolveSessionState
 from model.search_result import data
 from ui.control_panel import ControlPanel
-from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, ExperimentSummaryDialog, LpShowKeyButton, ParamEditorDialog, RecentSolveHistoryDialog, ToolsDialog, W1EmbeddingDialog
+from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, ExperimentSummaryDialog, LearningHistoryDialog, LpShowKeyButton, ParamEditorDialog, RecentSolveHistoryDialog, ToolsDialog, W1EmbeddingDialog
 from ui.frame_config import FrameConfig
 from ui.move_controls import MoveControlProxy, square1_manual_move, update_square1_manual_status
 from ui.group_puzzle.state_viewer import GroupStateViewer
@@ -1120,6 +1120,16 @@ class Frame(Tk.Frame):
         self.experiment_summary_dialog.refresh()
         self.experiment_summary_dialog.deiconify()
         self.experiment_summary_dialog.lift()
+
+    def show_learning_history(self):
+        if (
+            not hasattr(self, 'learning_history_dialog')
+            or not self.learning_history_dialog.winfo_exists()
+        ):
+            self.learning_history_dialog = LearningHistoryDialog(self)
+        self.learning_history_dialog.refresh()
+        self.learning_history_dialog.deiconify()
+        self.learning_history_dialog.lift()
 
     def open_recent_solve_web_playback(self, record):
         puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)

@@ -7,6 +7,7 @@ import numpy as np
 
 from cube.rubiks_cube import Rubiks_3
 from core.experiment_log import ExperimentLogStore
+from core.learning_history import LearningHistoryStore
 from core.puzzle_registry import get_puzzle_adapter
 from ui.viewers import StateViewer
 
@@ -411,6 +412,150 @@ class ExperimentSummaryDialog(Tk.Toplevel):
 
     def _selected_source(self):
         return self.source_var.get().lower()
+
+
+class LearningHistoryDialog(Tk.Toplevel):
+    """Show per-AI loss trends and the settings used for each learning run."""
+
+    CHART_WIDTH = 760
+    CHART_HEIGHT = 210
+    CHART_HISTORY_LIMIT = 60
+
+    def __init__(self, frame):
+        Tk.Toplevel.__init__(self, frame)
+        self.frame = frame
+        self.font = ('Century Gothic', 11, 'bold')
+        self.title('学習履歴')
+        self.geometry('820x620')
+        self.ai_var = Tk.StringVar(value = 'AI 0')
+        self._build_widgets()
+
+    def _build_widgets(self):
+        header = Tk.Frame(self)
+        header.pack(fill = 'x', padx = 8, pady = (8, 4))
+        Tk.Label(header, text = 'AIごとの誤差と更新設定', font = self.font).pack(side = 'left')
+        options = tuple(f'AI {index}' for index in range(self.frame.AInum))
+        Tk.OptionMenu(
+            header,
+            self.ai_var,
+            *options,
+            command = lambda _selection: self.refresh(),
+        ).pack(side = 'right', padx = 4)
+        Tk.Button(header, text = '更新', font = self.font, command = self.refresh).pack(side = 'right')
+
+        self.summary_label = Tk.Label(
+            self,
+            text = '',
+            font = ('Menlo', 10),
+            anchor = 'w',
+            justify = Tk.LEFT,
+        )
+        self.summary_label.pack(fill = 'x', padx = 8, pady = (0, 4))
+        self.chart = Tk.Canvas(
+            self,
+            width = self.CHART_WIDTH,
+            height = self.CHART_HEIGHT,
+            bg = '#202020',
+            highlightthickness = 0,
+        )
+        self.chart.pack(fill = 'x', padx = 8)
+        self.details = ScrolledText(self, height = 14, wrap = Tk.WORD, font = ('Menlo', 10))
+        self.details.pack(fill = 'both', expand = True, padx = 8, pady = 8)
+        self.details.configure(state = Tk.DISABLED)
+
+    def refresh(self):
+        try:
+            records = LearningHistoryStore().records()
+        except (OSError, ValueError) as error:
+            self.summary_label.configure(text = '学習履歴を読めませんでした。')
+            self._draw_chart([])
+            self._set_details(str(error))
+            return
+        ai_index = int(self.ai_var.get().replace('AI ', ''))
+        selected = [record for record in records if record['aiIndex'] == ai_index]
+        self._draw_chart(selected)
+        self._show_records(ai_index, selected)
+
+    def _show_records(self, ai_index, records):
+        if not records:
+            self.summary_label.configure(text = f'AI {ai_index}: まだ保存済みの学習履歴はありません。')
+            self._set_details('学習を実行すると、loss・更新回数・学習率・Search方式がここへ蓄積されます。')
+            return
+        latest = records[-1]
+        learning_rate = latest['learningRate']
+        update_scales = latest['updateScales']
+        self.summary_label.configure(
+            text = (
+                f"AI {ai_index} / {latest['searchMode']} / {len(records)} 回の学習\n"
+                f"最新: P={self._number(latest['policyLoss'])}  V={self._number(latest['valueLoss'])}  "
+                f"updates={latest['updatesDuringSolve']}  data={latest['trainingDataCount']}→{latest['retainedDataCount']}\n"
+                f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
+                f"update scale={self._number(update_scales['shared'])}/"
+                f"{self._number(update_scales['policy'])}/{self._number(update_scales['value'])}"
+            )
+        )
+        lines = ['直近の学習履歴（新しい順）']
+        for record in reversed(records[-20:]):
+            lr = record['learningRate']
+            scales = record['updateScales']
+            lines.append(
+                f"{record['timestamp']}  {record['searchMode']}  "
+                f"P={self._number(record['policyLoss'])} V={self._number(record['valueLoss'])}  "
+                f"updates={record['updatesDuringSolve']}  {record['learningSeconds']:.3f}s"
+            )
+            lines.append(
+                f"  lr={self._number(lr['base'])} lr_C={self._number(lr['lrC'])} "
+                f"momentum={self._number(lr['momentumV'])}/{self._number(lr['momentumH'])}  "
+                f"scale={self._number(scales['shared'])}/{self._number(scales['policy'])}/{self._number(scales['value'])}"
+            )
+        self._set_details('\n'.join(lines))
+
+    def _draw_chart(self, records):
+        self.chart.delete('trend')
+        width = self.CHART_WIDTH
+        height = self.CHART_HEIGHT
+        self.chart.create_rectangle(0, 0, width, height, fill = '#202020', outline = '', tags = 'trend')
+        visible = records[-self.CHART_HISTORY_LIMIT:]
+        policy = [record['policyLoss'] for record in visible]
+        value = [record['valueLoss'] for record in visible]
+        self.chart.create_text(8, 10, text = 'loss trend  policy=orange  value=cyan（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if not visible or not any(item is not None for item in policy + value):
+            self.chart.create_text(width // 2, height // 2, text = 'loss data がまだありません', fill = '#A0A0A0', tags = 'trend')
+            return
+        self._draw_loss_series(policy, '#E68A00', 25, width - 12, 35, height - 22)
+        self._draw_loss_series(value, '#49C7D4', 25, width - 12, 35, height - 22)
+        self.chart.create_text(8, height - 11, text = f'表示: 直近 {len(visible)} 回', fill = '#A0A0A0', anchor = 'w', font = ('Menlo', 9), tags = 'trend')
+
+    def _draw_loss_series(self, values, color, x0, x1, y0, y1):
+        numeric = [float(value) for value in values if value is not None]
+        if not numeric:
+            return
+        minimum = min(numeric)
+        maximum = max(numeric)
+        span = maximum - minimum
+        previous = None
+        count = max(1, len(values) - 1)
+        for index, item in enumerate(values):
+            if item is None:
+                previous = None
+                continue
+            x = x0 + (x1 - x0) * index / count
+            ratio = 0.5 if span == 0 else (float(item) - minimum) / span
+            y = y1 - (y1 - y0) * ratio
+            if previous is not None:
+                self.chart.create_line(*previous, x, y, fill = color, width = 2, tags = 'trend')
+            previous = (x, y)
+        self.chart.create_text(x0, y0 - 5, text = f'{color}: {minimum:.4g}–{maximum:.4g}', fill = color, anchor = 'sw', font = ('Menlo', 9), tags = 'trend')
+
+    @staticmethod
+    def _number(value):
+        return '--' if value is None else f'{value:.6g}'
+
+    def _set_details(self, content):
+        self.details.configure(state = Tk.NORMAL)
+        self.details.delete('1.0', Tk.END)
+        self.details.insert(Tk.END, content)
+        self.details.configure(state = Tk.DISABLED)
 
 
 class AnalysisScoresDialog(Tk.Toplevel):

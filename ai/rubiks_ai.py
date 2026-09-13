@@ -245,6 +245,7 @@ class Rubiks_3_AI:
         self.indices = []
         self.datas_search3 = []
         self.indices_search3 = []
+        self.last_training_metrics = None
 
 
         self.myperms = {}
@@ -1299,6 +1300,14 @@ class Rubiks_3_AI:
         if original_len > 0:
             self.lr_C = min(1,err/original_len/10)
 
+        self._record_training_metrics(
+            err,
+            err2,
+            original_len,
+            len(self.indices),
+            epoch_num,
+        )
+
         if epoch_num == 0:
             return (0,0,0,0,0)
 
@@ -1833,6 +1842,13 @@ class Rubiks_3_AI:
         err, err2, new_indices, original_len, epoch_num, l1_max = training_result
 
         self.indices_search3 = new_indices
+        self._record_training_metrics(
+            err,
+            err2,
+            original_len,
+            len(self.indices_search3),
+            epoch_num,
+        )
         if epoch_num == 0:
             return (0,0,0,0)
 
@@ -1842,6 +1858,18 @@ class Rubiks_3_AI:
 
         self._finalize_training(progress_callback = progress_callback)
         return (err / epoch_num,err2 / epoch_num,len(self.indices_search3),original_len,l1_max)
+
+    def _record_training_metrics(self, policy_loss_sum, value_loss_sum, original_len, retained_len, update_count):
+        """Keep one compact learning summary for the GUI and JSON history."""
+        updates = max(0,int(update_count))
+        self.last_training_metrics = {
+            'policyLoss': None if updates == 0 else float(policy_loss_sum) / updates,
+            'valueLoss': None if updates == 0 else float(value_loss_sum) / updates,
+            # One optimizer step is applied for each processed training batch.
+            'updatesDuringSolve': updates,
+            'trainingDataCount': max(0,int(original_len)),
+            'retainedDataCount': max(0,int(retained_len)),
+        }
 
     def _run_training_epochs(self, indices, data_source, train_batch, state_count_fn, transformation, flip_inside, progress_callback = None):
         """index 列を batch 学習して、残す index と誤差集計を返す。"""

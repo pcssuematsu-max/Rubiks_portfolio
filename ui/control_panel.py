@@ -85,6 +85,7 @@ class ControlPanel(Tk.Frame):
         self.loadparams_all_button = self._create_button(self.advanced_controls,'全AIの設定を読む', self.frame.loadparams_all, row = 0, column = 0)
         self.saveparams_all_button = self._create_button(self.advanced_controls,'全AIの設定を保存', self.frame.saveparams_all, row = 0, column = 1)
         self.tools_button = self._create_button(self.advanced_controls,'ツール', self.frame.open_tools_dialog, row = 0, column = 2)
+        self.learning_history_button = self._create_button(self.advanced_controls,'学習履歴', self.frame.show_learning_history, row = 0, column = 3)
 
     def _build_param_controls(self):
         """AI index 指定と param 入出力まわりの入力欄を配置する。"""
