@@ -12,7 +12,7 @@ from statistics import median
 from typing import Any
 
 
-EXPERIMENT_LOG_SCHEMA_VERSION = 2
+EXPERIMENT_LOG_SCHEMA_VERSION = 3
 EXPERIMENT_LOG_FILE_NAME = "ai-experiments.jsonl"
 EXPERIMENT_CSV_FILE_NAME = "ai-experiments.csv"
 EXPERIMENT_SUMMARY_FILE_NAME = "ai-experiment-summary.json"
@@ -20,6 +20,8 @@ EXPERIMENT_SUMMARY_CSV_FILE_NAME = "ai-experiment-summary.csv"
 SUMMARY_CSV_FIELDS = (
     "puzzle",
     "searchMode",
+    "aiIndex",
+    "aiSettings",
     "runCount",
     "classifiedRunCount",
     "directSearchSuccessCount",
@@ -44,7 +46,7 @@ CSV_FIELDS = (
     "searchMode", "aiIndex", "solveIndex", "stage", "succeeded",
     "searchSucceeded", "fallbackUsed", "outcome",
     "elapsedSeconds", "setupMoveCount", "moveCount", "score", "rootScore",
-    "bestScore", "endReason", "stats", "setup", "moves",
+    "bestScore", "endReason", "stats", "setup", "moves", "aiSettings",
 )
 
 
@@ -80,6 +82,7 @@ class ExperimentLogRecord:
     best_score: float | None
     end_reason: str | None
     stats: tuple[Any, ...]
+    ai_settings: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         """Return the camelCase record written to both output formats."""
@@ -109,6 +112,7 @@ class ExperimentLogRecord:
             "stats": list(self.stats),
             "setup": list(self.setup),
             "moves": list(self.moves),
+            "aiSettings": self.ai_settings,
         }
 
 
@@ -134,6 +138,7 @@ class ExperimentLogStore:
 
     def _append_csv(self, payload: dict[str, Any]) -> None:
         self.csv_path.parent.mkdir(parents = True, exist_ok = True)
+        self._ensure_csv_schema()
         write_header = not self.csv_path.exists() or self.csv_path.stat().st_size == 0
         row = {field: self._csv_value(payload[field]) for field in CSV_FIELDS}
         with self.csv_path.open("a", encoding = "utf-8", newline = "") as stream:
@@ -142,13 +147,38 @@ class ExperimentLogStore:
                 writer.writeheader()
             writer.writerow(row)
 
+    def _ensure_csv_schema(self) -> None:
+        """Extend a legacy CSV header before appending a newer schema row."""
+        if not self.csv_path.exists() or self.csv_path.stat().st_size == 0:
+            return
+        with self.csv_path.open(encoding = "utf-8", newline = "") as stream:
+            reader = csv.DictReader(stream)
+            if reader.fieldnames == list(CSV_FIELDS):
+                return
+            rows = list(reader)
+        temporary_path = self.csv_path.with_suffix(self.csv_path.suffix + ".tmp")
+        with temporary_path.open("w", encoding = "utf-8", newline = "") as stream:
+            writer = csv.DictWriter(stream, fieldnames = CSV_FIELDS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({field: row.get(field, "") for field in CSV_FIELDS})
+        temporary_path.replace(self.csv_path)
+
     def summarize(self, source = "jsonl") -> dict[str, Any]:
         """Aggregate runs by puzzle and search mode for comparison or Web use."""
         records = self._read_records(source)
         groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        ai_groups: dict[tuple[str, str, int | None, str], list[dict[str, Any]]] = {}
         for record in records:
             key = (record["puzzle"], record["searchMode"])
             groups.setdefault(key, []).append(record)
+            ai_key = (
+                record["puzzle"],
+                record["searchMode"],
+                record["aiIndex"],
+                _settings_fingerprint(record["aiSettings"]),
+            )
+            ai_groups.setdefault(ai_key, []).append(record)
         return {
             "schemaVersion": 1,
             "generatedAt": datetime.now(timezone.utc).isoformat(timespec = "seconds"),
@@ -158,6 +188,19 @@ class ExperimentLogStore:
             "groups": [
                 _summarize_group(puzzle, search_mode, rows)
                 for (puzzle, search_mode), rows in sorted(groups.items())
+            ],
+            "aiGroups": [
+                _summarize_group(
+                    puzzle,
+                    search_mode,
+                    rows,
+                    ai_index = ai_index,
+                    ai_settings = rows[0]["aiSettings"],
+                )
+                for (puzzle, search_mode, ai_index, _settings), rows in sorted(
+                    ai_groups.items(),
+                    key = _ai_group_sort_key,
+                )
             ],
         }
 
@@ -220,7 +263,7 @@ class ExperimentLogStore:
         with path.open("w", encoding = "utf-8", newline = "") as stream:
             writer = csv.DictWriter(stream, fieldnames = SUMMARY_CSV_FIELDS)
             writer.writeheader()
-            for group in payload["groups"]:
+            for group in payload["aiGroups"]:
                 writer.writerow(_summary_csv_row(group))
 
     @staticmethod
@@ -235,7 +278,7 @@ def completed_experiment_record(
     solve_index: int, stage: int, succeeded: bool, search_succeeded: bool,
     fallback_used: bool, elapsed_seconds: float,
     setup, moves, root_score: float | None, best_score: float | None,
-    end_reason: str | None, stats = (),
+    end_reason: str | None, stats = (), ai_settings: dict[str, Any] | None = None,
 ) -> ExperimentLogRecord:
     """Create a normalized record at the instant a solve completes."""
     normalized_type = str(puzzle_type).strip().lower() or "unknown"
@@ -266,6 +309,7 @@ def completed_experiment_record(
         best_score = best_score,
         end_reason = None if end_reason is None else str(end_reason),
         stats = tuple(_json_scalar(value) for value in normalized_stats),
+        ai_settings = _normalize_ai_settings(ai_settings),
     )
 
 
@@ -289,7 +333,7 @@ def _json_scalar(value: Any) -> Any:
 
 
 def _normalize_experiment_record(payload: Any, line_number: int) -> dict[str, Any]:
-    """Normalize schema v1/v2 rows while preserving v1's unknown outcome."""
+    """Normalize older rows while preserving their unavailable settings."""
     if not isinstance(payload, dict):
         raise ValueError(f"Invalid experiment log at line {line_number}: expected object")
     required_fields = ("puzzle", "searchMode", "succeeded", "elapsedSeconds", "moveCount")
@@ -317,10 +361,20 @@ def _normalize_experiment_record(payload: Any, line_number: int) -> dict[str, An
         "score": _safe_float(payload.get("score")),
         "setup": list(payload.get("setup", [])),
         "moves": list(payload.get("moves", [])),
+        "aiSettings": _normalize_ai_settings(
+            payload.get("aiSettings") if schema_version >= 3 else {}
+        ),
     }
 
 
-def _summarize_group(puzzle: str, search_mode: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+def _summarize_group(
+    puzzle: str,
+    search_mode: str,
+    rows: list[dict[str, Any]],
+    *,
+    ai_index: int | None = None,
+    ai_settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build comparison metrics and the shortest direct-search discoveries."""
     classified_rows = [row for row in rows if row["outcome"] != "legacy_unknown"]
     direct_rows = [row for row in rows if row["outcome"] == "search_success"]
@@ -342,7 +396,7 @@ def _summarize_group(puzzle: str, search_mode: str, rows: list[dict[str, Any]]) 
             row["timestamp"],
         ),
     )[:5]
-    return {
+    summary = {
         "puzzle": puzzle,
         "searchMode": search_mode,
         "runCount": len(rows),
@@ -370,6 +424,10 @@ def _summarize_group(puzzle: str, search_mode: str, rows: list[dict[str, Any]]) 
             for row in interesting_rows
         ],
     }
+    if ai_index is not None:
+        summary["aiIndex"] = ai_index
+        summary["aiSettings"] = ai_settings or {}
+    return summary
 
 
 def _number_summary(values: list[float | int]) -> dict[str, float | int | None]:
@@ -429,6 +487,7 @@ def _csv_row_to_payload(row: dict[str, str]) -> dict[str, Any]:
         "setup": _parse_csv_json_list(row.get("setup")),
         "moves": _parse_csv_json_list(row.get("moves")),
         "stats": _parse_csv_json_list(row.get("stats")),
+        "aiSettings": _parse_csv_json_object(row.get("aiSettings")),
     }
 
 
@@ -442,6 +501,16 @@ def _parse_csv_json_list(value: str | None) -> list[Any]:
     return parsed if isinstance(parsed, list) else []
 
 
+def _parse_csv_json_object(value: str | None) -> dict[str, Any]:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
 def _summary_csv_row(group: dict[str, Any]) -> dict[str, Any]:
     """Flatten one Search2/Search3 comparison row for spreadsheet tools."""
     elapsed = group["elapsedSeconds"]
@@ -450,6 +519,13 @@ def _summary_csv_row(group: dict[str, Any]) -> dict[str, Any]:
     return {
         "puzzle": group["puzzle"],
         "searchMode": group["searchMode"],
+        "aiIndex": group.get("aiIndex"),
+        "aiSettings": json.dumps(
+            group.get("aiSettings", {}),
+            ensure_ascii = False,
+            separators = (",", ":"),
+            sort_keys = True,
+        ),
         "runCount": group["runCount"],
         "classifiedRunCount": group["classifiedRunCount"],
         "directSearchSuccessCount": group["directSearchSuccessCount"],
@@ -473,3 +549,62 @@ def _summary_csv_row(group: dict[str, Any]) -> dict[str, Any]:
             separators = (",", ":"),
         ),
     }
+
+
+def rank_ai_metric_differences(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rank outcome metrics by their relative spread across comparable AIs.
+
+    This describes observed differences, not the cause.  The supplied groups
+    should therefore all share one puzzle and one search mode.
+    """
+    specifications = (
+        ("directSearchSuccessRate", "直接探索成功率", "rate", "higher"),
+        ("directSolutionMoves", "直接探索の中央値手数", "median", "lower"),
+        ("elapsedSeconds", "探索時間の中央値", "median", "lower"),
+        ("completedSolutionMoves", "完了結果の中央値手数", "median", "lower"),
+    )
+    differences = []
+    for key, label, field, preference in specifications:
+        values = []
+        for group in groups:
+            value = group.get(key) if field == "rate" else group.get(key, {}).get(field)
+            if value is not None:
+                values.append((group, float(value)))
+        if len(values) < 2:
+            continue
+        low_group, low_value = min(values, key = lambda item: item[1])
+        high_group, high_value = max(values, key = lambda item: item[1])
+        midpoint = (abs(low_value) + abs(high_value)) / 2
+        differences.append({
+            "key": key,
+            "label": label,
+            "field": field,
+            "preference": preference,
+            "lowGroup": low_group,
+            "lowValue": low_value,
+            "highGroup": high_group,
+            "highValue": high_value,
+            "relativeSpread": (high_value - low_value) / (midpoint or 1.0),
+        })
+    return sorted(differences, key = lambda item: item["relativeSpread"], reverse = True)
+
+
+def _normalize_ai_settings(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    normalized = {}
+    for key, item in value.items():
+        if isinstance(item, dict):
+            normalized[str(key)] = _normalize_ai_settings(item)
+        elif isinstance(item, (str, int, float, bool)) or item is None:
+            normalized[str(key)] = _json_scalar(item)
+    return normalized
+
+
+def _settings_fingerprint(settings: dict[str, Any]) -> str:
+    return json.dumps(settings, ensure_ascii = False, sort_keys = True, separators = (",", ":"))
+
+
+def _ai_group_sort_key(item):
+    (puzzle, search_mode, ai_index, settings), _rows = item
+    return (puzzle, search_mode, -1 if ai_index is None else ai_index, settings)

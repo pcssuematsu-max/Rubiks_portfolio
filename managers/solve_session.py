@@ -1196,6 +1196,7 @@ class SolveSessionManager:
             best_score = best_score,
             end_reason = getattr(result, 'end_reason', None),
             stats = getattr(result, 'stats', ()),
+            ai_settings = self._experiment_ai_settings(self.frame.AIs[self.frame.AI_idx]),
         )
         try:
             ExperimentLogStore().append(experiment)
@@ -1207,6 +1208,28 @@ class SolveSessionManager:
                 f'{experiment.elapsed_seconds:.3f}s を保存しました。'
             )
         return experiment
+
+    @staticmethod
+    def _experiment_ai_settings(ai):
+        """Capture result-affecting AI settings beside a solve record."""
+        return {
+            'model': 'transformer' if getattr(ai, 'use_transformer_attention', False) else 'linear',
+            'learningRate': getattr(ai, 'lr', None),
+            'weightDecayRate': getattr(ai, 'wdlr', None),
+            'updateScales': {
+                'shared': getattr(ai, 'update_scale_shared', None),
+                'policy': getattr(ai, 'update_scale_policy', None),
+                'value': getattr(ai, 'update_scale_value', None),
+            },
+            'search2': {
+                'maxFrontier': getattr(ai, 'search2_max_frontier', None),
+                'batchSize': getattr(ai, 'search2_torch_batch_size', None),
+                'valueLossType': getattr(ai, 'search2_value_loss_type', None),
+            },
+            'search3C': getattr(ai, 'search3_C', None),
+            'torchPredict': getattr(ai, 'use_torch_predict', None),
+            'torchTraining': getattr(ai, 'use_torch_training', None),
+        }
 
     @staticmethod
     def _experiment_score(value):

@@ -6,7 +6,7 @@ from tkinter.scrolledtext import ScrolledText
 import numpy as np
 
 from cube.rubiks_cube import Rubiks_3
-from core.experiment_log import ExperimentLogStore
+from core.experiment_log import ExperimentLogStore, rank_ai_metric_differences
 from core.learning_history import LearningHistoryStore
 from core.puzzle_registry import get_puzzle_adapter
 from ui.viewers import StateViewer
@@ -312,14 +312,29 @@ class RecentSolveHistoryDialog(Tk.Toplevel):
 
 
 class ExperimentSummaryDialog(Tk.Toplevel):
-    """Compare persisted Search2/Search3 experiment outcomes."""
+    """Compare experiment outcomes and observed differences between AIs."""
+
+    CHART_WIDTH = 820
+    CHART_HEIGHT = 285
+    AUTO_METRIC = '差が大きい指標（自動）'
+    METRICS = (
+        AUTO_METRIC,
+        '直接探索成功率',
+        '直接探索の中央値手数',
+        '探索時間の中央値',
+        '完了結果の中央値手数',
+    )
 
     def __init__(self, frame):
         Tk.Toplevel.__init__(self, frame)
         self.frame = frame
         self.font = ('Century Gothic', 11, 'bold')
         self.title('実験ログ集計')
-        self.geometry('800x560')
+        self.geometry('900x790')
+        self.puzzle_var = Tk.StringVar(value = '')
+        self.search_mode_var = Tk.StringVar(value = '')
+        self.metric_var = Tk.StringVar(value = self.AUTO_METRIC)
+        self.summary = None
         self._build_widgets()
 
     def _build_widgets(self):
@@ -336,6 +351,39 @@ class ExperimentSummaryDialog(Tk.Toplevel):
         ).pack(side = 'right', padx = 4)
         Tk.Button(header, text = '更新', font = self.font, command = self.refresh).pack(side = 'right')
         Tk.Button(header, text = '集計を保存', font = self.font, command = self.export).pack(side = 'right', padx = 4)
+
+        filters = Tk.Frame(self)
+        filters.pack(fill = 'x', padx = 8, pady = (0, 4))
+        Tk.Label(filters, text = 'Puzzle', font = self.font).pack(side = 'left')
+        self.puzzle_menu = Tk.OptionMenu(filters, self.puzzle_var, '')
+        self.puzzle_menu.pack(side = 'left', padx = (4, 10))
+        Tk.Label(filters, text = 'Search', font = self.font).pack(side = 'left')
+        self.search_mode_menu = Tk.OptionMenu(filters, self.search_mode_var, '')
+        self.search_mode_menu.pack(side = 'left', padx = (4, 10))
+        Tk.Label(filters, text = 'グラフ', font = self.font).pack(side = 'left')
+        Tk.OptionMenu(
+            filters,
+            self.metric_var,
+            *self.METRICS,
+            command = lambda _selection: self._refresh_display(),
+        ).pack(side = 'left', padx = 4)
+
+        self.chart_summary = Tk.Label(
+            self,
+            text = '',
+            font = ('Menlo', 10),
+            anchor = 'w',
+            justify = Tk.LEFT,
+        )
+        self.chart_summary.pack(fill = 'x', padx = 8, pady = (0, 3))
+        self.chart = Tk.Canvas(
+            self,
+            width = self.CHART_WIDTH,
+            height = self.CHART_HEIGHT,
+            bg = '#202020',
+            highlightthickness = 0,
+        )
+        self.chart.pack(fill = 'x', padx = 8)
         self.text = ScrolledText(self, wrap = Tk.WORD, font = ('Menlo', 11))
         self.text.pack(fill = 'both', expand = True, padx = 8, pady = (0, 8))
         self.text.configure(state = Tk.DISABLED)
@@ -344,9 +392,14 @@ class ExperimentSummaryDialog(Tk.Toplevel):
         try:
             summary = ExperimentLogStore().summarize(self._selected_source())
         except (OSError, ValueError) as error:
+            self.summary = None
+            self.chart_summary.configure(text = '実験ログを読めませんでした。')
+            self._draw_chart([], None)
             self._set_text(f'実験ログを集計できませんでした。\n{error}')
             return
-        self._set_text(self._format_summary(summary))
+        self.summary = summary
+        self._update_filter_options(summary)
+        self._refresh_display()
 
     def export(self):
         try:
@@ -356,6 +409,239 @@ class ExperimentSummaryDialog(Tk.Toplevel):
             return
         self.frame.append_log(f'実験ログ集計: JSON/CSV を {path.parent} に保存しました。')
         self.refresh()
+
+    def _update_filter_options(self, summary):
+        ai_groups = summary['aiGroups']
+        self._set_filter_options(
+            self.puzzle_menu,
+            self.puzzle_var,
+            sorted({group['puzzle'] for group in ai_groups}),
+        )
+        selected_puzzle = self.puzzle_var.get()
+        self._set_filter_options(
+            self.search_mode_menu,
+            self.search_mode_var,
+            sorted({
+                group['searchMode'] for group in ai_groups
+                if group['puzzle'] == selected_puzzle
+            }),
+        )
+
+    def _set_filter_options(self, menu, variable, options):
+        menu_items = menu['menu']
+        menu_items.delete(0, 'end')
+        if not options:
+            variable.set('')
+            return
+        for option in options:
+            menu_items.add_command(
+                label = option,
+                command = lambda value = option, var = variable: self._select_filter(var, value),
+            )
+        if variable.get() not in options:
+            variable.set(options[0])
+
+    def _select_filter(self, variable, value):
+        variable.set(value)
+        if variable is self.puzzle_var and self.summary is not None:
+            self._update_filter_options(self.summary)
+        self._refresh_display()
+
+    def _refresh_display(self):
+        if self.summary is None:
+            return
+        groups = self._selected_ai_groups()
+        differences = rank_ai_metric_differences(groups)
+        metric = self._selected_metric(differences)
+        self._draw_chart(groups, metric)
+        self._show_comparison(groups, differences, metric)
+
+    def _selected_ai_groups(self):
+        return [
+            group for group in self.summary['aiGroups']
+            if group['puzzle'] == self.puzzle_var.get()
+            and group['searchMode'] == self.search_mode_var.get()
+        ]
+
+    def _selected_metric(self, differences):
+        if self.metric_var.get() == self.AUTO_METRIC:
+            return differences[0] if differences else None
+        label = self.metric_var.get()
+        for difference in differences:
+            if difference['label'] == label:
+                return difference
+        return next(
+            (
+                {
+                    'key': key,
+                    'label': label,
+                    'field': field,
+                    'preference': preference,
+                }
+                for key, candidate, field, preference in (
+                    ('directSearchSuccessRate', '直接探索成功率', 'rate', 'higher'),
+                    ('directSolutionMoves', '直接探索の中央値手数', 'median', 'lower'),
+                    ('elapsedSeconds', '探索時間の中央値', 'median', 'lower'),
+                    ('completedSolutionMoves', '完了結果の中央値手数', 'median', 'lower'),
+                )
+                if candidate == label
+            ),
+            None,
+        )
+
+    def _draw_chart(self, groups, metric):
+        self.chart.delete('comparison')
+        self.chart.create_rectangle(
+            0, 0, self.CHART_WIDTH, self.CHART_HEIGHT,
+            fill = '#202020', outline = '', tags = 'comparison',
+        )
+        if metric is None:
+            self.chart_summary.configure(text = '比較には、同じ条件で少なくとも2つのAIの有効な結果が必要です。')
+            self.chart.create_text(
+                self.CHART_WIDTH // 2,
+                self.CHART_HEIGHT // 2,
+                text = '比較できるAI別データがまだありません',
+                fill = '#A0A0A0', tags = 'comparison',
+            )
+            return
+        values = [
+            (group, self._metric_value(group, metric))
+            for group in groups
+        ]
+        values = [(group, value) for group, value in values if value is not None]
+        if not values:
+            self.chart_summary.configure(text = f"{metric['label']}: 表示できる値がありません。")
+            return
+        maximum = max(value for _group, value in values) or 1.0
+        low = metric.get('lowValue')
+        high = metric.get('highValue')
+        if low is not None:
+            self.chart_summary.configure(
+                text = (
+                    f"{metric['label']}（{self._metric_unit(metric)}） / "
+                    f"観測上の最大差 {self._difference_text(metric, low, high)}"
+                )
+            )
+        else:
+            self.chart_summary.configure(text = f"{metric['label']}（{self._metric_unit(metric)}）")
+        self.chart.create_text(
+            8, 10,
+            text = 'AI別比較（同一 Puzzle / Search の実験結果）',
+            fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'comparison',
+        )
+        label_width = 280
+        x0 = label_width
+        x1 = self.CHART_WIDTH - 80
+        y0 = 32
+        row_height = max(12, (self.CHART_HEIGHT - y0 - 12) / len(values))
+        for index, (group, value) in enumerate(sorted(
+            values,
+            key = lambda item: -1 if item[0]['aiIndex'] is None else item[0]['aiIndex'],
+        )):
+            y = y0 + index * row_height
+            self.chart.create_text(
+                8, y + row_height / 2,
+                text = self._ai_label(group),
+                fill = '#D8D8D8', anchor = 'w', font = ('Menlo', 9), tags = 'comparison',
+            )
+            width = (x1 - x0) * value / maximum
+            self.chart.create_rectangle(
+                x0, y + 2, x0 + width, y + row_height - 2,
+                fill = '#48A9D4', outline = '', tags = 'comparison',
+            )
+            self.chart.create_text(
+                x1 + 6, y + row_height / 2,
+                text = self._metric_text(metric, value),
+                fill = '#FFFFFF', anchor = 'w', font = ('Menlo', 9), tags = 'comparison',
+            )
+
+    def _show_comparison(self, groups, differences, metric):
+        lines = [self._format_summary(self.summary), '', 'AI別の比較']
+        if not groups:
+            lines.append('この Puzzle / Search のAI別ログはありません。')
+        else:
+            lines.append(
+                f"比較条件: {self.puzzle_var.get()} / {self.search_mode_var.get()} / AI {len(groups)}種類"
+            )
+            lines.append('※設定と結果の関係は観測上の相関です。因果を判断するには同条件の試行数を増やしてください。')
+            if differences:
+                lines.append('差が大きい指標（相対差順）:')
+                for difference in differences[:3]:
+                    lines.append(
+                        f"  {difference['label']}: "
+                        f"{self._ai_label(difference['lowGroup'])} {self._metric_text(difference, difference['lowValue'])} "
+                        f"→ {self._ai_label(difference['highGroup'])} {self._metric_text(difference, difference['highValue'])} "
+                        f"({difference['relativeSpread'] * 100:.1f}%差)"
+                    )
+            else:
+                lines.append('差の順位を出すには、AIごとに有効な結果が必要です。')
+            lines.append('')
+            for group in sorted(
+                groups,
+                key = lambda item: -1 if item['aiIndex'] is None else item['aiIndex'],
+            ):
+                lines.append(
+                    f"{self._ai_label(group)}: runs={group['runCount']} / "
+                    f"直接探索={self._format_rate(group['directSearchSuccessRate'])} / "
+                    f"直接手数={self._format_numbers(group['directSolutionMoves'])} / "
+                    f"時間={self._format_numbers(group['elapsedSeconds'])}"
+                )
+                lines.append(f"  設定: {self._settings_text(group.get('aiSettings', {}))}")
+        self._set_text('\n'.join(lines))
+
+    @staticmethod
+    def _metric_value(group, metric):
+        if metric['field'] == 'rate':
+            return group.get(metric['key'])
+        return group.get(metric['key'], {}).get(metric['field'])
+
+    @staticmethod
+    def _metric_unit(metric):
+        if metric['key'] == 'directSearchSuccessRate':
+            return '%'
+        if metric['key'] == 'elapsedSeconds':
+            return '秒'
+        return '手'
+
+    @classmethod
+    def _metric_text(cls, metric, value):
+        if metric['key'] == 'directSearchSuccessRate':
+            return f'{value * 100:.1f}%'
+        return f'{value:.4g}'
+
+    @classmethod
+    def _difference_text(cls, metric, low, high):
+        if metric['key'] == 'directSearchSuccessRate':
+            return f'{(high - low) * 100:.1f}pt'
+        return f'{high - low:.4g}'
+
+    @staticmethod
+    def _ai_label(group):
+        index = group.get('aiIndex')
+        settings = group.get('aiSettings', {})
+        model = settings.get('model')
+        lr = settings.get('learningRate')
+        details = []
+        if model:
+            details.append(str(model))
+        if lr is not None:
+            details.append(f'lr={lr:.3g}')
+        suffix = f" ({', '.join(details)})" if details else ' (設定未保存)'
+        return f"AI {index if index is not None else '?'}{suffix}"
+
+    @staticmethod
+    def _settings_text(settings):
+        if not settings:
+            return '旧ログのため設定スナップショットなし'
+        search2 = settings.get('search2', {})
+        scales = settings.get('updateScales', {})
+        return (
+            f"model={settings.get('model', '--')} lr={settings.get('learningRate', '--')} "
+            f"wd={settings.get('weightDecayRate', '--')} "
+            f"scale={scales.get('shared', '--')}/{scales.get('policy', '--')}/{scales.get('value', '--')} "
+            f"S2 frontier={search2.get('maxFrontier', '--')} batch={search2.get('batchSize', '--')} "
+            f"loss={search2.get('valueLossType', '--')} S3C={settings.get('search3C', '--')}"
+        )
 
     @staticmethod
     def _format_summary(summary):

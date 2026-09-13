@@ -5,9 +5,11 @@ import tempfile
 import unittest
 
 from core.experiment_log import (
+    CSV_FIELDS,
     ExperimentLogStore,
     completed_experiment_record,
     experiment_outcome,
+    rank_ai_metric_differences,
 )
 
 
@@ -29,7 +31,7 @@ class ExperimentLogStoreTests(unittest.TestCase):
             ExperimentLogStore(jsonl_path, csv_path).append(record)
 
             payload = json.loads(jsonl_path.read_text(encoding = "utf-8"))
-            self.assertEqual(payload["schemaVersion"], 2)
+            self.assertEqual(payload["schemaVersion"], 3)
             self.assertEqual(payload["puzzle"], "rubiks-7x7")
             self.assertEqual(payload["searchMode"], "search3")
             self.assertEqual(payload["elapsedSeconds"], 1.234568)
@@ -39,6 +41,7 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertTrue(payload["searchSucceeded"])
             self.assertFalse(payload["fallbackUsed"])
             self.assertEqual(payload["outcome"], "search_success")
+            self.assertEqual(payload["aiSettings"], {})
 
             with csv_path.open(encoding = "utf-8", newline = "") as stream:
                 rows = list(csv.DictReader(stream))
@@ -109,14 +112,84 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertEqual(csv_exported["source"], "csv")
             self.assertEqual(csv_exported["groups"], summary["groups"])
 
+    def test_summarizes_ai_settings_separately_and_ranks_result_differences(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            store = ExperimentLogStore(
+                output_directory / 'runs.jsonl',
+                output_directory / 'runs.csv',
+            )
+            store.append(self._record(
+                'search2', 10, 1.0, True, False,
+                ai_index = 0,
+                ai_settings = {'model': 'linear', 'learningRate': 0.001},
+            ))
+            store.append(self._record(
+                'search2', 20, 3.0, True, False,
+                ai_index = 1,
+                ai_settings = {'model': 'transformer', 'learningRate': 0.01},
+            ))
+            store.append(self._record(
+                'search2', 0, 2.0, False, False,
+                ai_index = 1,
+                ai_settings = {'model': 'transformer', 'learningRate': 0.01},
+            ))
+
+            summary = store.summarize()
+            self.assertEqual(len(summary['aiGroups']), 2)
+            transformer = next(group for group in summary['aiGroups'] if group['aiIndex'] == 1)
+            self.assertEqual(transformer['aiSettings']['model'], 'transformer')
+            self.assertEqual(transformer['directSearchSuccessRate'], 0.5)
+            differences = rank_ai_metric_differences(summary['aiGroups'])
+            self.assertIn('directSolutionMoves', {item['key'] for item in differences})
+            self.assertIn('directSearchSuccessRate', {item['key'] for item in differences})
+
+            store.export_summary()
+            with (output_directory / 'ai-experiment-summary.csv').open(
+                encoding = 'utf-8', newline = '',
+            ) as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual(rows[0]['aiIndex'], '0')
+            self.assertIn('learningRate', rows[0]['aiSettings'])
+
+    def test_extends_a_legacy_csv_header_before_appending_settings(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            csv_path = output_directory / 'runs.csv'
+            legacy_fields = CSV_FIELDS[:-1]
+            with csv_path.open('w', encoding = 'utf-8', newline = '') as stream:
+                writer = csv.DictWriter(stream, fieldnames = legacy_fields)
+                writer.writeheader()
+                writer.writerow({field: '' for field in legacy_fields})
+            store = ExperimentLogStore(output_directory / 'runs.jsonl', csv_path)
+            store.append(self._record(
+                'search2', 3, 1.0, True, False,
+                ai_settings = {'model': 'linear'},
+            ))
+
+            with csv_path.open(encoding = 'utf-8', newline = '') as stream:
+                reader = csv.DictReader(stream)
+                rows = list(reader)
+            self.assertEqual(reader.fieldnames, list(CSV_FIELDS))
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[-1]['aiSettings'], '{"model":"linear"}')
+
     @staticmethod
-    def _record(search_mode, move_count, elapsed_seconds, search_succeeded, fallback_used):
+    def _record(
+        search_mode,
+        move_count,
+        elapsed_seconds,
+        search_succeeded,
+        fallback_used,
+        ai_index = 0,
+        ai_settings = None,
+    ):
         succeeded = search_succeeded or fallback_used
         return completed_experiment_record(
             puzzle_type = "rubiks",
             cube_size = 7,
             search_mode = search_mode,
-            ai_index = 0,
+            ai_index = ai_index,
             solve_index = move_count,
             stage = 0,
             succeeded = succeeded,
@@ -128,4 +201,5 @@ class ExperimentLogStoreTests(unittest.TestCase):
             root_score = 0.1,
             best_score = 0.2,
             end_reason = "solved" if succeeded else "budget",
+            ai_settings = ai_settings,
         )
