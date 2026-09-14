@@ -5,7 +5,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from core.ai_discoveries import AiDiscoveryStore, point_canonical_discovery_sequences
+from core.ai_discoveries import (
+    AiDiscoveryStore,
+    discovery_effect_metadata,
+    point_canonical_discovery_sequences,
+)
+from core.myperm_effects import MypermEffectAnalyzer
 from cube.rubiks_cube import Rubiks_3
 
 
@@ -25,6 +30,21 @@ class AiDiscoveryStoreTests(unittest.TestCase):
             self.assertEqual(payload["discoveries"][0]["setup"], ["R"])
             self.assertEqual(payload["discoveries"][0]["moves"], ["R2", "U2"])
             self.assertEqual(payload["discoveries"][0]["moveCount"], 2)
+
+    def test_saves_complete_effect_metadata_when_provided(self):
+        with TemporaryDirectory() as temporary_directory:
+            cube = Rubiks_3(size=3, RegisterMyperms=False)
+            effect = MypermEffectAnalyzer(cube).analyze((" R ",))
+            metadata = discovery_effect_metadata(effect)
+            store = AiDiscoveryStore(Path(temporary_directory) / "ai-discoveries.json")
+
+            store.save("3x3x3", (), ("R",), effect_metadata=metadata)
+
+            record = json.loads(store.path.read_text(encoding="utf-8"))["discoveries"][0]
+            self.assertEqual(record["effectName"], metadata["effectName"])
+            self.assertEqual(record["effectClass"], metadata["effectClass"])
+            self.assertEqual(record["effectCount"], metadata["effectCount"])
+            self.assertEqual(record["orientationCount"], metadata["orientationCount"])
 
     def test_keeps_different_start_positions_as_separate_discoveries(self):
         with TemporaryDirectory() as temporary_directory:

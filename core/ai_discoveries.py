@@ -17,6 +17,9 @@ _PAYLOAD_FIELDS = frozenset({"schemaVersion", "updatedAt", "discoveries"})
 _RECORD_FIELDS = frozenset(
     {"id", "puzzle", "setup", "moves", "moveCount", "foundAt", "updatedAt"}
 )
+_EFFECT_FIELDS = frozenset(
+    {"effectName", "effectClass", "effectCount", "orientationCount"}
+)
 
 
 def default_discoveries_path() -> Path:
@@ -60,6 +63,30 @@ def point_canonical_discovery_sequences(cube, setup, moves) -> tuple[tuple, tupl
     return canonical_setup, tuple(representative.moves)
 
 
+def discovery_effect_metadata(effect) -> dict:
+    """Build compact, display-ready effect information for a discovery."""
+    visible_components = tuple(
+        component
+        for component in effect.components
+        if not component.is_internal_center_permutation()
+    )
+    effect_count = sum(component.moved_count for component in visible_components)
+    orientation_count = sum(component.orientation_count for component in visible_components)
+    if effect_count <= 0:
+        raise ValueError("discovery effect must move at least one visible piece")
+
+    effect_name = effect.concise_name()
+    effect_class = effect.concise_name(max_positions = 0)
+    if not effect_name or not effect_class or effect_name == "Identity":
+        raise ValueError("discovery effect must have a visible effect name")
+    return {
+        "effectName": effect_name,
+        "effectClass": effect_class,
+        "effectCount": effect_count,
+        "orientationCount": orientation_count,
+    }
+
+
 def _new_payload() -> dict:
     return {
         "schemaVersion": DISCOVERY_SCHEMA_VERSION,
@@ -93,12 +120,34 @@ def _validate_move_list(value, field: str, path: str, *, allow_empty: bool) -> l
     return value
 
 
+def _validate_effect_metadata(metadata, path: str) -> dict:
+    if not isinstance(metadata, dict) or set(metadata) != _EFFECT_FIELDS:
+        raise _validation_error(path, f"effect metadata must contain exactly {sorted(_EFFECT_FIELDS)}")
+    for field in ("effectName", "effectClass"):
+        if not isinstance(metadata[field], str) or not metadata[field].strip():
+            raise _validation_error(path, f"{field} must be a non-empty string")
+    for field in ("effectCount", "orientationCount"):
+        value = metadata[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise _validation_error(path, f"{field} must be a non-negative integer")
+    if metadata["effectCount"] <= 0:
+        raise _validation_error(path, "effectCount must be positive")
+    if metadata["orientationCount"] > metadata["effectCount"]:
+        raise _validation_error(path, "orientationCount cannot exceed effectCount")
+    return dict(metadata)
+
+
 def _validate_record(record, index: int, path: str) -> None:
     location = f"discoveries[{index}]"
     if not isinstance(record, dict):
         raise _validation_error(path, f"{location} must be an object")
-    if set(record) != _RECORD_FIELDS:
-        raise _validation_error(path, f"{location} must contain exactly {sorted(_RECORD_FIELDS)}")
+    fields = set(record)
+    allowed_fields = _RECORD_FIELDS | _EFFECT_FIELDS
+    if fields not in (_RECORD_FIELDS, allowed_fields):
+        raise _validation_error(
+            path,
+            f"{location} must contain base fields with optional complete effect metadata",
+        )
 
     puzzle = record["puzzle"]
     if not isinstance(puzzle, str) or not puzzle.strip():
@@ -118,6 +167,8 @@ def _validate_record(record, index: int, path: str) -> None:
         raise _validation_error(path, f"{location}.id does not match puzzle and setup")
     _validate_timestamp(record["foundAt"], f"{location}.foundAt", path)
     _validate_timestamp(record["updatedAt"], f"{location}.updatedAt", path)
+    if fields == allowed_fields:
+        _validate_effect_metadata({field: record[field] for field in _EFFECT_FIELDS}, location)
 
 
 def _validate_payload(payload, path: str) -> None:
@@ -150,7 +201,7 @@ class AiDiscoveryStore:
     def __init__(self, path: Path | None = None):
         self.path = Path(path) if path is not None else default_discoveries_path()
 
-    def save(self, puzzle: str, setup, moves) -> str:
+    def save(self, puzzle: str, setup, moves, *, effect_metadata = None) -> str:
         """Save a discovery and return ``added``, ``shorter``, or ``unchanged``."""
         normalized_puzzle = str(puzzle).strip()
         clean_setup = _clean_moves(setup)
@@ -177,6 +228,8 @@ class AiDiscoveryStore:
             "foundAt": current.get("foundAt", now) if current else now,
             "updatedAt": now,
         }
+        if effect_metadata is not None:
+            record.update(_validate_effect_metadata(effect_metadata, "effect metadata"))
         if current is None:
             discoveries.append(record)
             outcome = "added"

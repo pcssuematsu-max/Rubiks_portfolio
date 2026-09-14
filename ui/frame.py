@@ -8,7 +8,11 @@ import numpy as np
 import tkinter as Tk
 
 from ai.rubiks_ai import Rubiks_3_AI
-from core.ai_discoveries import AiDiscoveryStore, point_canonical_discovery_sequences
+from core.ai_discoveries import (
+    AiDiscoveryStore,
+    discovery_effect_metadata,
+    point_canonical_discovery_sequences,
+)
 from core.puzzle_registry import get_puzzle_adapter
 from core.web_playback import build_web_playback_url, web_puzzle_key
 from group_puzzle.cube import create_group_puzzle
@@ -1158,10 +1162,17 @@ class Frame(Tk.Frame):
         setup, moves = point_canonical_discovery_sequences(self.cube, setup, moves)
 
         try:
+            if self.puzzle_adapter is None:
+                from core.myperm_effects import MypermEffectAnalyzer
+                effect = MypermEffectAnalyzer(self.cube).analyze(moves)
+            else:
+                effect = self.puzzle_adapter.analyze_effect(self.cube, moves)
+            effect_metadata = discovery_effect_metadata(effect)
             outcome = AiDiscoveryStore().save(
                 puzzle,
                 self.display_move_sequence(setup),
                 self.display_move_sequence(moves),
+                effect_metadata = effect_metadata,
             )
         except (OSError, ValueError) as error:
             self.append_log(f'Web discoveries: 保存できませんでした ({error})')
