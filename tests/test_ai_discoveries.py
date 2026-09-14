@@ -43,6 +43,7 @@ class AiDiscoveryStoreTests(unittest.TestCase):
             record = json.loads(store.path.read_text(encoding="utf-8"))["discoveries"][0]
             self.assertEqual(record["effectName"], metadata["effectName"])
             self.assertEqual(record["effectClass"], metadata["effectClass"])
+            self.assertEqual(record["effectLabel"], metadata["effectLabel"])
             self.assertEqual(record["effectCount"], metadata["effectCount"])
             self.assertEqual(record["orientationCount"], metadata["orientationCount"])
 

@@ -18,8 +18,22 @@ _RECORD_FIELDS = frozenset(
     {"id", "puzzle", "setup", "moves", "moveCount", "foundAt", "updatedAt"}
 )
 _EFFECT_FIELDS = frozenset(
-    {"effectName", "effectClass", "effectCount", "orientationCount"}
+    {"effectName", "effectClass", "effectLabel", "effectCount", "orientationCount"}
 )
+
+_EFFECT_PART_LABELS = {
+    "C": "コーナー",
+    "E": "エッジ",
+    "EAll": "エッジ束",
+    "ME": "中エッジ",
+    "W1": "第1ウイング",
+    "W2": "第2ウイング",
+    "W3": "第3ウイング",
+    "CtrCore": "中心センター",
+    "CtrObl": "斜めセンター",
+    "CtrPlus": "十字センター",
+    "CtrX": "X型センター",
+}
 
 
 def default_discoveries_path() -> Path:
@@ -63,6 +77,29 @@ def point_canonical_discovery_sequences(cube, setup, moves) -> tuple[tuple, tupl
     return canonical_setup, tuple(representative.moves)
 
 
+def _effect_component_label(component) -> str:
+    """Return a short Japanese description of one visible effect component."""
+    cycle_lengths = tuple(sorted(len(cycle) for cycle in component.cycles))
+    operations = []
+    for length in sorted(set(cycle_lengths)):
+        count = cycle_lengths.count(length)
+        if length == 2:
+            operations.append(f"{count}組交換")
+        else:
+            suffix = f"×{count}" if count > 1 else ""
+            operations.append(f"{length}巡回{suffix}")
+    if not operations:
+        operations.append(f"{component.moved_count}個移動")
+    if component.orientation_count:
+        operations.append(f"向き変化{component.orientation_count}")
+    part_label = _EFFECT_PART_LABELS.get(component.part_code, component.part_code)
+    return f"{part_label}：{'・'.join(operations)}"
+
+
+def _effect_label(components) -> str:
+    return "＋".join(_effect_component_label(component) for component in components)
+
+
 def discovery_effect_metadata(effect) -> dict:
     """Build compact, display-ready effect information for a discovery."""
     visible_components = tuple(
@@ -82,6 +119,7 @@ def discovery_effect_metadata(effect) -> dict:
     return {
         "effectName": effect_name,
         "effectClass": effect_class,
+        "effectLabel": _effect_label(visible_components),
         "effectCount": effect_count,
         "orientationCount": orientation_count,
     }
@@ -123,7 +161,7 @@ def _validate_move_list(value, field: str, path: str, *, allow_empty: bool) -> l
 def _validate_effect_metadata(metadata, path: str) -> dict:
     if not isinstance(metadata, dict) or set(metadata) != _EFFECT_FIELDS:
         raise _validation_error(path, f"effect metadata must contain exactly {sorted(_EFFECT_FIELDS)}")
-    for field in ("effectName", "effectClass"):
+    for field in ("effectName", "effectClass", "effectLabel"):
         if not isinstance(metadata[field], str) or not metadata[field].strip():
             raise _validation_error(path, f"{field} must be a non-empty string")
     for field in ("effectCount", "orientationCount"):

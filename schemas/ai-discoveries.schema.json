@@ -38,6 +38,7 @@
         "updatedAt": {"type": "string", "format": "date-time"},
         "effectName": {"type": "string", "minLength": 1},
         "effectClass": {"type": "string", "minLength": 1},
+        "effectLabel": {"type": "string", "minLength": 1},
         "effectCount": {"type": "integer", "minimum": 1},
         "orientationCount": {"type": "integer", "minimum": 0}
       }

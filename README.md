@@ -26,7 +26,7 @@ python3 -m ruff check .
 
 ## AI discoveries のデータ形式
 
-AIが見つけた解法は `ai-discoveries.json` に保存します。rootの `schemaVersion` は現在 `1` で、各成果について `puzzle`、`setup`、`moves`、`moveCount`、`foundAt`、`updatedAt` を検証します。効果解析できる成果には `effectName`、`effectClass`、`effectCount`、`orientationCount` も保存し、Webでは同じ効果型を最短の1件へ整理したうえで、`effectCount × moveCount` が小さい順に表示します。保存時には `myperms_point` が最大になる対称変換を選び、setupとmovesの両方を同じ向きへ正規化します。正式なJSON Schemaは [`schemas/ai-discoveries.schema.json`](schemas/ai-discoveries.schema.json) にあります。
+AIが見つけた解法は `ai-discoveries.json` に保存します。rootの `schemaVersion` は現在 `1` で、各成果について `puzzle`、`setup`、`moves`、`moveCount`、`foundAt`、`updatedAt` を検証します。効果解析できる成果には `effectName`、`effectClass`、`effectLabel`、`effectCount`、`orientationCount` も保存し、Webでは同じ効果型を最短の1件へ整理したうえで、`effectCount × moveCount` が小さい順に表示します。保存時には `myperms_point` が最大になる対称変換を選び、setupとmovesの両方を同じ向きへ正規化します。正式なJSON Schemaは [`schemas/ai-discoveries.schema.json`](schemas/ai-discoveries.schema.json) にあります。
 
 ## 制作背景
 
