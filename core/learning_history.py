@@ -70,6 +70,12 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "searchMode": str(getattr(ai, "search_mode", "unknown")),
         "policyLoss": _finite_number(metrics.get("policyLoss")),
         "valueLoss": _finite_number(metrics.get("valueLoss")),
+        "valueBcePerState": _finite_number(metrics.get("valueBcePerState")),
+        "valueMae": _finite_number(metrics.get("valueMae")),
+        "valueStartToEndDelta": _finite_number(metrics.get("valueStartToEndDelta")),
+        "valueTargetStartToEndDelta": _finite_number(metrics.get("valueTargetStartToEndDelta")),
+        "valueEffectiveStateCount": _finite_number(metrics.get("valueEffectiveStateCount")),
+        "valueSequenceCount": _safe_optional_int(metrics.get("valueSequenceCount")),
         "updatesDuringSolve": int(metrics.get("updatesDuringSolve", 0) or 0),
         "trainingDataCount": int(metrics.get("trainingDataCount", 0) or 0),
         "retainedDataCount": int(metrics.get("retainedDataCount", 0) or 0),
@@ -116,7 +122,14 @@ def _validate_record(record: Any) -> None:
         "updatesDuringSolve", "trainingDataCount", "retainedDataCount",
         "learningSeconds", "learningRate", "updateScales", "search2ValueLossType",
     }
-    if not isinstance(record, dict) or set(record) != required:
+    optional = {
+        # Added after the first history format shipped.  These remain optional
+        # so existing local history files stay readable.
+        "valueBcePerState", "valueMae", "valueStartToEndDelta",
+        "valueTargetStartToEndDelta", "valueEffectiveStateCount",
+        "valueSequenceCount",
+    }
+    if not isinstance(record, dict) or not required.issubset(record) or set(record) - required - optional:
         raise ValueError("Invalid learning history record")
     if not isinstance(record["timestamp"], str) or not record["timestamp"]:
         raise ValueError("Invalid learning history timestamp")
@@ -127,6 +140,18 @@ def _validate_record(record: Any) -> None:
         raise ValueError("Invalid learning history search mode")
     _validate_optional_number(record["policyLoss"])
     _validate_optional_number(record["valueLoss"])
+    for field in (
+        "valueBcePerState", "valueMae", "valueStartToEndDelta",
+        "valueTargetStartToEndDelta", "valueEffectiveStateCount",
+    ):
+        _validate_optional_number(record.get(field))
+    value_sequence_count = record.get("valueSequenceCount")
+    if value_sequence_count is not None and (
+        isinstance(value_sequence_count,bool)
+        or not isinstance(value_sequence_count,int)
+        or value_sequence_count < 0
+    ):
+        raise ValueError("Invalid learning history valueSequenceCount")
     _validate_optional_number(record["learningSeconds"])
     _validate_number_mapping(record["learningRate"], {"base", "lrC", "momentumV", "momentumH"})
     _validate_number_mapping(record["updateScales"], {"shared", "policy", "value"})
@@ -152,3 +177,14 @@ def _finite_number(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if number == number and abs(number) != float("inf") else None
+
+
+def _safe_optional_int(value: Any) -> int | None:
+    """Convert a non-negative integral metric without accepting booleans."""
+    if value is None or isinstance(value,bool):
+        return None
+    try:
+        number = int(value)
+    except (TypeError,ValueError):
+        return None
+    return number if number >= 0 else None

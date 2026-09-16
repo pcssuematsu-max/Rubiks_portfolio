@@ -701,10 +701,10 @@ class ExperimentSummaryDialog(Tk.Toplevel):
 
 
 class LearningHistoryDialog(Tk.Toplevel):
-    """Show per-AI loss trends and the settings used for each learning run."""
+    """Show per-AI loss trends plus state-normalized Search3 value quality."""
 
     CHART_WIDTH = 760
-    CHART_HEIGHT = 210
+    CHART_HEIGHT = 340
     CHART_HISTORY_LIMIT = 60
 
     def __init__(self, frame):
@@ -712,7 +712,7 @@ class LearningHistoryDialog(Tk.Toplevel):
         self.frame = frame
         self.font = ('Century Gothic', 11, 'bold')
         self.title('学習履歴')
-        self.geometry('820x620')
+        self.geometry('820x750')
         self.ai_var = Tk.StringVar(value = 'AI 0')
         self._build_widgets()
 
@@ -775,6 +775,7 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"AI {ai_index} / {latest['searchMode']} / {len(records)} 回の学習\n"
                 f"最新: P={self._number(latest['policyLoss'])}  V={self._number(latest['valueLoss'])}  "
                 f"updates={latest['updatesDuringSolve']}  data={latest['trainingDataCount']}→{latest['retainedDataCount']}\n"
+                f"Search3 Value: {self._search3_quality_text(latest)}\n"
                 f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
                 f"update scale={self._number(update_scales['shared'])}/"
                 f"{self._number(update_scales['policy'])}/{self._number(update_scales['value'])}"
@@ -789,6 +790,8 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"P={self._number(record['policyLoss'])} V={self._number(record['valueLoss'])}  "
                 f"updates={record['updatesDuringSolve']}  {record['learningSeconds']:.3f}s"
             )
+            if record.get('valueBcePerState') is not None:
+                lines.append(f"  Search3 Value: {self._search3_quality_text(record)}")
             lines.append(
                 f"  lr={self._number(lr['base'])} lr_C={self._number(lr['lrC'])} "
                 f"momentum={self._number(lr['momentumV'])}/{self._number(lr['momentumH'])}  "
@@ -804,13 +807,42 @@ class LearningHistoryDialog(Tk.Toplevel):
         visible = records[-self.CHART_HISTORY_LIMIT:]
         policy = [record['policyLoss'] for record in visible]
         value = [record['valueLoss'] for record in visible]
-        self.chart.create_text(8, 10, text = 'loss trend  policy=orange  value=cyan（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        bce_per_state = [record.get('valueBcePerState') for record in visible]
+        mae = [record.get('valueMae') for record in visible]
+        delta = [record.get('valueStartToEndDelta') for record in visible]
+        target_delta = [record.get('valueTargetStartToEndDelta') for record in visible]
+        self.chart.create_text(8, 8, text = '学習loss  policy=orange  value/sample=cyan（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
         if not visible or not any(item is not None for item in policy + value):
             self.chart.create_text(width // 2, height // 2, text = 'loss data がまだありません', fill = '#A0A0A0', tags = 'trend')
             return
-        self._draw_loss_series(policy, '#E68A00', 25, width - 12, 35, height - 22)
-        self._draw_loss_series(value, '#49C7D4', 25, width - 12, 35, height - 22)
-        self.chart.create_text(8, height - 11, text = f'表示: 直近 {len(visible)} 回', fill = '#A0A0A0', anchor = 'w', font = ('Menlo', 9), tags = 'trend')
+        self._draw_loss_series(policy, '#E68A00', 25, width - 12, 38, 150)
+        self._draw_loss_series(value, '#49C7D4', 25, width - 12, 38, 150)
+        self.chart.create_text(
+            8, 160,
+            text = (
+                f'P {self._series_range(policy)}   V/sample {self._series_range(value)}'
+            ),
+            fill = '#A0A0A0', anchor = 'nw', font = ('Menlo', 9), tags = 'trend',
+        )
+        self.chart.create_text(8, 184, text = 'Search3 Value quality  BCE/state=blue  MAE=magenta  end−start=green  target=gray（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if any(item is not None for item in bce_per_state + mae + delta + target_delta):
+            self._draw_loss_series(bce_per_state, '#49C7D4', 25, width - 12, 214, 315)
+            self._draw_loss_series(mae, '#DE5CE6', 25, width - 12, 214, 315)
+            self._draw_loss_series(delta, '#78C850', 25, width - 12, 214, 315)
+            self._draw_loss_series(target_delta, '#A0A0A0', 25, width - 12, 214, 315)
+            self.chart.create_text(
+                8, 324,
+                text = (
+                    f'BCE/state {self._series_range(bce_per_state)}   '
+                    f'MAE {self._series_range(mae)}   '
+                    f'Δpred {self._series_range(delta)}   '
+                    f'Δtarget {self._series_range(target_delta)}   '
+                    f'表示: 直近 {len(visible)} 回'
+                ),
+                fill = '#A0A0A0', anchor = 'sw', font = ('Menlo', 9), tags = 'trend',
+            )
+        else:
+            self.chart.create_text(width // 2, 265, text = 'Search3 quality は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
 
     def _draw_loss_series(self, values, color, x0, x1, y0, y1):
         numeric = [float(value) for value in values if value is not None]
@@ -831,7 +863,24 @@ class LearningHistoryDialog(Tk.Toplevel):
             if previous is not None:
                 self.chart.create_line(*previous, x, y, fill = color, width = 2, tags = 'trend')
             previous = (x, y)
-        self.chart.create_text(x0, y0 - 5, text = f'{color}: {minimum:.4g}–{maximum:.4g}', fill = color, anchor = 'sw', font = ('Menlo', 9), tags = 'trend')
+    @staticmethod
+    def _series_range(values):
+        numeric = [float(value) for value in values if value is not None]
+        if not numeric:
+            return '--'
+        return f'{min(numeric):.4g}–{max(numeric):.4g}'
+
+    def _search3_quality_text(self, record):
+        if record.get('valueBcePerState') is None:
+            return '（未記録）'
+        return (
+            f"BCE/state={self._number(record.get('valueBcePerState'))}  "
+            f"MAE={self._number(record.get('valueMae'))}  "
+            f"Δpred={self._number(record.get('valueStartToEndDelta'))}  "
+            f"Δtarget={self._number(record.get('valueTargetStartToEndDelta'))}  "
+            f"states={self._number(record.get('valueEffectiveStateCount'))}  "
+            f"seq={record.get('valueSequenceCount', '--')}"
+        )
 
     @staticmethod
     def _number(value):

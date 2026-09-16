@@ -1329,6 +1329,10 @@ class Rubiks_3_AI:
             search3_inputs['value_indices'],
             search3_inputs['policy_weights'],
         )
+        self._last_search3_quality_metrics = self._search3_quality_metrics(
+            out,
+            search3_inputs,
+        )
         self._last_search3_debug_summary = self._build_search3_debug_summary(out, search3_inputs)
         return losses
 
@@ -1465,6 +1469,65 @@ class Rubiks_3_AI:
                 )
             )
         return '\n'.join(lines)
+
+    @staticmethod
+    def _search3_quality_metrics(out, search3_inputs):
+        """Summarize Search3 value quality without depending on sequence length.
+
+        BCE is weighted exactly as the training loss, then divided by its
+        effective state weight at the end of an epoch.  The two deltas retain
+        the within-sequence signal that a state-wise average cannot show.
+        """
+        targets = np.asarray(search3_inputs['value_targets'],dtype = 'f').reshape(-1)
+        weights = np.asarray(search3_inputs['sample_weights'],dtype = 'f').reshape(-1)
+        logits = np.asarray(out[-1:],dtype = 'f').reshape(-1)
+        if targets.size == 0:
+            return {
+                'bce_sum': 0.0,
+                'mae_sum': 0.0,
+                'weight_sum': 0.0,
+                'delta_sum': 0.0,
+                'target_delta_sum': 0.0,
+                'sequence_count': 0,
+            }
+        logits = np.clip(logits,-60.0,60.0)
+        predictions = 1.0 / (1.0 + np.exp(-logits))
+        bce = np.maximum(logits,0.0) - logits * targets + np.log1p(np.exp(-np.abs(logits)))
+        metrics = {
+            'bce_sum': float(np.sum(weights * bce)),
+            'mae_sum': float(np.sum(weights * np.abs(predictions - targets))),
+            'weight_sum': float(np.sum(weights)),
+            'delta_sum': 0.0,
+            'target_delta_sum': 0.0,
+            'sequence_count': 0,
+        }
+        for start,end in zip(search3_inputs['value_indices'][:-1],search3_inputs['value_indices'][1:]):
+            if end <= start:
+                continue
+            metrics['delta_sum'] += float(predictions[end - 1] - predictions[start])
+            metrics['target_delta_sum'] += float(targets[end - 1] - targets[start])
+            metrics['sequence_count'] += 1
+        return metrics
+
+    @staticmethod
+    def _accumulate_search3_quality_metrics(epoch_state, metrics):
+        """Merge one batch's Search3 quality totals into the epoch summary."""
+        if metrics is None:
+            return
+        current = epoch_state.get('search3_quality_metrics')
+        if current is None:
+            current = {
+                'bce_sum': 0.0,
+                'mae_sum': 0.0,
+                'weight_sum': 0.0,
+                'delta_sum': 0.0,
+                'target_delta_sum': 0.0,
+                'sequence_count': 0,
+            }
+            epoch_state['search3_quality_metrics'] = current
+        for key in ('bce_sum','mae_sum','weight_sum','delta_sum','target_delta_sum'):
+            current[key] += float(metrics.get(key,0.0))
+        current['sequence_count'] += int(metrics.get('sequence_count',0))
 
     def _masked_mean(self, values, mask):
         values = np.asarray(values)
@@ -1830,6 +1893,7 @@ class Rubiks_3_AI:
         return getattr(data_item,'sample_weight',1.0)
 
     def learn_search3(self,transformation = 0,flip_inside = False, progress_callback = None):
+        self._last_training_search3_quality_metrics = None
         training_result = self._run_training_epochs(
             indices = self.indices_search3,
             data_source = self.datas_search3,
@@ -1848,6 +1912,7 @@ class Rubiks_3_AI:
             original_len,
             len(self.indices_search3),
             epoch_num,
+            self._last_training_search3_quality_metrics,
         )
         if epoch_num == 0:
             return (0,0,0,0)
@@ -1859,17 +1924,38 @@ class Rubiks_3_AI:
         self._finalize_training(progress_callback = progress_callback)
         return (err / epoch_num,err2 / epoch_num,len(self.indices_search3),original_len,l1_max)
 
-    def _record_training_metrics(self, policy_loss_sum, value_loss_sum, original_len, retained_len, update_count):
+    def _record_training_metrics(self, policy_loss_sum, value_loss_sum, original_len, retained_len, update_count, search3_quality_metrics = None):
         """Keep one compact learning summary for the GUI and JSON history."""
         updates = max(0,int(update_count))
+        quality = search3_quality_metrics if updates > 0 else None
         self.last_training_metrics = {
             'policyLoss': None if updates == 0 else float(policy_loss_sum) / updates,
             'valueLoss': None if updates == 0 else float(value_loss_sum) / updates,
+            # Search3's legacy valueLoss is normalized by samples, while one
+            # sample can contain many states.  Keep state-normalized quality
+            # metrics alongside it so changing solution lengths do not look
+            # like a value-regression in the learning graph.
+            'valueBcePerState': self._search3_quality_value(quality,'bce_sum','weight_sum'),
+            'valueMae': self._search3_quality_value(quality,'mae_sum','weight_sum'),
+            'valueStartToEndDelta': self._search3_quality_value(quality,'delta_sum','sequence_count'),
+            'valueTargetStartToEndDelta': self._search3_quality_value(quality,'target_delta_sum','sequence_count'),
+            'valueEffectiveStateCount': None if quality is None else float(quality.get('weight_sum',0.0)),
+            'valueSequenceCount': None if quality is None else int(quality.get('sequence_count',0)),
             # One optimizer step is applied for each processed training batch.
             'updatesDuringSolve': updates,
             'trainingDataCount': max(0,int(original_len)),
             'retainedDataCount': max(0,int(retained_len)),
         }
+
+    @staticmethod
+    def _search3_quality_value(quality, numerator_key, denominator_key):
+        """Return one aggregate Search3 quality value, or None when absent."""
+        if quality is None:
+            return None
+        denominator = float(quality.get(denominator_key,0.0))
+        if denominator <= 0.0:
+            return None
+        return float(quality.get(numerator_key,0.0)) / denominator
 
     def _run_training_epochs(self, indices, data_source, train_batch, state_count_fn, transformation, flip_inside, progress_callback = None):
         """index 列を batch 学習して、残す index と誤差集計を返す。"""
@@ -1920,6 +2006,7 @@ class Rubiks_3_AI:
                 epoch_state['new_indices'] += batch_indices
 
         epoch_state['new_indices'] += remainder_indices
+        self._last_training_search3_quality_metrics = epoch_state.get('search3_quality_metrics')
         self._report_final_search2_value_debug(epoch_state)
         return (
             epoch_state['err'],
@@ -2199,6 +2286,7 @@ class Rubiks_3_AI:
             'progress_callback': None,
             'last_batch_item_count': 0,
             'search2_value_loss_components': None,
+            'search3_quality_metrics': None,
         }
 
     def _iter_training_batches(self, batches):
@@ -2225,6 +2313,10 @@ class Rubiks_3_AI:
         L = self.loss_search3(d_lis,transformation = transformation,flip_inside = flip_inside)
         L0 = L[0] / len(d_lis)
         L1 = L[1] / len(d_lis)
+        self._accumulate_search3_quality_metrics(
+            epoch_state,
+            getattr(self,'_last_search3_quality_metrics',None),
+        )
         epoch_state = self._update_training_maxima(L0,L1,batch_indices,epoch_state)
         self._maybe_report_search3_value_debug(epoch_state,L1)
 
@@ -2323,6 +2415,10 @@ class Rubiks_3_AI:
             micro_losses,micro_grads,out = self._torch_search3_losses_and_grads(search3_inputs)
             loss_sum[0] += micro_losses[0]
             loss_sum[1] += micro_losses[1]
+            self._accumulate_search3_quality_metrics(
+                epoch_state,
+                self._search3_quality_metrics(out,search3_inputs),
+            )
             self._accumulate_torch_grad_dict(grad_by_key,micro_grads)
             debug_inputs = search3_inputs
             debug_out = out
