@@ -5,7 +5,12 @@ from urllib.parse import parse_qs, urlparse
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core.web_playback import build_web_playback_url, web_puzzle_key
+from core.web_playback import (
+    build_own_3d_viewer_url,
+    build_web_playback_url,
+    own_viewer_puzzle_key,
+    web_puzzle_key,
+)
 from ui.frame import Frame
 
 
@@ -20,6 +25,13 @@ class WebPlaybackTests(unittest.TestCase):
         self.assertEqual(web_puzzle_key("square1", 3), "square1")
         self.assertIsNone(web_puzzle_key("cto", 3))
 
+    def test_own_viewer_supports_cube_sizes_two_through_seven(self):
+        self.assertEqual(own_viewer_puzzle_key("cube", 2), "cube-2x2")
+        self.assertEqual(own_viewer_puzzle_key("rubiks", 3), "cube-3x3")
+        self.assertEqual(own_viewer_puzzle_key("cube", 7), "cube-7x7")
+        self.assertIsNone(own_viewer_puzzle_key("cube", 8))
+        self.assertIsNone(own_viewer_puzzle_key("pyraminx", 3))
+
     def test_playback_url_preserves_moves_and_setup(self):
         url = build_web_playback_url("3x3x3", ("R", "U", "R'"), ("F2", "E"))
         query = parse_qs(urlparse(url).query)
@@ -27,6 +39,18 @@ class WebPlaybackTests(unittest.TestCase):
             "puzzle": ["3x3x3"],
             "moves": ["R U R'"],
             "setup": ["F2 E"],
+        })
+
+    def test_own_viewer_url_preserves_moves_and_setup(self):
+        url = build_own_3d_viewer_url(
+            "cube-3x3", ("R", "U", "R'"), ("F2", "D"), theme="portfolio",
+        )
+        query = parse_qs(urlparse(url).query)
+        self.assertEqual(query, {
+            "puzzle": ["cube-3x3"],
+            "moves": ["R U R'"],
+            "setup": ["F2 D"],
+            "theme": ["portfolio"],
         })
 
     def test_gui_opens_the_current_solve_with_setup_and_moves(self):
@@ -52,7 +76,36 @@ class WebPlaybackTests(unittest.TestCase):
             Frame.open_web_playback(frame)
 
         query = parse_qs(urlparse(open_new_tab.call_args.args[0]).query)
-        self.assertEqual(query["puzzle"], ["3x3x3"])
+        self.assertEqual(query["puzzle"], ["cube-3x3"])
         self.assertEqual(query["setup"], ["F2 E"])
         self.assertEqual(query["moves"], ["E' F2"])
+        self.assertEqual(query["theme"], ["portfolio"])
         self.assertEqual(frame.messages, ["Web replay: 現在の解法をブラウザで開きました。"])
+
+    def test_gui_opens_the_current_solve_in_the_own_viewer(self):
+        class FakeFrame:
+            puzzle_type = "rubiks"
+            cube_size = 3
+            solve_state = SimpleNamespace(
+                s=("F2", "D"),
+                move_lis=[("R",), ("U'",)],
+            )
+
+            def __init__(self):
+                self.messages = []
+
+            def display_move_sequence(self, moves):
+                return tuple(move.strip() for move in moves)
+
+            def append_log(self, message):
+                self.messages.append(message)
+
+        frame = FakeFrame()
+        with patch("ui.frame.webbrowser.open_new_tab") as open_new_tab:
+            Frame.open_own_3d_viewer(frame)
+
+        query = parse_qs(urlparse(open_new_tab.call_args.args[0]).query)
+        self.assertEqual(query["puzzle"], ["cube-3x3"])
+        self.assertEqual(query["setup"], ["F2 D"])
+        self.assertEqual(query["moves"], ["R U'"])
+        self.assertEqual(frame.messages, ["独自3D: 現在の解法を自作ビューアで開きました。"])

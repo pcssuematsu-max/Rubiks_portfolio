@@ -14,7 +14,12 @@ from core.ai_discoveries import (
     point_canonical_discovery_sequences,
 )
 from core.puzzle_registry import get_puzzle_adapter
-from core.web_playback import build_web_playback_url, web_puzzle_key
+from core.web_playback import (
+    build_own_3d_viewer_url,
+    build_web_playback_url,
+    own_viewer_puzzle_key,
+    web_puzzle_key,
+)
 from group_puzzle.cube import create_group_puzzle
 from cube.rubiks_cube import Rubiks_3
 from managers.debug_analysis import DebugAnalysisManager, VIEWER_RANGE_TEXT_WIDTH
@@ -1083,6 +1088,7 @@ class Frame(Tk.Frame):
     def open_web_playback(self):
         """Open the current solve session in the public 3D playback tool."""
         puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)
+        own_viewer_puzzle = own_viewer_puzzle_key(self.puzzle_type, self.cube_size)
         if puzzle is None:
             self.append_log('Web replay: このパズルは現在Web再生に未対応です。')
             return
@@ -1094,16 +1100,50 @@ class Frame(Tk.Frame):
             self.append_log('Web replay: 解法が表示された後に使えます。')
             return
 
-        url = build_web_playback_url(
-            puzzle,
-            self.display_move_sequence(moves),
-            self.display_move_sequence(setup),
-        )
+        if own_viewer_puzzle is not None:
+            url = build_own_3d_viewer_url(
+                own_viewer_puzzle,
+                self.display_move_sequence(moves),
+                self.display_move_sequence(setup),
+                theme='portfolio',
+            )
+        else:
+            url = build_web_playback_url(
+                puzzle,
+                self.display_move_sequence(moves),
+                self.display_move_sequence(setup),
+            )
         webbrowser.open_new_tab(url)
         self.append_log('Web replay: 現在の解法をブラウザで開きました。')
 
+    def open_own_3d_viewer(self):
+        """Open the current 2×2〜7×7 solve in the self-built viewer."""
+        puzzle = own_viewer_puzzle_key(self.puzzle_type, self.cube_size)
+        if puzzle is None:
+            self.append_log('独自3D: 現在は2×2〜7×7キューブの解法だけに対応しています。')
+            return
+
+        state = self.solve_state
+        setup = tuple(state.s or ())
+        moves = tuple(move for move_row in state.move_lis for move in move_row)
+        if not moves:
+            self.append_log('独自3D: 解法が表示された後に使えます。')
+            return
+
+        url = build_own_3d_viewer_url(
+            puzzle,
+            self.display_move_sequence(moves),
+            self.display_move_sequence(setup),
+            theme='portfolio',
+        )
+        webbrowser.open_new_tab(url)
+        self.append_log('独自3D: 現在の解法を自作ビューアで開きました。')
+
     def can_replay_in_web(self):
         return web_puzzle_key(self.puzzle_type, self.cube_size) is not None
+
+    def can_replay_in_own_3d_viewer(self):
+        return own_viewer_puzzle_key(self.puzzle_type, self.cube_size) is not None
 
     def show_recent_solve_history(self):
         if (
@@ -1137,14 +1177,23 @@ class Frame(Tk.Frame):
 
     def open_recent_solve_web_playback(self, record):
         puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)
+        own_viewer_puzzle = own_viewer_puzzle_key(self.puzzle_type, self.cube_size)
         if puzzle is None:
             self.append_log('Web replay: このパズルは現在Web再生に未対応です。')
             return
-        url = build_web_playback_url(
-            puzzle,
-            self.display_move_sequence(record.moves),
-            self.display_move_sequence(record.setup),
-        )
+        if own_viewer_puzzle is not None:
+            url = build_own_3d_viewer_url(
+                own_viewer_puzzle,
+                self.display_move_sequence(record.moves),
+                self.display_move_sequence(record.setup),
+                theme='portfolio',
+            )
+        else:
+            url = build_web_playback_url(
+                puzzle,
+                self.display_move_sequence(record.moves),
+                self.display_move_sequence(record.setup),
+            )
         webbrowser.open_new_tab(url)
         self.append_log(f'Web replay: 探索 #{record.solve_index} をブラウザで開きました。')
 
