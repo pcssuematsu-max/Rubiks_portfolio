@@ -1472,7 +1472,7 @@ class Rubiks_3_AI:
 
     @staticmethod
     def _search3_quality_metrics(out, search3_inputs):
-        """Summarize Search3 value quality without depending on sequence length.
+        """Summarize Search3 policy/value quality without sequence-length bias.
 
         BCE is weighted exactly as the training loss, then divided by its
         effective state weight at the end of an epoch.  The two deltas retain
@@ -1481,8 +1481,13 @@ class Rubiks_3_AI:
         targets = np.asarray(search3_inputs['value_targets'],dtype = 'f').reshape(-1)
         weights = np.asarray(search3_inputs['sample_weights'],dtype = 'f').reshape(-1)
         logits = np.asarray(out[-1:],dtype = 'f').reshape(-1)
+        policy_targets = np.asarray(search3_inputs['policy_targets'],dtype = 'f')
+        policy_weights = np.asarray(search3_inputs['policy_weights'],dtype = 'f').reshape(-1)
+        policy_logits = np.asarray(out[:-1],dtype = 'f')
         if targets.size == 0:
             return {
+                'policy_ce_sum': 0.0,
+                'policy_weight_sum': 0.0,
                 'bce_sum': 0.0,
                 'mae_sum': 0.0,
                 'weight_sum': 0.0,
@@ -1493,7 +1498,14 @@ class Rubiks_3_AI:
         logits = np.clip(logits,-60.0,60.0)
         predictions = 1.0 / (1.0 + np.exp(-logits))
         bce = np.maximum(logits,0.0) - logits * targets + np.log1p(np.exp(-np.abs(logits)))
+        shifted_policy_logits = policy_logits - np.max(policy_logits,axis = 0,keepdims = True)
+        policy_log_probs = shifted_policy_logits - np.log(
+            np.sum(np.exp(shifted_policy_logits),axis = 0,keepdims = True)
+        )
+        policy_ce = -np.sum(policy_targets * policy_log_probs,axis = 0)
         metrics = {
+            'policy_ce_sum': float(np.sum(policy_weights * policy_ce)),
+            'policy_weight_sum': float(np.sum(policy_weights)),
             'bce_sum': float(np.sum(weights * bce)),
             'mae_sum': float(np.sum(weights * np.abs(predictions - targets))),
             'weight_sum': float(np.sum(weights)),
@@ -1517,6 +1529,8 @@ class Rubiks_3_AI:
         current = epoch_state.get('search3_quality_metrics')
         if current is None:
             current = {
+                'policy_ce_sum': 0.0,
+                'policy_weight_sum': 0.0,
                 'bce_sum': 0.0,
                 'mae_sum': 0.0,
                 'weight_sum': 0.0,
@@ -1525,7 +1539,10 @@ class Rubiks_3_AI:
                 'sequence_count': 0,
             }
             epoch_state['search3_quality_metrics'] = current
-        for key in ('bce_sum','mae_sum','weight_sum','delta_sum','target_delta_sum'):
+        for key in (
+            'policy_ce_sum','policy_weight_sum','bce_sum','mae_sum',
+            'weight_sum','delta_sum','target_delta_sum',
+        ):
             current[key] += float(metrics.get(key,0.0))
         current['sequence_count'] += int(metrics.get('sequence_count',0))
 
@@ -1935,6 +1952,8 @@ class Rubiks_3_AI:
             # sample can contain many states.  Keep state-normalized quality
             # metrics alongside it so changing solution lengths do not look
             # like a value-regression in the learning graph.
+            'policyCePerState': self._search3_quality_value(quality,'policy_ce_sum','policy_weight_sum'),
+            'policyEffectiveStateCount': None if quality is None else float(quality.get('policy_weight_sum',0.0)),
             'valueBcePerState': self._search3_quality_value(quality,'bce_sum','weight_sum'),
             'valueMae': self._search3_quality_value(quality,'mae_sum','weight_sum'),
             'valueStartToEndDelta': self._search3_quality_value(quality,'delta_sum','sequence_count'),

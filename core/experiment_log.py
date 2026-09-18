@@ -204,6 +204,41 @@ class ExperimentLogStore:
             ],
         }
 
+    def recent_ai_results(
+        self,
+        ai_index: int,
+        *,
+        puzzle: str | None = None,
+        search_mode: str | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """Return a compact, current-window benchmark for one AI.
+
+        The learning-history dialog uses this as its outcome metric.  It is
+        deliberately separate from loss because direct-search success is the
+        user-visible check that learned estimates actually improve search.
+        """
+        rows = [
+            row for row in self._read_records("jsonl")
+            if row["aiIndex"] == int(ai_index)
+            and (puzzle is None or row["puzzle"] == puzzle)
+            and (search_mode is None or row["searchMode"] == search_mode)
+        ]
+        window = rows[-max(1,int(limit)):]
+        classified = [row for row in window if row["outcome"] != "legacy_unknown"]
+        direct = [row for row in classified if row["outcome"] == "search_success"]
+        fallback = [
+            row for row in classified
+            if row["outcome"] in ("greedy_fallback_success", "greedy_fallback_failed")
+        ]
+        return {
+            "runCount": len(window),
+            "classifiedRunCount": len(classified),
+            "directSearchSuccessCount": len(direct),
+            "directSearchSuccessRate": _rate(len(direct),len(classified)),
+            "fallbackCount": len(fallback),
+        }
+
     def export_summary(self, path: Path | None = None, source = "jsonl") -> Path:
         """Write compact JSON and CSV summaries ready for Web or spreadsheet use."""
         destination = (

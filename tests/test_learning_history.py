@@ -22,6 +22,8 @@ class _FakeAI:
     last_training_metrics = {
         'policyLoss': 0.12,
         'valueLoss': 0.34,
+        'policyCePerState': 1.23,
+        'policyEffectiveStateCount': 160.0,
         'valueBcePerState': 0.56,
         'valueMae': 0.12,
         'valueStartToEndDelta': 0.31,
@@ -47,6 +49,7 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['aiIndex'], 3)
             self.assertEqual(saved['searchMode'], 'search3')
             self.assertEqual(saved['policyLoss'], 0.12)
+            self.assertEqual(saved['policyCePerState'], 1.23)
             self.assertEqual(saved['valueBcePerState'], 0.56)
             self.assertEqual(saved['valueMae'], 0.12)
             self.assertEqual(saved['valueStartToEndDelta'], 0.31)
@@ -69,9 +72,15 @@ class LearningHistoryTests(unittest.TestCase):
     def test_search3_quality_metrics_are_weighted_by_state_and_keep_sequence_deltas(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         metrics = ai._search3_quality_metrics(
-            # The final row is the value logit.  Zero logits predict 0.5.
+            # The final row is the value logit.  Every policy action and
+            # value logit is zero, so both CE values have closed-form checks.
             np.zeros((3, 3), dtype = 'f'),
             {
+                'policy_targets': np.array([
+                    [1.0, 0.0, 0.5],
+                    [0.0, 1.0, 0.5],
+                ], dtype = 'f'),
+                'policy_weights': np.array([[1.0, 2.0, 0.0]], dtype = 'f'),
                 'value_targets': np.array([[0.0, 1.0, 0.5]], dtype = 'f'),
                 'sample_weights': np.array([[1.0, 2.0, 1.0]], dtype = 'f'),
                 'value_indices': [0, 2, 3],
@@ -79,6 +88,8 @@ class LearningHistoryTests(unittest.TestCase):
         )
         ai._record_training_metrics(2.0, 4.0, 30, 18, 4, metrics)
 
+        self.assertAlmostEqual(ai.last_training_metrics['policyCePerState'], 0.693147, places = 5)
+        self.assertEqual(ai.last_training_metrics['policyEffectiveStateCount'], 3.0)
         self.assertAlmostEqual(ai.last_training_metrics['valueBcePerState'], 0.693147, places = 5)
         self.assertAlmostEqual(ai.last_training_metrics['valueMae'], 0.375, places = 6)
         self.assertAlmostEqual(ai.last_training_metrics['valueStartToEndDelta'], 0.0, places = 6)
@@ -90,6 +101,7 @@ class LearningHistoryTests(unittest.TestCase):
             path = Path(temporary_directory) / 'learning.json'
             legacy_record = completed_learning_record(3, _FakeAI(), 1.0)
             for field in (
+                'policyCePerState', 'policyEffectiveStateCount',
                 'valueBcePerState', 'valueMae', 'valueStartToEndDelta',
                 'valueTargetStartToEndDelta', 'valueEffectiveStateCount',
                 'valueSequenceCount',

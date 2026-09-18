@@ -70,6 +70,8 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "searchMode": str(getattr(ai, "search_mode", "unknown")),
         "policyLoss": _finite_number(metrics.get("policyLoss")),
         "valueLoss": _finite_number(metrics.get("valueLoss")),
+        "policyCePerState": _finite_number(metrics.get("policyCePerState")),
+        "policyEffectiveStateCount": _finite_number(metrics.get("policyEffectiveStateCount")),
         "valueBcePerState": _finite_number(metrics.get("valueBcePerState")),
         "valueMae": _finite_number(metrics.get("valueMae")),
         "valueStartToEndDelta": _finite_number(metrics.get("valueStartToEndDelta")),
@@ -125,6 +127,7 @@ def _validate_record(record: Any) -> None:
     optional = {
         # Added after the first history format shipped.  These remain optional
         # so existing local history files stay readable.
+        "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
         "valueSequenceCount",
@@ -141,6 +144,7 @@ def _validate_record(record: Any) -> None:
     _validate_optional_number(record["policyLoss"])
     _validate_optional_number(record["valueLoss"])
     for field in (
+        "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
     ):

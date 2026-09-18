@@ -112,6 +112,31 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertEqual(csv_exported["source"], "csv")
             self.assertEqual(csv_exported["groups"], summary["groups"])
 
+    def test_returns_a_recent_direct_search_window_for_one_ai(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            store = ExperimentLogStore(
+                output_directory / 'runs.jsonl',
+                output_directory / 'runs.csv',
+            )
+            store.append(self._record('search3', 8, 1.0, True, False, ai_index = 2))
+            store.append(self._record('search3', 9, 1.0, False, True, ai_index = 2))
+            store.append(self._record('search3', 10, 1.0, True, False, ai_index = 2))
+            store.append(self._record('search2', 11, 1.0, True, False, ai_index = 2))
+            store.append(self._record('search3', 12, 1.0, True, False, ai_index = 1))
+
+            recent = store.recent_ai_results(
+                2,
+                puzzle = 'rubiks-7x7',
+                search_mode = 'search3',
+                limit = 2,
+            )
+
+            self.assertEqual(recent['runCount'], 2)
+            self.assertEqual(recent['directSearchSuccessCount'], 1)
+            self.assertEqual(recent['fallbackCount'], 1)
+            self.assertEqual(recent['directSearchSuccessRate'], 0.5)
+
     def test_summarizes_ai_settings_separately_and_ranks_result_differences(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             output_directory = Path(temporary_directory)

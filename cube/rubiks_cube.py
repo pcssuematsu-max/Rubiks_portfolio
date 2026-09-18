@@ -693,25 +693,13 @@ class Rubiks_3:
         #   wing 2点交換 family。
         # - CornerEdgeBlockSwap-* は corner 2つ + edge block 2つの同時 swap。
         if self.size >= 4:
-            
-
-
-
-
-
-
-            
-        
-
+                
             self._add_myperm2('W2-3[FL@U>LB@U>RF@U]~v01', (' F2', ' L2', ' F ', "2L'", " F'", ' L2', ' F ', '2L ', ' F '))
             self._add_myperm2('W2-3[FL@U>RF@U>LB@U]~v01', (" F'", "2L'", " F'", ' L2', ' F ', '2L ', " F'", ' L2', ' F2'))
             self._add_myperm2('W2-3[FL@U>LB@U>RF@U]~v02', (' F2', ' L2', " F'", "2R'", ' F ', ' L2', " F'", '2R ', " F'"))
             self._add_myperm2('W2-3[FL@U>RF@U>LB@U]~v02', (' F ', "2R'", ' F ', ' L2', " F'", '2R ', ' F ', ' L2', ' F2'))
 
             
-
-            
-
             self._add_myperm2('W2-3[BR@D>RF@U>FL@U]~v01', (' R2', ' F ', "2R'", " F'", ' R2', ' F ', '2R ', " F'"))
             self._add_myperm2('W2-3[BR@D>FL@U>RF@U]~v01', (' F ', "2R'", " F'", ' R2', ' F ', '2R ', " F'", ' R2'))
             self._add_myperm2('W2-3[BR@D>RF@U>FL@U]~v02', (' R2', " F'", "2L'", ' F ', ' R2', " F'", '2L ', ' F '))

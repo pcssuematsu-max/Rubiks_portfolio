@@ -706,13 +706,20 @@ class LearningHistoryDialog(Tk.Toplevel):
     CHART_WIDTH = 760
     CHART_HEIGHT = 340
     CHART_HISTORY_LIMIT = 60
+    RECENT_SOLVE_LIMIT = 100
+    READING_GUIDE = (
+        '見る順  ① 実力: 直接探索成功率が上がる  '
+        '② Policy: CE/state が下がる  '
+        '③ Value: BCE/state・MAE が下がり、Δpred が Δtarget に近づく\n'
+        '注意  P / V sample は系列が長いほど増えるため、良し悪しの判断には使わない。'
+    )
 
     def __init__(self, frame):
         Tk.Toplevel.__init__(self, frame)
         self.frame = frame
         self.font = ('Century Gothic', 11, 'bold')
         self.title('学習履歴')
-        self.geometry('820x750')
+        self.geometry('820x810')
         self.ai_var = Tk.StringVar(value = 'AI 0')
         self._build_widgets()
 
@@ -737,6 +744,14 @@ class LearningHistoryDialog(Tk.Toplevel):
             justify = Tk.LEFT,
         )
         self.summary_label.pack(fill = 'x', padx = 8, pady = (0, 4))
+        self.guide_label = Tk.Label(
+            self,
+            text = self.READING_GUIDE,
+            font = ('Menlo', 10),
+            anchor = 'w',
+            justify = Tk.LEFT,
+        )
+        self.guide_label.pack(fill = 'x', padx = 8, pady = (0, 6))
         self.chart = Tk.Canvas(
             self,
             width = self.CHART_WIDTH,
@@ -745,7 +760,7 @@ class LearningHistoryDialog(Tk.Toplevel):
             highlightthickness = 0,
         )
         self.chart.pack(fill = 'x', padx = 8)
-        self.details = ScrolledText(self, height = 14, wrap = Tk.WORD, font = ('Menlo', 10))
+        self.details = ScrolledText(self, height = 11, wrap = Tk.WORD, font = ('Menlo', 10))
         self.details.pack(fill = 'both', expand = True, padx = 8, pady = 8)
         self.details.configure(state = Tk.DISABLED)
 
@@ -770,12 +785,14 @@ class LearningHistoryDialog(Tk.Toplevel):
         latest = records[-1]
         learning_rate = latest['learningRate']
         update_scales = latest['updateScales']
+        recent_result = self._recent_direct_search_result(ai_index,latest)
         self.summary_label.configure(
             text = (
                 f"AI {ai_index} / {latest['searchMode']} / {len(records)} 回の学習\n"
+                f"実力（直近{recent_result['runCount']}回）: {recent_result['text']}\n"
                 f"最新: P={self._number(latest['policyLoss'])}  V={self._number(latest['valueLoss'])}  "
                 f"updates={latest['updatesDuringSolve']}  data={latest['trainingDataCount']}→{latest['retainedDataCount']}\n"
-                f"Search3 Value: {self._search3_quality_text(latest)}\n"
+                f"Search3 quality: {self._search3_quality_text(latest)}\n"
                 f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
                 f"update scale={self._number(update_scales['shared'])}/"
                 f"{self._number(update_scales['policy'])}/{self._number(update_scales['value'])}"
@@ -791,13 +808,38 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"updates={record['updatesDuringSolve']}  {record['learningSeconds']:.3f}s"
             )
             if record.get('valueBcePerState') is not None:
-                lines.append(f"  Search3 Value: {self._search3_quality_text(record)}")
+                lines.append(f"  Search3 quality: {self._search3_quality_text(record)}")
             lines.append(
                 f"  lr={self._number(lr['base'])} lr_C={self._number(lr['lrC'])} "
                 f"momentum={self._number(lr['momentumV'])}/{self._number(lr['momentumH'])}  "
                 f"scale={self._number(scales['shared'])}/{self._number(scales['policy'])}/{self._number(scales['value'])}"
             )
         self._set_details('\n'.join(lines))
+
+    def _recent_direct_search_result(self, ai_index, latest):
+        """Format the current AI's direct-search outcome without mixing puzzles."""
+        puzzle_type = getattr(self.frame,'puzzle_type','')
+        cube_size = getattr(self.frame,'cube_size',None)
+        puzzle = None if cube_size is None else f'{puzzle_type}-{cube_size}x{cube_size}'
+        try:
+            result = ExperimentLogStore().recent_ai_results(
+                ai_index,
+                puzzle = puzzle,
+                search_mode = latest['searchMode'],
+                limit = self.RECENT_SOLVE_LIMIT,
+            )
+        except (OSError,ValueError):
+            return {'runCount': 0, 'text': '実験履歴を読めません'}
+        if result['classifiedRunCount'] == 0:
+            return {'runCount': result['runCount'], 'text': '判定済みの実験履歴なし'}
+        return {
+            'runCount': result['runCount'],
+            'text': (
+                f"直接探索 {result['directSearchSuccessCount']}/{result['classifiedRunCount']} "
+                f"({self._rate(result['directSearchSuccessRate'])})  "
+                f"fallback={result['fallbackCount']}"
+            ),
+        }
 
     def _draw_chart(self, records):
         self.chart.delete('trend')
@@ -807,6 +849,7 @@ class LearningHistoryDialog(Tk.Toplevel):
         visible = records[-self.CHART_HISTORY_LIMIT:]
         policy = [record['policyLoss'] for record in visible]
         value = [record['valueLoss'] for record in visible]
+        policy_ce_per_state = [record.get('policyCePerState') for record in visible]
         bce_per_state = [record.get('valueBcePerState') for record in visible]
         mae = [record.get('valueMae') for record in visible]
         delta = [record.get('valueStartToEndDelta') for record in visible]
@@ -824,8 +867,9 @@ class LearningHistoryDialog(Tk.Toplevel):
             ),
             fill = '#A0A0A0', anchor = 'nw', font = ('Menlo', 9), tags = 'trend',
         )
-        self.chart.create_text(8, 184, text = 'Search3 Value quality  BCE/state=blue  MAE=magenta  end−start=green  target=gray（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
-        if any(item is not None for item in bce_per_state + mae + delta + target_delta):
+        self.chart.create_text(8, 184, text = 'S3 quality  P-CE/state=orange  V-BCE/state=blue  MAE=magenta  Δpred=green  Δtarget=gray（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if any(item is not None for item in policy_ce_per_state + bce_per_state + mae + delta + target_delta):
+            self._draw_loss_series(policy_ce_per_state, '#E68A00', 25, width - 12, 214, 315)
             self._draw_loss_series(bce_per_state, '#49C7D4', 25, width - 12, 214, 315)
             self._draw_loss_series(mae, '#DE5CE6', 25, width - 12, 214, 315)
             self._draw_loss_series(delta, '#78C850', 25, width - 12, 214, 315)
@@ -833,7 +877,8 @@ class LearningHistoryDialog(Tk.Toplevel):
             self.chart.create_text(
                 8, 324,
                 text = (
-                    f'BCE/state {self._series_range(bce_per_state)}   '
+                    f'Policy CE/state {self._series_range(policy_ce_per_state)}   '
+                    f'Value BCE/state {self._series_range(bce_per_state)}   '
                     f'MAE {self._series_range(mae)}   '
                     f'Δpred {self._series_range(delta)}   '
                     f'Δtarget {self._series_range(target_delta)}   '
@@ -874,6 +919,7 @@ class LearningHistoryDialog(Tk.Toplevel):
         if record.get('valueBcePerState') is None:
             return '（未記録）'
         return (
+            f"Policy CE/state={self._number(record.get('policyCePerState'))}  "
             f"BCE/state={self._number(record.get('valueBcePerState'))}  "
             f"MAE={self._number(record.get('valueMae'))}  "
             f"Δpred={self._number(record.get('valueStartToEndDelta'))}  "
@@ -885,6 +931,10 @@ class LearningHistoryDialog(Tk.Toplevel):
     @staticmethod
     def _number(value):
         return '--' if value is None else f'{value:.6g}'
+
+    @staticmethod
+    def _rate(value):
+        return '--' if value is None else f'{value * 100:.1f}%'
 
     def _set_details(self, content):
         self.details.configure(state = Tk.NORMAL)
