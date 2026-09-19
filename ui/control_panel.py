@@ -95,6 +95,21 @@ class ControlPanel(Tk.Frame):
         self.loadparams_selected_button = self._create_button(self.advanced_controls,'設定を読む', self.frame.loadparams_selected, row = 1, column = 2)
         self.saveparams_selected_button = self._create_button(self.advanced_controls,'設定を保存', self.frame.saveparams_selected, row = 1, column = 3)
         self.sum_and_var_button = self._create_button(self.advanced_controls,'合計・分散', self.frame.sum_and_var_from_entry, row = 1, column = 8)
+        self.normalize_selected_button = self._create_button(
+            self.advanced_controls,
+            '選択AIを正規化…',
+            self.frame.normalize_selected_from_entry,
+            row = 3,
+            column = 0,
+            columnspan = 3,
+        )
+        self.normalize_hint_label = Tk.Label(
+            self.advanced_controls,
+            text = '先に「設定を保存」で復元点を作成してから実行',
+            font = self.font,
+            anchor = 'w',
+        )
+        self.normalize_hint_label.grid(row = 3,column = 3,columnspan = 6,sticky = 'ew')
 
     def _build_level_controls(self):
         """level 指定と counter 表示まわりの操作を配置する。"""
@@ -135,6 +150,7 @@ class ControlPanel(Tk.Frame):
         for button in (
             self.saveparams_all_button,
             self.saveparams_selected_button,
+            self.normalize_selected_button,
         ):
             button.configure(state = save_state)
 

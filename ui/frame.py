@@ -6,6 +6,7 @@ from functools import reduce
 
 import numpy as np
 import tkinter as Tk
+from tkinter import messagebox
 
 from ai.rubiks_ai import Rubiks_3_AI
 from core.ai_discoveries import (
@@ -946,6 +947,7 @@ class Frame(Tk.Frame):
             'loadparams_selected_button',
             'saveparams_selected_button',
             'sum_and_var_button',
+            'normalize_selected_button',
             'level_var',
             'level_entry',
             'set_level_button',
@@ -973,6 +975,38 @@ class Frame(Tk.Frame):
     def sum_and_var_from_entry(self):
         for index in self._selected_param_indices():
             self.sum_and_var(index)
+
+    def normalize_selected_from_entry(self):
+        """保存済みの選択AIへ、確認後に安全な重み正規化を適用する。"""
+        indices = self._selected_param_indices()
+        if len(indices) == 0:
+            messagebox.showwarning('モデルを正規化', '有効なAI番号を指定してください。', parent = self)
+            return
+        if self.solve_state.phase != -1 and not self.stop:
+            messagebox.showwarning(
+                'モデルを正規化',
+                'AIがsolve中のため、停止してから実行してください。',
+                parent = self,
+            )
+            return
+
+        index_text = ', '.join(str(index) for index in indices)
+        confirmed = messagebox.askokcancel(
+            'モデルを正規化',
+            'AI ' + index_text + ' の重みを正規化します。\n\n'
+            'W/WQ/WK/WV と対応bias、BatchNorm、optimizerの更新量が変更されます。\n'
+            '先に「設定を保存」で現在のパラメータを保存してください。\n\n'
+            '保存済みの復元点があることを確認して実行しますか？',
+            parent = self,
+        )
+        if not confirmed:
+            return
+
+        self.set_activity_status('正規化中: AI ' + index_text)
+        summaries = [self.debug_analysis_manager.normalize(index) for index in indices]
+        for summary in summaries:
+            self.append_log('normalization: ' + self.debug_analysis_manager.normalization_summary_text(summary))
+        self.set_activity_status('正規化完了: AI ' + index_text)
 
     def show_counter_from_entry(self):
         text = self.level_var.get().strip()

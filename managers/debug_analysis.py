@@ -6,6 +6,7 @@ import numpy as np
 
 
 VIEWER_RANGE_TEXT_WIDTH = 20
+NORMALIZATION_EPSILON = 1.0e-8
 
 
 class DebugAnalysisManager:
@@ -87,10 +88,40 @@ class DebugAnalysisManager:
     def normalize(self, index):
         """指定AIの重みスケールを整え、BatchNorm系パラメータを初期値に戻す。"""
         ai = self.frame.AIs[index]
+        summary = {
+            'index': index,
+            'normalized_rows': {},
+            'skipped_rows': {},
+            'reset_keys': [],
+        }
         for key in ai.params.keys():
-            self._normalize_param(ai,key)
+            result = self._normalize_param(ai,key)
+            if result['normalized_rows'] > 0:
+                summary['normalized_rows'][key] = result['normalized_rows']
+            if result['skipped_rows'] > 0:
+                summary['skipped_rows'][key] = result['skipped_rows']
+            if result['reset']:
+                summary['reset_keys'].append(key)
         ai.mark_params_dirty()
         ai.set_perfect_val()
+        return summary
+
+    @staticmethod
+    def normalization_summary_text(summary):
+        """GUIログ向けに正規化結果を短い1行へ整形する。"""
+        normalized = ', '.join(
+            f'{key}:{count}'
+            for key,count in summary['normalized_rows'].items()
+        ) or 'なし'
+        skipped = ', '.join(
+            f'{key}:{count}'
+            for key,count in summary['skipped_rows'].items()
+        )
+        resets = ','.join(summary['reset_keys']) or 'なし'
+        text = f"AI {summary['index']} normalized rows={normalized}; reset={resets}"
+        if skipped:
+            text += f'; skipped zero/non-finite rows={skipped}'
+        return text
 
     def re_activate(self, index):
         """更新量が小さいユニットを検出し、バイアスと一部重みを再活性化する。"""
@@ -913,15 +944,70 @@ class DebugAnalysisManager:
 
     def _normalize_param(self, ai, key):
         """1つのパラメータ配列に対して正規化または初期値リセットを行う。"""
-        if key[0] == 'W' and len(key) == 2:
-            scale = np.sqrt(np.var(ai.params[key],axis = 1).reshape(-1,1)) * np.sqrt(ai.params[key].shape[1] / 2)
-            ai.params[key] /= scale
-            ai.params['B' + key[1:]] /= scale.reshape(-1)
-            ai.v[key] *= 0
-        elif key[:3] == 'BNg':
+        result = {'normalized_rows': 0, 'skipped_rows': 0, 'reset': False}
+        if self._is_normalization_weight_key(key):
+            normalized_rows, skipped_rows = self._normalize_weight_rows(ai,key)
+            result['normalized_rows'] = normalized_rows
+            result['skipped_rows'] = skipped_rows
+        if key[:3] == 'BNg':
             ai.params[key][:] = 1
+            self._reset_velocity(ai,key)
+            result['reset'] = True
         elif key[:3] == 'BNb':
             ai.params[key][:] = 0
+            self._reset_velocity(ai,key)
+            result['reset'] = True
+        return result
+
+    @staticmethod
+    def _is_normalization_weight_key(key):
+        """通常AffineとTransformerのQ/K/V重みだけを正規化対象にする。"""
+        if key.startswith('W') and key[1:].isdigit():
+            return True
+        return any(
+            key.startswith(prefix) and key[len(prefix):].isdigit()
+            for prefix in ('WQ','WK','WV')
+        )
+
+    def _normalize_weight_rows(self, ai, key):
+        """有限で非ゼロの行だけを正規化し、0除算を避ける。"""
+        weights = ai.params[key]
+        if weights.ndim != 2 or weights.shape[1] == 0:
+            return 0, int(weights.shape[0]) if weights.ndim > 0 else 0
+
+        scale = np.sqrt(np.var(weights,axis = 1)) * np.sqrt(weights.shape[1] / 2.0)
+        valid_rows = np.isfinite(scale) & (scale > NORMALIZATION_EPSILON)
+        normalized_rows = int(np.count_nonzero(valid_rows))
+        skipped_rows = int(valid_rows.size - normalized_rows)
+        if normalized_rows == 0:
+            return 0, skipped_rows
+
+        weights[valid_rows,:] /= scale[valid_rows].reshape(-1,1)
+        self._reset_velocity(ai,key,valid_rows)
+        self._normalize_matching_bias(ai,key,scale,valid_rows)
+        return normalized_rows, skipped_rows
+
+    def _normalize_matching_bias(self, ai, weight_key, scale, valid_rows):
+        """Affineのbiasがある場合だけ、同じ行スケールを適用する。"""
+        bias_key = 'B' + weight_key[1:]
+        if bias_key not in ai.params:
+            return
+        bias = ai.params[bias_key]
+        if bias.ndim != 1 or bias.shape[0] != valid_rows.size:
+            return
+        bias[valid_rows] /= scale[valid_rows]
+        self._reset_velocity(ai,bias_key,valid_rows)
+
+    @staticmethod
+    def _reset_velocity(ai, key, rows = None):
+        """変更済みパラメータに古いoptimizer更新量を適用しない。"""
+        velocity = getattr(ai,'v',{}).get(key)
+        if velocity is None:
+            return
+        if rows is None:
+            velocity *= 0
+        else:
+            velocity[rows] *= 0
 
     def _is_reactivation_target(self, key):
         """再活性化の対象になる重みパラメータか判定する。"""
