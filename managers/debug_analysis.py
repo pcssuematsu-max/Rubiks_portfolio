@@ -949,7 +949,11 @@ class DebugAnalysisManager:
             normalized_rows, skipped_rows = self._normalize_weight_rows(ai,key)
             result['normalized_rows'] = normalized_rows
             result['skipped_rows'] = skipped_rows
-        if key[:3] == 'BNg':
+        if key[:7] == "ActBeta":
+            ai.params[key] *= 0
+            ai.v[key] *= 0
+            result['reset'] = True
+        elif key[:3] == 'BNg':
             ai.params[key][:] = 1
             self._reset_velocity(ai,key)
             result['reset'] = True
