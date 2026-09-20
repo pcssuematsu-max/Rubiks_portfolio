@@ -2,7 +2,13 @@ import unittest
 
 import numpy as np
 
-from managers.debug_analysis import DebugAnalysisManager
+from managers.debug_analysis import (
+    DebugAnalysisManager,
+    NORMALIZATION_TARGET_VARIANCE,
+    TRANSFORMER_INPUT_TARGET_VARIANCE,
+    TRANSFORMER_QUERY_KEY_TARGET_VARIANCE,
+    TRANSFORMER_VALUE_TARGET_VARIANCE,
+)
 
 
 class _NormalizeAI:
@@ -28,6 +34,12 @@ class _NormalizeAI:
 
     def set_perfect_val(self):
         self.perfect_calls += 1
+
+
+class _TransformerNormalizeAI(_NormalizeAI):
+    def __init__(self):
+        super().__init__()
+        self.use_transformer_attention = True
 
 
 class _NormalizeFrame:
@@ -59,7 +71,8 @@ class DebugNormalizationTests(unittest.TestCase):
     def test_normalize_rescales_matching_bias_and_resets_optimizer_state(self):
         self.manager.normalize(0)
 
-        self.assertTrue(np.allclose(self.ai.params['B1'], (2.0, 2.0)))
+        scale = np.sqrt(np.asarray((1.0, 4.0)) * 2.0 / NORMALIZATION_TARGET_VARIANCE)
+        self.assertTrue(np.allclose(self.ai.params['B1'], np.asarray((2.0, 4.0)) / scale))
         self.assertTrue(np.all(self.ai.v['W1'] == 0.0))
         self.assertTrue(np.all(self.ai.v['B1'] == 0.0))
         self.assertTrue(np.all(self.ai.params['BNg1'] == 1.0))
@@ -73,6 +86,19 @@ class DebugNormalizationTests(unittest.TestCase):
         text = self.manager.normalization_summary_text(summary)
 
         self.assertIn('skipped zero/non-finite rows=WQ1:1', text)
+
+    def test_transformer_uses_layer_specific_variance_targets(self):
+        transformer = _TransformerNormalizeAI()
+        manager = DebugAnalysisManager(_NormalizeFrame(transformer))
+
+        summary = manager.normalize(0)
+
+        self.assertEqual(summary['target_variances']['W1'], TRANSFORMER_INPUT_TARGET_VARIANCE)
+        self.assertEqual(summary['target_variances']['WQ1'], TRANSFORMER_QUERY_KEY_TARGET_VARIANCE)
+        self.assertEqual(summary['target_variances']['WK1'], TRANSFORMER_QUERY_KEY_TARGET_VARIANCE)
+        self.assertEqual(summary['target_variances']['WV1'], TRANSFORMER_VALUE_TARGET_VARIANCE)
+        self.assertEqual(summary['target_variances']['W1'], 1.0)
+        self.assertEqual(summary['target_variances']['WQ1'], 0.0004)
 
 
 if __name__ == '__main__':

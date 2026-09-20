@@ -48,12 +48,29 @@ class ParamManager:
         """指定AIのパラメータ・optimizer状態をAIdatasから読み込む。"""
         ai = self.frame.AIs[index]
         data_dir = self._data_dir(index)
+        requested_keys = tuple(self._target_keys(ai, keylis))
         if self._load_model_file(ai, data_dir):
             self._after_load(ai)
+            self._record_loaded_parameters(
+                index,
+                data_dir,
+                source = 'modelFile',
+                requested_keys = requested_keys,
+                loaded_keys = tuple(ai.params.keys()),
+            )
             return
-        for key in self._target_keys(ai, keylis):
-            self._load_param_set(ai, data_dir, key)
+        loaded_keys = []
+        for key in requested_keys:
+            if self._load_param_set(ai, data_dir, key):
+                loaded_keys.append(key)
         self._after_load(ai)
+        self._record_loaded_parameters(
+            index,
+            data_dir,
+            source = 'arrayFiles',
+            requested_keys = requested_keys,
+            loaded_keys = tuple(loaded_keys),
+        )
 
     def save(self, index, keylis = None):
         """指定AIのパラメータ・optimizer状態をAIdatasへ保存する。"""
@@ -162,11 +179,11 @@ class ParamManager:
         h_path = data_dir / f'{key}_h.npy'
         if not param_path.exists():
             print(f"Skip missing param: {param_path}")
-            return
+            return False
         loaded_param = np.load(param_path)
         if loaded_param.shape != ai.params[key].shape:
             print(f"Skip shape mismatch param: {param_path} {loaded_param.shape} != {ai.params[key].shape}")
-            return
+            return False
         ai.params[key][:] = loaded_param
         if v_path.exists():
             loaded_v = np.load(v_path)
@@ -176,6 +193,24 @@ class ParamManager:
             loaded_h = np.load(h_path)
             if loaded_h.shape == ai.h[key].shape:
                 ai.h[key][:] = loaded_h
+        return True
+
+    def _record_loaded_parameters(self, index, data_dir, source, requested_keys, loaded_keys):
+        """Frameが対応している場合だけ、再現性用の読込イベントを残す。"""
+        recorder = getattr(self.frame, 'record_ai_lifecycle_event', None)
+        if not callable(recorder):
+            return
+        recorder(
+            'parameters_loaded',
+            ai_index = index,
+            details = {
+                'source': source,
+                'parameterDirectory': str(data_dir),
+                'requestedParameterCount': len(requested_keys),
+                'loadedParameterCount': len(loaded_keys),
+                'loadedKeys': list(loaded_keys),
+            },
+        )
 
     def _save_param_set(self, ai, data_dir, key):
         """1つのkeyについて、重み・v・hを保存する。"""

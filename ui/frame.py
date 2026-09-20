@@ -2,6 +2,7 @@
 
 import pickle
 import webbrowser
+import uuid
 from functools import reduce
 
 import numpy as np
@@ -9,6 +10,7 @@ import tkinter as Tk
 from tkinter import messagebox
 
 from ai.rubiks_ai import Rubiks_3_AI
+from core.ai_lifecycle_log import AiLifecycleLogStore
 from core.ai_discoveries import (
     AiDiscoveryStore,
     discovery_effect_metadata,
@@ -111,6 +113,8 @@ class Frame(Tk.Frame):
             config = FrameConfig()
 
         self.config = config
+        self.ai_lifecycle_session_id = uuid.uuid4().hex
+        self.ai_lifecycle_log = AiLifecycleLogStore()
         self.puzzle_type = config.puzzle_type
         self.puzzle_adapter = get_puzzle_adapter(self.puzzle_type)
         self.cube_size = config.cube_size
@@ -179,6 +183,7 @@ class Frame(Tk.Frame):
 
         # Finalize solve/runtime state after all dependencies are in place.
         self._init_runtime_state()
+        self._record_application_started()
         
         
     def _register_initial_scrambles(self, initial_scramble_groups = None, F2L = False, OLL = False, Centers = False, Edges = False, Cross = False):
@@ -856,6 +861,39 @@ class Frame(Tk.Frame):
         self.data_search3_len = self.current_search3_data_len()
         self.set_activity_status('待機中')
 
+    def _record_application_started(self):
+        """起動ごとのデータ・AI構成を、比較境界として残す。"""
+        self.record_ai_lifecycle_event(
+            'application_started',
+            details = {
+                'puzzleType': self.puzzle_type,
+                'cubeSize': self.cube_size,
+                'aiCount': self.AInum,
+                'aiStates': [
+                    {
+                        'aiIndex': index,
+                        'searchMode': ai.search_mode,
+                        'transformer': bool(getattr(ai, 'use_transformer_attention', False)),
+                        'search2DataCount': len(ai.datas),
+                        'search3DataCount': len(ai.datas_search3),
+                    }
+                    for index,ai in enumerate(self.AIs)
+                ],
+            },
+        )
+
+    def record_ai_lifecycle_event(self, event_type, ai_index = None, details = None):
+        """ログ保存失敗でGUIの操作が止まらないようにイベントを記録する。"""
+        try:
+            self.ai_lifecycle_log.append(
+                event_type,
+                self.ai_lifecycle_session_id,
+                ai_index = ai_index,
+                details = details,
+            )
+        except (OSError,ValueError) as error:
+            self.append_log(f'AI lifecycle log: 保存できませんでした ({error})')
+
     def current_search3_data_len(self):
         """Return the largest Search3 dataset length among AIs."""
         if not self.AIs:
@@ -1006,6 +1044,16 @@ class Frame(Tk.Frame):
         summaries = [self.debug_analysis_manager.normalize(index) for index in indices]
         for summary in summaries:
             self.append_log('normalization: ' + self.debug_analysis_manager.normalization_summary_text(summary))
+            self.record_ai_lifecycle_event(
+                'parameters_normalized',
+                ai_index = summary['index'],
+                details = {
+                    'normalizedRows': summary['normalized_rows'],
+                    'skippedRows': summary['skipped_rows'],
+                    'resetKeys': summary['reset_keys'],
+                    'targetVariances': summary['target_variances'],
+                },
+            )
         self.set_activity_status('正規化完了: AI ' + index_text)
 
     def show_counter_from_entry(self):

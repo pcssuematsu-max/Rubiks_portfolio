@@ -7,6 +7,11 @@ import numpy as np
 
 VIEWER_RANGE_TEXT_WIDTH = 20
 NORMALIZATION_EPSILON = 1.0e-8
+# Residual branch: keep each SiLU branch smaller than its skip connection.
+NORMALIZATION_TARGET_VARIANCE = 0.125
+TRANSFORMER_INPUT_TARGET_VARIANCE = 1.0
+TRANSFORMER_QUERY_KEY_TARGET_VARIANCE = 0.0004
+TRANSFORMER_VALUE_TARGET_VARIANCE = 0.04
 
 
 class DebugAnalysisManager:
@@ -93,11 +98,13 @@ class DebugAnalysisManager:
             'normalized_rows': {},
             'skipped_rows': {},
             'reset_keys': [],
+            'target_variances': {},
         }
         for key in ai.params.keys():
             result = self._normalize_param(ai,key)
             if result['normalized_rows'] > 0:
                 summary['normalized_rows'][key] = result['normalized_rows']
+                summary['target_variances'][key] = result['target_variance']
             if result['skipped_rows'] > 0:
                 summary['skipped_rows'][key] = result['skipped_rows']
             if result['reset']:
@@ -113,12 +120,19 @@ class DebugAnalysisManager:
             f'{key}:{count}'
             for key,count in summary['normalized_rows'].items()
         ) or 'なし'
+        targets = ', '.join(
+            f'{key}:{value:g}'
+            for key,value in summary['target_variances'].items()
+        ) or 'なし'
         skipped = ', '.join(
             f'{key}:{count}'
             for key,count in summary['skipped_rows'].items()
         )
         resets = ','.join(summary['reset_keys']) or 'なし'
-        text = f"AI {summary['index']} normalized rows={normalized}; reset={resets}"
+        text = (
+            f"AI {summary['index']} normalized rows={normalized}; "
+            f"target_variance={targets}; reset={resets}"
+        )
         if skipped:
             text += f'; skipped zero/non-finite rows={skipped}'
         return text
@@ -944,11 +958,22 @@ class DebugAnalysisManager:
 
     def _normalize_param(self, ai, key):
         """1つのパラメータ配列に対して正規化または初期値リセットを行う。"""
-        result = {'normalized_rows': 0, 'skipped_rows': 0, 'reset': False}
+        result = {
+            'normalized_rows': 0,
+            'skipped_rows': 0,
+            'reset': False,
+            'target_variance': None,
+        }
         if self._is_normalization_weight_key(key):
-            normalized_rows, skipped_rows = self._normalize_weight_rows(ai,key)
+            target_variance = self._normalization_target_variance(ai,key)
+            normalized_rows, skipped_rows = self._normalize_weight_rows(
+                ai,
+                key,
+                target_variance,
+            )
             result['normalized_rows'] = normalized_rows
             result['skipped_rows'] = skipped_rows
+            result['target_variance'] = target_variance
         if key[:7] == "ActBeta":
             ai.params[key] *= 0
             ai.v[key] *= 0
@@ -973,13 +998,30 @@ class DebugAnalysisManager:
             for prefix in ('WQ','WK','WV')
         )
 
-    def _normalize_weight_rows(self, ai, key):
+    @staticmethod
+    def _normalization_target_variance(ai, key):
+        """Return layer-specific variance targets for the piece-token Transformer."""
+        if not bool(getattr(ai,'use_transformer_attention',False)):
+            return NORMALIZATION_TARGET_VARIANCE
+        if key == 'W1':
+            return TRANSFORMER_INPUT_TARGET_VARIANCE
+        if key.startswith(('WQ','WK')):
+            return TRANSFORMER_QUERY_KEY_TARGET_VARIANCE
+        if key.startswith('WV'):
+            return TRANSFORMER_VALUE_TARGET_VARIANCE
+        # W2--W8 are SiLU residual branches.  A small branch variance avoids
+        # repeatedly inflating the skip signal through the seven blocks.
+        return NORMALIZATION_TARGET_VARIANCE
+
+    def _normalize_weight_rows(self, ai, key, target_variance):
         """有限で非ゼロの行だけを正規化し、0除算を避ける。"""
         weights = ai.params[key]
         if weights.ndim != 2 or weights.shape[1] == 0:
             return 0, int(weights.shape[0]) if weights.ndim > 0 else 0
 
-        scale = np.sqrt(np.var(weights,axis = 1)) * np.sqrt(weights.shape[1] / 2.0)
+        scale = np.sqrt(np.var(weights,axis = 1)) * np.sqrt(
+            weights.shape[1] / target_variance
+        )
         valid_rows = np.isfinite(scale) & (scale > NORMALIZATION_EPSILON)
         normalized_rows = int(np.count_nonzero(valid_rows))
         skipped_rows = int(valid_rows.size - normalized_rows)
