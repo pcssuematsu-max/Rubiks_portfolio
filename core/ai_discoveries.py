@@ -257,7 +257,7 @@ def _validate_payload(payload, path: str) -> None:
 
 
 class AiDiscoveryStore:
-    """Store the shortest successful solve for each puzzle and start position."""
+    """Store one concise replay for each discovered puzzle procedure."""
 
     def __init__(self, path: Path | None = None):
         self.path = Path(path) if path is not None else default_discoveries_path()
@@ -278,7 +278,37 @@ class AiDiscoveryStore:
         discoveries = payload["discoveries"]
         record_id = _record_id(normalized_puzzle, clean_setup, discovery_kind)
         current = next((item for item in discoveries if item.get("id") == record_id), None)
-        if current is not None and len(current.get("moves", ())) <= len(clean_moves):
+        procedure_matches = [
+            item
+            for item in discoveries
+            if item["puzzle"] == normalized_puzzle and item["moves"] == clean_moves
+        ]
+
+        def procedure_priority(item):
+            return (
+                len(item["setup"]),
+                0 if item.get("discoveryKind", "full-solve") == "full-solve" else 1,
+                item["foundAt"],
+                item["id"],
+            )
+
+        incoming_priority = (
+            len(clean_setup),
+            0 if discovery_kind == "full-solve" else 1,
+            "",
+            record_id,
+        )
+        previous_found_at = None
+        replaced_procedure = False
+        if procedure_matches:
+            representative = min(procedure_matches, key=procedure_priority)
+            if procedure_priority(representative) <= incoming_priority:
+                return "unchanged"
+            previous_found_at = representative["foundAt"]
+            replaced_procedure = True
+            discoveries[:] = [item for item in discoveries if item not in procedure_matches]
+            current = None
+        elif current is not None and len(current.get("moves", ())) <= len(clean_moves):
             return "unchanged"
 
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -288,7 +318,7 @@ class AiDiscoveryStore:
             "setup": clean_setup,
             "moves": clean_moves,
             "moveCount": len(clean_moves),
-            "foundAt": current.get("foundAt", now) if current else now,
+            "foundAt": previous_found_at or (current.get("foundAt", now) if current else now),
             "updatedAt": now,
         }
         if effect_metadata is not None:
@@ -297,7 +327,7 @@ class AiDiscoveryStore:
             record["discoveryKind"] = discovery_kind
         if current is None:
             discoveries.append(record)
-            outcome = "added"
+            outcome = "shorter" if replaced_procedure else "added"
         else:
             discoveries[discoveries.index(current)] = record
             outcome = "shorter"

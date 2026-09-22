@@ -48,6 +48,18 @@ class AiDiscoveryStoreTests(unittest.TestCase):
             self.assertEqual(record["effectCount"], metadata["effectCount"])
             self.assertEqual(record["orientationCount"], metadata["orientationCount"])
 
+    def test_keeps_one_replay_for_the_same_discovered_procedure(self):
+        with TemporaryDirectory() as temporary_directory:
+            store = AiDiscoveryStore(Path(temporary_directory) / "ai-discoveries.json")
+            self.assertEqual(store.save("3x3x3", ("R", "U"), ("F",)), "added")
+            self.assertEqual(store.save("3x3x3", ("R", "U", "L"), ("F",)), "unchanged")
+            self.assertEqual(store.save("3x3x3", (), ("F",)), "shorter")
+
+            records = json.loads(store.path.read_text(encoding="utf-8"))["discoveries"]
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]["setup"], [])
+            self.assertEqual(records[0]["moves"], ["F"])
+
     def test_keeps_different_start_positions_as_separate_discoveries(self):
         with TemporaryDirectory() as temporary_directory:
             store = AiDiscoveryStore(Path(temporary_directory) / "ai-discoveries.json")
