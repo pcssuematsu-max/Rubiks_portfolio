@@ -118,6 +118,7 @@ class AiDiscoveryStoreTests(unittest.TestCase):
 
         self.assertEqual(terminal, (("R", "U", "F"), ("L", "D")))
         self.assertIsNone(terminal_last_perm_sequences(("R",), (("U",),)))
+        self.assertIsNone(terminal_last_perm_sequences(("R",), ((), ("L",))))
 
     def test_terminal_last_perm_has_an_independent_record_id(self):
         with TemporaryDirectory() as temporary_directory:

@@ -90,10 +90,10 @@ def terminal_last_perm_sequences(setup, move_rows) -> tuple[tuple, tuple] | None
     rows = tuple(tuple(row) for row in move_rows)
     if len(rows) < 2 or not rows[-1]:
         return None
-    terminal_setup = tuple(setup)
-    for row in rows[:-1]:
-        terminal_setup += row
-    return terminal_setup, rows[-1]
+    preceding_moves = tuple(move for row in rows[:-1] for move in row)
+    if not preceding_moves:
+        return None
+    return tuple(setup) + preceding_moves, rows[-1]
 
 
 def _effect_component_label(component) -> str:
