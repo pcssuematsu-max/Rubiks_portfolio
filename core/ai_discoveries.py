@@ -17,6 +17,8 @@ _PAYLOAD_FIELDS = frozenset({"schemaVersion", "updatedAt", "discoveries"})
 _RECORD_FIELDS = frozenset(
     {"id", "puzzle", "setup", "moves", "moveCount", "foundAt", "updatedAt"}
 )
+_OPTIONAL_RECORD_FIELDS = frozenset({"discoveryKind"})
+_DISCOVERY_KINDS = frozenset({"full-solve", "terminal-last-perm"})
 _EFFECT_FIELDS = frozenset(
     {"effectName", "effectClass", "effectLabel", "effectCount", "orientationCount"}
 )
@@ -55,9 +57,11 @@ def _clean_moves(moves) -> list[str]:
     return [str(move).strip() for move in moves if str(move).strip()]
 
 
-def _record_id(puzzle: str, setup: list[str]) -> str:
-    payload = "\0".join((puzzle, *setup)).encode("utf-8")
-    return sha256(payload).hexdigest()[:16]
+def _record_id(puzzle: str, setup: list[str], discovery_kind: str = "full-solve") -> str:
+    parts = (puzzle, *setup)
+    if discovery_kind != "full-solve":
+        parts = (discovery_kind, *parts)
+    return sha256("\0".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
 def point_canonical_discovery_sequences(cube, setup, moves) -> tuple[tuple, tuple]:
@@ -75,6 +79,21 @@ def point_canonical_discovery_sequences(cube, setup, moves) -> tuple[tuple, tupl
     except (OSError, AttributeError, KeyError, TypeError, ValueError):
         return source_setup, source_moves
     return canonical_setup, tuple(representative.moves)
+
+
+def terminal_last_perm_sequences(setup, move_rows) -> tuple[tuple, tuple] | None:
+    """Return the replayable final search step from a multi-step solve.
+
+    The final row is stored with the state reached by all preceding rows, so
+    its effect remains visible instead of being absorbed into the full solve.
+    """
+    rows = tuple(tuple(row) for row in move_rows)
+    if len(rows) < 2 or not rows[-1]:
+        return None
+    terminal_setup = tuple(setup)
+    for row in rows[:-1]:
+        terminal_setup += row
+    return terminal_setup, rows[-1]
 
 
 def _effect_component_label(component) -> str:
@@ -180,13 +199,17 @@ def _validate_record(record, index: int, path: str) -> None:
     if not isinstance(record, dict):
         raise _validation_error(path, f"{location} must be an object")
     fields = set(record)
+    non_optional_fields = fields - _OPTIONAL_RECORD_FIELDS
     allowed_fields = _RECORD_FIELDS | _EFFECT_FIELDS
-    if fields not in (_RECORD_FIELDS, allowed_fields):
+    if non_optional_fields not in (_RECORD_FIELDS, allowed_fields):
         raise _validation_error(
             path,
             f"{location} must contain base fields with optional complete effect metadata",
         )
+    if "discoveryKind" in record and record["discoveryKind"] not in _DISCOVERY_KINDS:
+        raise _validation_error(path, f"{location}.discoveryKind is invalid")
 
+    discovery_kind = record.get("discoveryKind", "full-solve")
     puzzle = record["puzzle"]
     if not isinstance(puzzle, str) or not puzzle.strip():
         raise _validation_error(path, f"{location}.puzzle must be a non-empty string")
@@ -200,12 +223,12 @@ def _validate_record(record, index: int, path: str) -> None:
         raise _validation_error(path, f"{location}.moveCount must equal len(moves)")
 
     record_id = record["id"]
-    expected_id = _record_id(puzzle, setup)
+    expected_id = _record_id(puzzle, setup, discovery_kind)
     if not isinstance(record_id, str) or record_id != expected_id:
         raise _validation_error(path, f"{location}.id does not match puzzle and setup")
     _validate_timestamp(record["foundAt"], f"{location}.foundAt", path)
     _validate_timestamp(record["updatedAt"], f"{location}.updatedAt", path)
-    if fields == allowed_fields:
+    if non_optional_fields == allowed_fields:
         _validate_effect_metadata({field: record[field] for field in _EFFECT_FIELDS}, location)
 
 
@@ -239,7 +262,7 @@ class AiDiscoveryStore:
     def __init__(self, path: Path | None = None):
         self.path = Path(path) if path is not None else default_discoveries_path()
 
-    def save(self, puzzle: str, setup, moves, *, effect_metadata = None) -> str:
+    def save(self, puzzle: str, setup, moves, *, effect_metadata = None, discovery_kind = "full-solve") -> str:
         """Save a discovery and return ``added``, ``shorter``, or ``unchanged``."""
         normalized_puzzle = str(puzzle).strip()
         clean_setup = _clean_moves(setup)
@@ -248,10 +271,12 @@ class AiDiscoveryStore:
             raise ValueError("puzzle is required")
         if not clean_moves:
             raise ValueError("moves is required")
+        if discovery_kind not in _DISCOVERY_KINDS:
+            raise ValueError("discovery_kind is invalid")
 
         payload = self._read()
         discoveries = payload["discoveries"]
-        record_id = _record_id(normalized_puzzle, clean_setup)
+        record_id = _record_id(normalized_puzzle, clean_setup, discovery_kind)
         current = next((item for item in discoveries if item.get("id") == record_id), None)
         if current is not None and len(current.get("moves", ())) <= len(clean_moves):
             return "unchanged"
@@ -268,6 +293,8 @@ class AiDiscoveryStore:
         }
         if effect_metadata is not None:
             record.update(_validate_effect_metadata(effect_metadata, "effect metadata"))
+        if discovery_kind != "full-solve":
+            record["discoveryKind"] = discovery_kind
         if current is None:
             discoveries.append(record)
             outcome = "added"

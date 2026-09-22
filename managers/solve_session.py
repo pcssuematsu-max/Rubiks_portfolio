@@ -1043,6 +1043,13 @@ class SolveSessionManager:
                 record_web_discovery = getattr(self.frame, 'record_web_discovery', None)
                 if callable(record_web_discovery):
                     record_web_discovery()
+                record_web_terminal_discovery = getattr(
+                    self.frame,
+                    'record_web_terminal_discovery',
+                    None,
+                )
+                if callable(record_web_terminal_discovery):
+                    record_web_terminal_discovery()
                 self.frame.perf_num[self.frame.stage] += 1
                 self.frame.success[self.frame.AI_idx] += 1
                 result_recorded = True

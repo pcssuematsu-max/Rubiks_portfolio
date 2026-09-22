@@ -15,6 +15,7 @@ from core.ai_discoveries import (
     AiDiscoveryStore,
     discovery_effect_metadata,
     point_canonical_discovery_sequences,
+    terminal_last_perm_sequences,
 )
 from core.puzzle_registry import get_puzzle_adapter
 from core.web_playback import (
@@ -1279,16 +1280,10 @@ class Frame(Tk.Frame):
         webbrowser.open_new_tab(url)
         self.append_log(f'Web replay: 探索 #{record.solve_index} をブラウザで開きました。')
 
-    def record_web_discovery(self):
-        """Save the current successful solve to the web discovery feed."""
+    def _save_web_discovery(self, setup, moves, *, discovery_kind = "full-solve"):
+        """Save one replayable direct-search result to the web discovery feed."""
         puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)
         if puzzle is None:
-            return
-
-        state = self.solve_state
-        setup = tuple(state.s or ())
-        moves = tuple(move for move_row in state.move_lis for move in move_row)
-        if not moves:
             return
         setup, moves = point_canonical_discovery_sequences(self.cube, setup, moves)
 
@@ -1304,15 +1299,36 @@ class Frame(Tk.Frame):
                 self.display_move_sequence(setup),
                 self.display_move_sequence(moves),
                 effect_metadata = effect_metadata,
+                discovery_kind = discovery_kind,
             )
         except (OSError, ValueError) as error:
             self.append_log(f'Web discoveries: 保存できませんでした ({error})')
             return
 
         if outcome == 'added':
-            self.append_log('Web discoveries: 新しいAI成果を保存しました。')
+            detail = '局面解消のAI成果' if discovery_kind == 'terminal-last-perm' else '新しいAI成果'
+            self.append_log(f'Web discoveries: {detail}を保存しました。')
         elif outcome == 'shorter':
             self.append_log('Web discoveries: より短いAI成果に更新しました。')
+
+    def record_web_discovery(self):
+        """Save the complete successful solve to the web discovery feed."""
+        state = self.solve_state
+        setup = tuple(state.s or ())
+        moves = tuple(move for move_row in state.move_lis for move in move_row)
+        if moves:
+            self._save_web_discovery(setup, moves)
+
+    def record_web_terminal_discovery(self):
+        """Save only the final direct-search step with its preceding state."""
+        state = self.solve_state
+        if not state.search_TF:
+            return
+        terminal = terminal_last_perm_sequences(state.s or (), state.move_lis)
+        if terminal is None:
+            return
+        setup, moves = terminal
+        self._save_web_discovery(setup, moves, discovery_kind = 'terminal-last-perm')
 
     def make_myperm(self):
         self.myperm_manager.open_apply_dialog()

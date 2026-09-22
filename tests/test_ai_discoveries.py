@@ -9,6 +9,7 @@ from core.ai_discoveries import (
     AiDiscoveryStore,
     discovery_effect_metadata,
     point_canonical_discovery_sequences,
+    terminal_last_perm_sequences,
 )
 from core.myperm_effects import MypermEffectAnalyzer
 from cube.rubiks_cube import Rubiks_3
@@ -108,6 +109,42 @@ class AiDiscoveryStoreTests(unittest.TestCase):
             migrated = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(migrated["schemaVersion"], 1)
             self.assertNotIn("version", migrated)
+
+    def test_terminal_last_perm_keeps_the_preceding_state_as_setup(self):
+        terminal = terminal_last_perm_sequences(
+            ("R",),
+            (("U", "F"), ("L", "D")),
+        )
+
+        self.assertEqual(terminal, (("R", "U", "F"), ("L", "D")))
+        self.assertIsNone(terminal_last_perm_sequences(("R",), (("U",),)))
+
+    def test_terminal_last_perm_has_an_independent_record_id(self):
+        with TemporaryDirectory() as temporary_directory:
+            store = AiDiscoveryStore(Path(temporary_directory) / "ai-discoveries.json")
+            metadata = {
+                "effectName": "C3",
+                "effectClass": "C3",
+                "effectLabel": "コーナー：3巡回",
+                "effectCount": 3,
+                "orientationCount": 0,
+            }
+
+            store.save("3x3x3", ("R",), ("R'",), effect_metadata=metadata)
+            store.save(
+                "3x3x3",
+                ("R",),
+                ("U",),
+                effect_metadata=metadata,
+                discovery_kind="terminal-last-perm",
+            )
+
+            records = json.loads(store.path.read_text(encoding="utf-8"))["discoveries"]
+            self.assertEqual(len(records), 2)
+            self.assertEqual(
+                {record.get("discoveryKind", "full-solve") for record in records},
+                {"full-solve", "terminal-last-perm"},
+            )
 
     def test_point_canonical_sequences_keep_the_solution_valid_for_setup(self):
         cube = Rubiks_3(size=3)
