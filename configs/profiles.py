@@ -507,6 +507,11 @@ def build_experiment_frame_config():
         lr_hs = [0.99] * ai_count,
         out_cs = [1.0] * ai_count,
         search3_cs = [2.0] * ai_count,
+        # Transformer Search3 keeps C=2 near the root, then widens its local
+        # exploration linearly to C=4 by depth 20.  Linear Search3 remains at
+        # the fixed C=2 baseline for a direct comparison.
+        search3_c_depth_maxes = [2.0] * 10 + [4.0] * 10,
+        search3_c_depth_ramp_depths = [0] * 10 + [20] * 10,
         search2_max_frontiers = [30000] * ai_count,
         search2_torch_batch_sizes = [
             64 if original_transformer_attention[ai_index] else 100
@@ -532,7 +537,7 @@ def build_experiment_frame_config():
         ],
         residuals = residuals,
         update_scales = [
-            (5.0, 1.0, 20.0) if is_search2_ai[ai_index] else (5.0, 1.0, 20.0)
+            (5.0, 1.0, 20.0) if is_search2_ai[ai_index] else (5.0, 1.0, 10.0)
             for ai_index in range(ai_count)
         ],
         original_transformer_attention = original_transformer_attention,

@@ -259,6 +259,9 @@ class Rubiks_3_AI:
         self.search_batch3 = 40
         self.search_depth3 = 200
         self.search3_C = 0.05
+        # A zero ramp keeps the conventional fixed-C PUCT behavior.
+        self.search3_C_depth_max = self.search3_C
+        self.search3_C_depth_ramp_depth = 0
         self.search3_max_node_cache = 5000
         self.search3_max_prediction_cache = 5000
         self.perfect_val = 1.0

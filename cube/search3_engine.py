@@ -158,6 +158,21 @@ class Search3Engine:
         self.node_cache[state_key] = node
         return node
 
+    def _exploration_c(self, depth):
+        """Return the PUCT exploration coefficient for root-relative depth.
+
+        Nodes survive root advancement, so C must be calculated at selection
+        time rather than fixed when the node was first created.  A disabled
+        schedule (ramp depth 0, or equal endpoints) is exactly fixed-C.
+        """
+        base_c = float(getattr(self.ai, 'search3_C', 0.05))
+        max_c = float(getattr(self.ai, 'search3_C_depth_max', base_c))
+        ramp_depth = max(0, int(getattr(self.ai, 'search3_C_depth_ramp_depth', 0)))
+        if ramp_depth == 0 or max_c == base_c:
+            return base_c
+        progress = min(max(int(depth), 0), ramp_depth) / ramp_depth
+        return base_c + (max_c - base_c) * progress
+
     def _create_node_from_current_state(self, C=0.05):
         state_key = self._state_key()
         node_PV = self._predict_current_state()
@@ -286,7 +301,10 @@ class Search3Engine:
         path_moves = []
         path_state_keys = {root_node.state_key}
         while True:
-            index = node.select_node(self._find_invalid_indices(path_moves))
+            index = node.select_node(
+                self._find_invalid_indices(path_moves),
+                C = self._exploration_c(len(path_moves)),
+            )
             if index is None:
                 return {
                     'resolved': True,
@@ -492,7 +510,7 @@ class Node:
         self.children = {}
         self.score = None
 
-    def select_node(self, invalid_index=None):
+    def select_node(self, invalid_index=None, C=None):
         masked = self.blocked.copy()
         if invalid_index is not None:
             if isinstance(invalid_index, (set, list, tuple, np.ndarray)):
@@ -504,7 +522,8 @@ class Node:
             return None
         average_value = np.full_like(self.P, self.value, dtype='f')
         np.divide(self.val, self.visited, out=average_value, where=self.visited != 0)
-        self.score = average_value + self.C * self.P * np.sqrt(max(1, self.S)) / (1 + self.visited)
+        exploration_c = self.C if C is None else float(C)
+        self.score = average_value + exploration_c * self.P * np.sqrt(max(1, self.S)) / (1 + self.visited)
         self.score[masked] = -np.inf
         if self.S == 0:
             prior = self.P.copy()

@@ -1355,6 +1355,10 @@ class SolveSessionManager:
                 'valueLossType': getattr(ai, 'search2_value_loss_type', None),
             },
             'search3C': getattr(ai, 'search3_C', None),
+            'search3DepthSchedule': {
+                'maxC': getattr(ai, 'search3_C_depth_max', getattr(ai, 'search3_C', None)),
+                'rampDepth': getattr(ai, 'search3_C_depth_ramp_depth', 0),
+            },
             'torchPredict': getattr(ai, 'use_torch_predict', None),
             'torchTraining': getattr(ai, 'use_torch_training', None),
         }

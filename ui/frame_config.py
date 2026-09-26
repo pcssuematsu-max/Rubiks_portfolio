@@ -56,6 +56,8 @@ class FrameConfig:
     lr_hs: Optional[Sequence[float]] = None
     out_cs: Optional[Sequence[float]] = None
     search3_cs: Optional[Sequence[float]] = None
+    search3_c_depth_maxes: Optional[Sequence[float]] = None
+    search3_c_depth_ramp_depths: Optional[Sequence[int]] = None
     search2_max_frontiers: Optional[Sequence[int]] = None
     search2_torch_batch_sizes: Optional[Sequence[int]] = None
     search2_value_loss_types: Optional[Sequence[str]] = None
@@ -107,6 +109,8 @@ class FrameConfig:
         self._validate_ai_sequence_length('lr_hs', self.lr_hs, ai_count)
         self._validate_ai_sequence_length('out_cs', self.out_cs, ai_count)
         self._validate_ai_sequence_length('search3_cs', self.search3_cs, ai_count)
+        self._validate_ai_sequence_length('search3_c_depth_maxes', self.search3_c_depth_maxes, ai_count)
+        self._validate_ai_sequence_length('search3_c_depth_ramp_depths', self.search3_c_depth_ramp_depths, ai_count)
         self._validate_ai_sequence_length('search2_max_frontiers', self.search2_max_frontiers, ai_count)
         self._validate_ai_sequence_length('search2_torch_batch_sizes', self.search2_torch_batch_sizes, ai_count)
         self._validate_ai_sequence_length('search2_value_loss_types', self.search2_value_loss_types, ai_count)

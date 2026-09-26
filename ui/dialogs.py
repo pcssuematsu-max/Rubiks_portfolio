@@ -635,12 +635,21 @@ class ExperimentSummaryDialog(Tk.Toplevel):
             return '旧ログのため設定スナップショットなし'
         search2 = settings.get('search2', {})
         scales = settings.get('updateScales', {})
+        depth_schedule = settings.get('search3DepthSchedule', {})
+        ramp_depth = depth_schedule.get('rampDepth', 0) if isinstance(depth_schedule, dict) else 0
+        if ramp_depth:
+            search3_text = (
+                f"S3C={settings.get('search3C', '--')}→"
+                f"{depth_schedule.get('maxC', '--')}@d{ramp_depth}"
+            )
+        else:
+            search3_text = f"S3C={settings.get('search3C', '--')}"
         return (
             f"model={settings.get('model', '--')} lr={settings.get('learningRate', '--')} "
             f"wd={settings.get('weightDecayRate', '--')} "
             f"scale={scales.get('shared', '--')}/{scales.get('policy', '--')}/{scales.get('value', '--')} "
             f"S2 frontier={search2.get('maxFrontier', '--')} batch={search2.get('batchSize', '--')} "
-            f"loss={search2.get('valueLossType', '--')} S3C={settings.get('search3C', '--')}"
+            f"loss={search2.get('valueLossType', '--')} {search3_text}"
         )
 
     @staticmethod

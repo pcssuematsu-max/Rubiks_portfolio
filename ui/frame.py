@@ -150,6 +150,8 @@ class Frame(Tk.Frame):
             lr_hs = config.lr_hs,
             out_cs = config.out_cs,
             search3_cs = config.search3_cs,
+            search3_c_depth_maxes = config.search3_c_depth_maxes,
+            search3_c_depth_ramp_depths = config.search3_c_depth_ramp_depths,
             search2_max_frontiers = config.search2_max_frontiers,
             search2_torch_batch_sizes = config.search2_torch_batch_sizes,
             search2_value_loss_types = config.search2_value_loss_types,
@@ -481,6 +483,8 @@ class Frame(Tk.Frame):
                                    lr_hs = None,
                                    out_cs = None,
                                    search3_cs = None,
+                                   search3_c_depth_maxes = None,
+                                   search3_c_depth_ramp_depths = None,
                                    search2_max_frontiers = None,
                                    search2_torch_batch_sizes = None,
                                    search2_value_loss_types = None,
@@ -527,6 +531,14 @@ class Frame(Tk.Frame):
                 self.AIs[i].search3_C = search3_cs[i]
             else:
                 self.AIs[i].search3_C = 0.05
+            if search3_c_depth_maxes is not None:
+                self.AIs[i].search3_C_depth_max = float(search3_c_depth_maxes[i])
+            else:
+                self.AIs[i].search3_C_depth_max = self.AIs[i].search3_C
+            if search3_c_depth_ramp_depths is not None:
+                self.AIs[i].search3_C_depth_ramp_depth = max(0,int(search3_c_depth_ramp_depths[i]))
+            else:
+                self.AIs[i].search3_C_depth_ramp_depth = 0
             if search2_max_frontiers is not None:
                 self.AIs[i].search2_max_frontier = int(search2_max_frontiers[i])
             if search2_torch_batch_sizes is not None:
