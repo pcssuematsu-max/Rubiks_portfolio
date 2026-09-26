@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import numpy as np
 
+from ai.transformer_variance import (
+    RESIDUAL_BRANCH_TARGET_VARIANCE,
+    TRANSFORMER_INPUT_TARGET_VARIANCE,
+    TRANSFORMER_QUERY_KEY_TARGET_VARIANCE,
+    TRANSFORMER_VALUE_TARGET_VARIANCE,
+    transformer_parameter_target_variance,
+)
 
 VIEWER_RANGE_TEXT_WIDTH = 20
 NORMALIZATION_EPSILON = 1.0e-8
 # Residual branch: keep each SiLU branch smaller than its skip connection.
-NORMALIZATION_TARGET_VARIANCE = 0.125
-TRANSFORMER_INPUT_TARGET_VARIANCE = 1.0
-TRANSFORMER_QUERY_KEY_TARGET_VARIANCE = 0.0004
-TRANSFORMER_VALUE_TARGET_VARIANCE = 0.04
+NORMALIZATION_TARGET_VARIANCE = RESIDUAL_BRANCH_TARGET_VARIANCE
 
 
 class DebugAnalysisManager:
@@ -1003,15 +1007,7 @@ class DebugAnalysisManager:
         """Return layer-specific variance targets for the piece-token Transformer."""
         if not bool(getattr(ai,'use_transformer_attention',False)):
             return NORMALIZATION_TARGET_VARIANCE
-        if key == 'W1':
-            return TRANSFORMER_INPUT_TARGET_VARIANCE
-        if key.startswith(('WQ','WK')):
-            return TRANSFORMER_QUERY_KEY_TARGET_VARIANCE
-        if key.startswith('WV'):
-            return TRANSFORMER_VALUE_TARGET_VARIANCE
-        # W2--W8 are SiLU residual branches.  A small branch variance avoids
-        # repeatedly inflating the skip signal through the seven blocks.
-        return NORMALIZATION_TARGET_VARIANCE
+        return transformer_parameter_target_variance(key)
 
     def _normalize_weight_rows(self, ai, key, target_variance):
         """有限で非ゼロの行だけを正規化し、0除算を避ける。"""

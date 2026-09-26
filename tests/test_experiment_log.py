@@ -26,12 +26,17 @@ class ExperimentLogStoreTests(unittest.TestCase):
                 elapsed_seconds = 1.23456789, setup = (" R ", "U"),
                 moves = ("R'",), root_score = 0.25, best_score = 0.75,
                 end_reason = "solved", stats = (12, 34),
+                direct_search = {
+                    'attemptCount': 1,
+                    'terminalEndReason': 'solved',
+                    'totals': {'playoutCount': 34},
+                },
             )
 
             ExperimentLogStore(jsonl_path, csv_path).append(record)
 
             payload = json.loads(jsonl_path.read_text(encoding = "utf-8"))
-            self.assertEqual(payload["schemaVersion"], 3)
+            self.assertEqual(payload["schemaVersion"], 4)
             self.assertEqual(payload["puzzle"], "rubiks-7x7")
             self.assertEqual(payload["searchMode"], "search3")
             self.assertEqual(payload["elapsedSeconds"], 1.234568)
@@ -41,6 +46,8 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertTrue(payload["searchSucceeded"])
             self.assertFalse(payload["fallbackUsed"])
             self.assertEqual(payload["outcome"], "search_success")
+            self.assertEqual(payload['directSearch']['terminalEndReason'], 'solved')
+            self.assertEqual(payload['directSearch']['totals']['playoutCount'], 34)
             self.assertEqual(payload["aiSettings"], {})
 
             with csv_path.open(encoding = "utf-8", newline = "") as stream:
@@ -48,6 +55,10 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["puzzle"], "rubiks-7x7")
             self.assertEqual(rows[0]["moves"], "[\"R'\"]")
+            self.assertEqual(
+                json.loads(rows[0]['directSearch'])['attemptCount'],
+                1,
+            )
 
     def test_classifies_greedy_fallback_separately_from_search_success(self):
         self.assertEqual(

@@ -701,16 +701,17 @@ class ExperimentSummaryDialog(Tk.Toplevel):
 
 
 class LearningHistoryDialog(Tk.Toplevel):
-    """Show per-AI loss trends plus state-normalized Search3 value quality."""
+    """Show online losses alongside fixed held-out checkpoint quality."""
 
     CHART_WIDTH = 760
-    CHART_HEIGHT = 340
+    CHART_HEIGHT = 440
     CHART_HISTORY_LIMIT = 60
     RECENT_SOLVE_LIMIT = 100
     READING_GUIDE = (
         '見る順  ① 実力: 直接探索成功率が上がる  '
         '② Policy: CE/state が下がる  '
-        '③ Value: BCE/state・MAE が下がり、Δpred が Δtarget に近づく\n'
+        '③ Value: BCE/state・MAE が下がり、Δpred が Δtarget に近づく  '
+        '④ 固定検証: P@1/P@3・Value順位相関が上がる\n'
         '注意  P / V sample は系列が長いほど増えるため、良し悪しの判断には使わない。'
     )
 
@@ -719,7 +720,7 @@ class LearningHistoryDialog(Tk.Toplevel):
         self.frame = frame
         self.font = ('Century Gothic', 11, 'bold')
         self.title('学習履歴')
-        self.geometry('820x810')
+        self.geometry('820x920')
         self.ai_var = Tk.StringVar(value = 'AI 0')
         self._build_widgets()
 
@@ -793,6 +794,7 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"最新: P={self._number(latest['policyLoss'])}  V={self._number(latest['valueLoss'])}  "
                 f"updates={latest['updatesDuringSolve']}  data={latest['trainingDataCount']}→{latest['retainedDataCount']}\n"
                 f"Search3 quality: {self._search3_quality_text(latest)}\n"
+                f"固定検証: {self._fixed_validation_text(latest)}\n"
                 f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
                 f"update scale={self._number(update_scales['shared'])}/"
                 f"{self._number(update_scales['policy'])}/{self._number(update_scales['value'])}"
@@ -809,6 +811,9 @@ class LearningHistoryDialog(Tk.Toplevel):
             )
             if record.get('valueBcePerState') is not None:
                 lines.append(f"  Search3 quality: {self._search3_quality_text(record)}")
+            if record.get('fixedValidation') is not None:
+                lines.append(f"  固定検証: {self._fixed_validation_text(record)}")
+                lines.append(f"    Value分布: {self._fixed_validation_calibration_text(record)}")
             lines.append(
                 f"  lr={self._number(lr['base'])} lr_C={self._number(lr['lrC'])} "
                 f"momentum={self._number(lr['momentumV'])}/{self._number(lr['momentumH'])}  "
@@ -854,28 +859,32 @@ class LearningHistoryDialog(Tk.Toplevel):
         mae = [record.get('valueMae') for record in visible]
         delta = [record.get('valueStartToEndDelta') for record in visible]
         target_delta = [record.get('valueTargetStartToEndDelta') for record in visible]
+        fixed_top1 = [self._fixed_validation_value(record, 'policyTop1Accuracy') for record in visible]
+        fixed_top3 = [self._fixed_validation_value(record, 'policyTop3Accuracy') for record in visible]
+        fixed_correlation = [self._fixed_validation_value(record, 'valueRankCorrelation') for record in visible]
+        fixed_mae = [self._fixed_validation_value(record, 'valueMae') for record in visible]
         self.chart.create_text(8, 8, text = '学習loss  policy=orange  value/sample=cyan（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
         if not visible or not any(item is not None for item in policy + value):
             self.chart.create_text(width // 2, height // 2, text = 'loss data がまだありません', fill = '#A0A0A0', tags = 'trend')
             return
-        self._draw_loss_series(policy, '#E68A00', 25, width - 12, 38, 150)
-        self._draw_loss_series(value, '#49C7D4', 25, width - 12, 38, 150)
+        self._draw_loss_series(policy, '#E68A00', 25, width - 12, 38, 140)
+        self._draw_loss_series(value, '#49C7D4', 25, width - 12, 38, 140)
         self.chart.create_text(
-            8, 160,
+            8, 148,
             text = (
                 f'P {self._series_range(policy)}   V/sample {self._series_range(value)}'
             ),
             fill = '#A0A0A0', anchor = 'nw', font = ('Menlo', 9), tags = 'trend',
         )
-        self.chart.create_text(8, 184, text = 'S3 quality  P-CE/state=orange  V-BCE/state=blue  MAE=magenta  Δpred=green  Δtarget=gray（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        self.chart.create_text(8, 176, text = 'S3 quality  P-CE/state=orange  V-BCE/state=blue  MAE=magenta  Δpred=green  Δtarget=gray（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
         if any(item is not None for item in policy_ce_per_state + bce_per_state + mae + delta + target_delta):
-            self._draw_loss_series(policy_ce_per_state, '#E68A00', 25, width - 12, 214, 315)
-            self._draw_loss_series(bce_per_state, '#49C7D4', 25, width - 12, 214, 315)
-            self._draw_loss_series(mae, '#DE5CE6', 25, width - 12, 214, 315)
-            self._draw_loss_series(delta, '#78C850', 25, width - 12, 214, 315)
-            self._draw_loss_series(target_delta, '#A0A0A0', 25, width - 12, 214, 315)
+            self._draw_loss_series(policy_ce_per_state, '#E68A00', 25, width - 12, 206, 300)
+            self._draw_loss_series(bce_per_state, '#49C7D4', 25, width - 12, 206, 300)
+            self._draw_loss_series(mae, '#DE5CE6', 25, width - 12, 206, 300)
+            self._draw_loss_series(delta, '#78C850', 25, width - 12, 206, 300)
+            self._draw_loss_series(target_delta, '#A0A0A0', 25, width - 12, 206, 300)
             self.chart.create_text(
-                8, 324,
+                8, 310,
                 text = (
                     f'Policy CE/state {self._series_range(policy_ce_per_state)}   '
                     f'Value BCE/state {self._series_range(bce_per_state)}   '
@@ -887,7 +896,24 @@ class LearningHistoryDialog(Tk.Toplevel):
                 fill = '#A0A0A0', anchor = 'sw', font = ('Menlo', 9), tags = 'trend',
             )
         else:
-            self.chart.create_text(width // 2, 265, text = 'Search3 quality は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
+            self.chart.create_text(width // 2, 250, text = 'Search3 quality は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
+        self.chart.create_text(8, 338, text = '固定検証（学習に使わない同一局面）  P@1=orange  P@3=yellow  Value順位相関=green  Search3 MAE=magenta', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if any(item is not None for item in fixed_top1 + fixed_top3 + fixed_correlation + fixed_mae):
+            self._draw_loss_series(fixed_top1, '#E68A00', 25, width - 12, 368, 418)
+            self._draw_loss_series(fixed_top3, '#E6D200', 25, width - 12, 368, 418)
+            self._draw_loss_series(fixed_correlation, '#78C850', 25, width - 12, 368, 418)
+            self._draw_loss_series(fixed_mae, '#DE5CE6', 25, width - 12, 368, 418)
+            self.chart.create_text(
+                8, 430,
+                text = (
+                    f'P@1 {self._series_range(fixed_top1)}  P@3 {self._series_range(fixed_top3)}  '
+                    f'Value順位相関 {self._series_range(fixed_correlation)}  '
+                    f'S3 MAE {self._series_range(fixed_mae)}'
+                ),
+                fill = '#A0A0A0', anchor = 'sw', font = ('Menlo', 9), tags = 'trend',
+            )
+        else:
+            self.chart.create_text(width // 2, 390, text = '固定検証は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
 
     def _draw_loss_series(self, values, color, x0, x1, y0, y1):
         numeric = [float(value) for value in values if value is not None]
@@ -927,6 +953,36 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"states={self._number(record.get('valueEffectiveStateCount'))}  "
             f"seq={record.get('valueSequenceCount', '--')}"
         )
+
+    def _fixed_validation_text(self, record):
+        validation = record.get('fixedValidation')
+        if not validation:
+            return '（次回の学習から記録）'
+        value_parts = [
+            f"P@1={self._rate(validation.get('policyTop1Accuracy'))}",
+            f"P@3={self._rate(validation.get('policyTop3Accuracy'))}",
+            f"Value順位相関={self._number(validation.get('valueRankCorrelation'))}",
+        ]
+        if validation.get('valueMae') is not None:
+            value_parts.append(f"Value MAE={self._number(validation.get('valueMae'))}")
+        if validation.get('valuePathCrossEntropy') is not None:
+            value_parts.append(f"Value path CE={self._number(validation.get('valuePathCrossEntropy'))}")
+        return '  '.join(value_parts) + f"  states={validation.get('stateCount', '--')}"
+
+    def _fixed_validation_calibration_text(self, record):
+        validation = record.get('fixedValidation') or {}
+        return (
+            f"pred μ/σ={self._number(validation.get('valuePredictionMean'))}/"
+            f"{self._number(validation.get('valuePredictionStd'))}  "
+            f"target μ/σ={self._number(validation.get('valueTargetMean'))}/"
+            f"{self._number(validation.get('valueTargetStd'))}  "
+            f"Pearson={self._number(validation.get('valuePearsonCorrelation'))}"
+        )
+
+    @staticmethod
+    def _fixed_validation_value(record, key):
+        validation = record.get('fixedValidation')
+        return None if not validation else validation.get(key)
 
     @staticmethod
     def _number(value):

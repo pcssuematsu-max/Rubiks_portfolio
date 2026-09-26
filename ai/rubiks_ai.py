@@ -19,6 +19,8 @@ from cube.search3_engine import Search3Engine
 from cube.rubiks_cube import Rubiks_3
 from ai.layers import Affine, Batch_Normalization, Hard_Sigmoid, ReLU, ResidualBlock, Sigmoid, SiLU, Transformer_SelfAttention, PieceTokenSelfAttention
 from ai.losses import BCEWithLogits, MyLoss2, MyLoss2Pairwise, Myloss, Soft_Target_Cross_Entropy, Softmax_Cross_Entropy
+from ai.fixed_validation import evaluate_fixed_validation
+from ai.transformer_variance import transformer_parameter_target_variance
 
 
 
@@ -195,9 +197,7 @@ class Rubiks_3_AI:
             self.params['B1'][::2] = 1.0
 
         if self.use_transformer_attention:
-            self.params['WQ1'] *= 0.2
-            self.params['WK1'] *= 0.2
-            self.params['WV1'] *= 0.2
+            self._initialize_transformer_parameter_variances()
 
         if self.search_mode == "search3":
             self.params['WO_V'] *= 0.05
@@ -275,6 +275,14 @@ class Rubiks_3_AI:
         self.search2_value_loss_type = self._normalize_search2_value_loss_type(loss_type)
         self.losslayer2 = self._create_search2_value_loss()
 
+    def evaluate_fixed_validation(self):
+        """Evaluate this checkpoint on the fixed held-out trajectory set."""
+        metrics = evaluate_fixed_validation(self)
+        if self.last_training_metrics is None:
+            self.last_training_metrics = {}
+        self.last_training_metrics['fixedValidation'] = metrics
+        return metrics
+
     def set_search2_value_loss_margin(self, margin):
         """Set the margin used by pairwise Search2 value training."""
         self.search2_value_loss_margin = float(margin)
@@ -291,6 +299,15 @@ class Rubiks_3_AI:
     def set_search3_rank_loss_mix(self, mix):
         """Set the auxiliary Search3 rank-loss coefficient."""
         self.search3_rank_loss_mix = max(0.0,float(mix))
+
+    def _initialize_transformer_parameter_variances(self):
+        """Initialize Transformer weights with the same targets used by normalization."""
+        for key,weights in self.params.items():
+            target_variance = transformer_parameter_target_variance(key)
+            if target_variance is None or weights.ndim != 2 or weights.shape[1] == 0:
+                continue
+            stddev = math.sqrt(target_variance / weights.shape[1])
+            weights[:] = np.random.randn(*weights.shape).astype('f') * stddev
 
     def _create_trunk_activation(self, index):
         """Create the configured hidden activation for one trunk layer."""

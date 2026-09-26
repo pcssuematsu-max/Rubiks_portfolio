@@ -53,8 +53,30 @@ class LearnManager:
         started_at = perf_counter()
         result = self.run_learning(index,ai)
         self.after_learning(ai)
+        self.evaluate_fixed_validation(index, ai)
         self.record_learning_history(index, ai, perf_counter() - started_at)
         return result
+
+    def evaluate_fixed_validation(self, index, ai):
+        """Record held-out checkpoint quality without making a training sample."""
+        evaluator = getattr(ai, 'evaluate_fixed_validation', None)
+        if not callable(evaluator):
+            return
+        try:
+            metrics = evaluator()
+        except (ArithmeticError, KeyError, RuntimeError, TypeError, ValueError) as error:
+            self.frame.append_log(f'固定検証: AI {index} を評価できませんでした ({error})')
+            return
+        self.frame.append_log(
+            f"固定検証: AI {index} "
+            f"P@1={metrics['policyTop1Accuracy'] * 100:.1f}% "
+            f"P@3={metrics['policyTop3Accuracy'] * 100:.1f}% "
+            f"Value順位相関={self._format_validation_number(metrics.get('valueRankCorrelation'))}"
+        )
+
+    @staticmethod
+    def _format_validation_number(value):
+        return '--' if value is None else f'{value:.3f}'
 
     def record_learning_history(self, index, ai, elapsed_seconds):
         """Persist one completed AI learning point without interrupting learning."""

@@ -72,6 +72,9 @@ class SolveSessionState:
         self.active_search_mode = ''
         self.last_search_result = None
         self.fallback_used = False
+        # Direct-search facts must outlive the greedy fallback's temporary
+        # SearchResult so the completed experiment can explain a failure.
+        self.direct_search_attempts = []
 
     def add_recent_solve(
         self,
@@ -137,6 +140,11 @@ class SolveSessionState:
         self.solve_elapsed_seconds = 0.0
         self.active_search_mode = ''
         self.fallback_used = False
+        self.reset_direct_search_diagnostics()
+
+    def reset_direct_search_diagnostics(self):
+        """Discard direct-search diagnostics at the boundary of one solve."""
+        self.direct_search_attempts.clear()
 
     def start_solve_timer(self, now = None):
         """Start timing active solve work, excluding later paused intervals."""
@@ -300,6 +308,7 @@ class SolveSessionManager:
         state.last_perfect_key = ''
         state.last_perfect_changed_number = 0
         state.last_simplified_lis = tuple([])
+        state.reset_direct_search_diagnostics()
 
     def _advance_solve_step(self, AI):
         """search段階かgreedy段階かを見て、次の1ステップを進める。"""
@@ -316,11 +325,14 @@ class SolveSessionManager:
             self._append_initial_value(AI)
 
         self._set_status('探索中', getattr(AI, 'search_mode', 'search'))
+        search_started_at = perf_counter()
         if self._uses_search3(AI):
             search_result = AI.search(progress_callback = lambda result: self._record_search_attempt_progress(AI, result))
         else:
             search_result = AI.search()
+        direct_search_seconds = max(0.0, perf_counter() - search_started_at)
         search_result = self._apply_puzzle_fallback(AI, search_result)
+        self._record_direct_search_attempt(AI, search_result, direct_search_seconds)
         self._maybe_log_search2_memory(AI)
         self._release_search_step_memory(AI)
 
@@ -391,6 +403,114 @@ class SolveSessionManager:
         if fallback_result is None:
             return search_result
         return fallback_result
+
+    def _record_direct_search_attempt(self, AI, search_result, elapsed_seconds):
+        """Keep a compact, labeled account of one pre-greedy search attempt."""
+        stats = self._search_stats(search_result)
+        search_mode = str(getattr(search_result, 'search_mode', getattr(AI, 'search_mode', '')))
+        root_score = self._experiment_score(getattr(search_result, 'root_value', None))
+        best_score = self._experiment_score(getattr(search_result, 'best_value', None))
+        attempt = {
+            'searchMode': search_mode,
+            'endReason': getattr(search_result, 'end_reason', None),
+            'elapsedSeconds': round(max(0.0, float(elapsed_seconds)), 6),
+            'returnedMoveCount': len(getattr(search_result, 'moves', ()) or ()),
+            'rootScore': root_score,
+            'bestScore': best_score,
+            'bestImprovement': (
+                None if root_score is None or best_score is None
+                else best_score - root_score
+            ),
+        }
+        if search_mode == 'search2':
+            attempt.update({
+                # Search2.stats = [root-improving states, evaluated states].
+                'improvingStateCount': stats[0],
+                'evaluatedStateCount': stats[1],
+                'frontierPeak': self._optional_int(getattr(AI, '_last_search2_frontier_peak', None)),
+                'frontierRemaining': self._optional_int(getattr(AI, '_last_search2_frontier_remaining', None)),
+                'uniqueStateCount': self._optional_int(getattr(AI, '_last_search2_value_count', None)),
+            })
+        elif search_mode in ('search3', 'transformer'):
+            policy_target = getattr(search_result, 'policy_target', None)
+            attempt.update({
+                # Search3.stats = [max root-child visits, total playouts].
+                'maxRootChildVisits': stats[0],
+                'playoutCount': stats[1],
+                'visitedRootChildCount': self._nonzero_count(policy_target),
+                'treeNodeCount': self._optional_len(getattr(getattr(AI, 'search3_engine', None), 'node_cache', None)),
+            })
+        self.frame.solve_state.direct_search_attempts.append(attempt)
+
+    @staticmethod
+    def _search_stats(search_result):
+        raw_stats = getattr(search_result, 'stats', ())
+        if raw_stats is None:
+            raw_stats = ()
+        try:
+            values = list(raw_stats)
+        except TypeError:
+            values = []
+        return (
+            SolveSessionManager._optional_int(values[0]) if len(values) > 0 else None,
+            SolveSessionManager._optional_int(values[1]) if len(values) > 1 else None,
+        )
+
+    @staticmethod
+    def _optional_int(value):
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    @staticmethod
+    def _optional_len(value):
+        if value is None:
+            return None
+        try:
+            return len(value)
+        except TypeError:
+            return None
+
+    @staticmethod
+    def _nonzero_count(values):
+        if values is None:
+            return None
+        try:
+            return int(np.count_nonzero(values))
+        except (TypeError, ValueError):
+            return None
+
+    def _direct_search_summary(self):
+        """Summarize all direct attempts without conflating a later fallback."""
+        attempts = self.frame.solve_state.direct_search_attempts
+        if not attempts:
+            return {}
+        end_reason_counts = {}
+        for attempt in attempts:
+            reason = attempt.get('endReason') or 'unknown'
+            end_reason_counts[reason] = end_reason_counts.get(reason, 0) + 1
+        totals = {
+            'elapsedSeconds': round(sum(attempt['elapsedSeconds'] for attempt in attempts), 6),
+        }
+        for key in ('evaluatedStateCount', 'improvingStateCount', 'playoutCount'):
+            values = [attempt[key] for attempt in attempts if attempt.get(key) is not None]
+            if values:
+                totals[key] = sum(values)
+        for key in ('frontierPeak', 'maxRootChildVisits', 'visitedRootChildCount', 'treeNodeCount'):
+            values = [attempt[key] for attempt in attempts if attempt.get(key) is not None]
+            if values:
+                totals[key] = max(values)
+        return {
+            'attemptCount': len(attempts),
+            'terminalEndReason': attempts[-1].get('endReason'),
+            'endReasonCounts': end_reason_counts,
+            'totals': totals,
+            'finalAttempt': attempts[-1],
+            'attempts': list(attempts),
+        }
 
     def _record_search_result(self, reduced_lis, search_result, value_deltas, key_label = None):
         """探索結果をmainログへ追加し、必要なら表示ログにも反映する。"""
@@ -1203,6 +1323,7 @@ class SolveSessionManager:
             best_score = best_score,
             end_reason = getattr(result, 'end_reason', None),
             stats = getattr(result, 'stats', ()),
+            direct_search = self._direct_search_summary(),
             ai_settings = self._experiment_ai_settings(self.frame.AIs[self.frame.AI_idx]),
         )
         try:

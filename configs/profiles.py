@@ -262,15 +262,39 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 (" F "," U "," R "," U'"," R'"," F'"),
                 (" F "," R "," U2"," R'"," U2"," F'"),
                 (" F "," U2"," R "," U2"," R'"," F'"),
+                (" R2"," F "," R "," U "," R'"," U'"," F'"," R2"),
+                (" R2"," F "," U "," R "," U'"," R'"," F'"," R2"),
+                (" F'"," R "," U2"," R'"," U2"," F "),
+                (" F'"," U2"," R "," U2"," R'"," F "),
+
 
                 (' U2', " B'", " U'", ' B ', " U'", ' L2', ' D ', " F'", " D'", ' L2'),
                 (" U'", " R'", " U'", ' R ', " U'", ' B2', ' D ', " L'", " D'", ' B2', " U'"),
                 (' R ', ' F ', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F2'),
                 (' L ', " D'", " L'", ' D ', " L'", ' F2', ' R ', " U'", " R'", ' F2', ' L '),
 
+                (' R ', ' B ', " R'", ' F ', ' R ', " B'", " F'", " L'", ' F ', " R'", " F'", ' L '),
+                (' L ', ' D ', " L'", ' U ', ' L ', " D'", " U'", " R'", ' U ', " L'", " U'", ' R '),
+                (" R'", ' D2', ' R ', " U'", " R'", ' D2', " R'", ' U ', ' L2', " U'", ' R2', ' U ', ' L2'),
 
-            ],
-            [
+                ("2F ","2R ","2U ","2R'","2U'","2F'"),
+                ("2F ","2U ","2R ","2U'","2R'","2F'"),
+                ("2F ","3R ","2U ","3R'","2U'","2F'"),
+                ("2F ","2U ","3R ","2U'","3R'","2F'"),                
+                ("2F "," M'","2U "," M ","2U'","2F'"),
+                ("2F ","2U "," M'","2U'"," M ","2F'"),
+
+                ('2U2', " B'", '2R2', ' B ', ' R2', " B'", '2R2', " B'", "2U'", ' B2', '2U2', ' R2', "2D'", ' F2', '2U2', ' F2', ' R2', '2D ', ' R2'),
+                ('2U2', " F'", "2R'", ' F ', ' R2', " F'", '2R ', " F'", "2U'", ' F2', '2U2', ' R2', '2U ', ' F2', '2U2', ' F2', ' R2', '2U ', ' R2'),
+                ('2D2', ' B ', '2R ', " B'", ' R2', ' B ', "2R'", ' B ', '2D ', ' B2', '2D2', ' R2', '2U ', ' F2', '2D2', ' F2', ' R2', "2U'", ' R2'),
+                ('2U2', ' B ', "2L'", " B'", ' R2', ' B ', '2L ', ' B ', "2U'", ' B2', '2U2', ' R2', "2D'", ' F2', '2U2', ' F2', ' R2', '2D ', ' R2'),
+                ('2U2', ' F ', '2L2', " F'", ' R2', ' F ', '2L2', ' F ', "2U'", ' F2', '2U2', ' R2', '2U ', ' F2', '2U2', ' F2', ' R2', '2U ', ' R2'),
+                ('2D2', ' F ', '2R2', " F'", ' R2', ' F ', '2R2', ' F ', '2D ', ' F2', '2D2', ' R2', "2D'", ' F2', '2D2', ' F2', ' R2', "2D'", ' R2'),
+                ('2D2', ' L2', "2U'", ' R2', '2D ', ' R2', ' F2', '2D ', ' F2', "2D'", ' F2', '2U ', ' F2', ' L2', '2D2'),
+                ("3D'", ' L2', '3U2', ' B2', "3U'", ' B2', "3U'", ' L2', '3D2', ' F2', "3D'", ' F2'),
+                ('2D2', ' B2', "2U'", ' F2', "2D'", ' L2', '2U ', ' L2', ' F2', '2D ', ' R2', "2U'", ' R2', ' B2', '2D2'),
+                ('2D2', ' B2', ' L2', "2D'", ' L2', '2U ', ' B2', "2U'", ' B2', '2D2', ' L2', '2D ', ' L2', "2D'", ' B2'),
+                ("2U'", ' R2', '2D2', ' B2', "2D'", ' B2', '2D ', '2U ', ' R2', ' F2', '2D ', ' F2', ' R2', '2D2', ' R2'),
                 ("2R "," U'","2F'"," U ","2R'"," U'","2F "," U "),
                 ("2R "," U'","3F'"," U ","2R'"," U'","3F "," U "),
                 ("2R "," U'"," S'"," U ","2R'"," U'"," S "," U "),
@@ -280,19 +304,32 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 ("2R2"," U'","2F2"," U ","2R2"," U'","2F2"," U "),
                 ("2R2"," U'","3F2"," U ","2R2"," U'","3F2"," U "),
                 ("2R2"," U'"," S2"," U ","2R2"," U'"," S2"," U "),
-                (" M2"," U "," M2"," U2"," M2"," U "," M2"),
-                (" U "," M2"," U2"," M2"," U "),
-                (" S2"," U "," S2"," U2"," S2"," U "," S2"),
-                (" U "," S2"," U2"," S2"," U "),
-                ('2U2', " B'", '2R2', ' B ', ' R2', " B'", '2R2', " B'", "2U'", ' B2', '2U2', ' R2', "2D'", ' F2', '2U2', ' F2', ' R2', '2D ', ' R2'),
-                ('2U2', " F'", "2R'", ' F ', ' R2', " F'", '2R ', " F'", "2U'", ' F2', '2U2', ' R2', '2U ', ' F2', '2U2', ' F2', ' R2', '2U ', ' R2'),
-                ('2D2', ' B ', '2R ', " B'", ' R2', ' B ', "2R'", ' B ', '2D ', ' B2', '2D2', ' R2', '2U ', ' F2', '2D2', ' F2', ' R2', "2U'", ' R2'),
-                ('2U2', ' B ', "2L'", " B'", ' R2', ' B ', '2L ', ' B ', "2U'", ' B2', '2U2', ' R2', "2D'", ' F2', '2U2', ' F2', ' R2', '2D ', ' R2'),
-                ('2U2', ' F ', '2L2', " F'", ' R2', ' F ', '2L2', ' F ', "2U'", ' F2', '2U2', ' R2', '2U ', ' F2', '2U2', ' F2', ' R2', '2U ', ' R2'),
-                ('2D2', ' F ', '2R2', " F'", ' R2', ' F ', '2R2', ' F ', '2D ', ' F2', '2D2', ' R2', "2D'", ' F2', '2D2', ' F2', ' R2', "2D'", ' R2'),
-                ('2D2', ' L2', "2U'", ' R2', '2D ', ' R2', ' F2', '2D ', ' F2', "2D'", ' F2', '2U ', ' F2', ' L2', '2D2'),
-                ("3D'", ' L2', '3U2', ' B2', "3U'", ' B2', "3U'", ' L2', '3D2', ' F2', "3D'", ' F2'),
+                (" M "," U "," M2"," U2"," M2"," U "," M'"),
+                (" S "," U "," S2"," U2"," S2"," U "," S'"),
+                (" M'"," U "," M2"," U2"," M2"," U "," M "),
+                (" S'"," U "," S2"," U2"," S2"," U "," S "),
+            ],
+            [
+                ("3F'","2R ","2U ","3F ","2U'","2R'"),
+                ("2F'","2R ","2U ","2F ","2U'","2R'"),
+                (" S'","2R ","2U "," S ","2U'","2R'"),
+                ("2R ","2U ","3F'","2U'","2R'","3F "),
+                ("2R ","2U ","2F'","2U'","2R'","2F "),
+                ("2R ","2U "," S'","2U'","2R'"," S "),
 
+                ("2U ","2R2","2U'","2D'","2R2","2D "),
+                ("2U ","2R2","2U'","2D ","2R2","2D'"),
+                ("2U ","3R2","2U'","2D'","3R2","2D "),
+                ("2U ","3R2","2U'","2D ","3R2","2D'"),
+                ("2U "," M2","2U'","2D'"," M2","2D "),
+                ("2U "," M2","2U'","2D "," M2","2D'"),
+
+                ("2U ","2F2","2U'","2D'","2F2","2D "),
+                ("2U ","2F2","2U'","2D ","2F2","2D'"),
+                ("2U ","3F2","2U'","2D'","3F2","2D "),
+                ("2U ","3F2","2U'","2D ","3F2","2D'"),
+                ("2U "," S2","2U'","2D'"," S2","2D "),
+                ("2U "," S2","2U'","2D "," S2","2D'"),
             ],
             [
             ],
@@ -346,8 +383,8 @@ def build_experiment_frame_config():
     ai_count = len(ai_search_modes)
     is_search2_ai = [mode.startswith('search2') for mode in ai_search_modes]
     lrs = [
-        2.0e-6,2.0e-6,2.0e-5,2.0e-5,2.0e-5,2.0e-5,2.0e-5,2.0e-5,2.0e-6,2.0e-6,
-        2.0e-5,2.0e-5,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,2.0e-5,2.0e-5,
+        2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,
+        5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,
     ]
     wdlrs = [
         1.0e-4 if original_transformer_attention[ai_index] else (1.0e-7 if is_search2_ai[ai_index] else 1.0e-5)
@@ -356,7 +393,7 @@ def build_experiment_frame_config():
     skip_search = [is_search2_ai[ai_index] for ai_index in range(ai_count)]
     weight_decay = [True] * ai_count
     activations = ['SiLU'] * ai_count
-    search3_progress = [False] * 10 + [False,False,False,True,False,True,False,True,False,False]
+    search3_progress = [False,False,False,True,False,True,False,True,False,False] + [True,True,False,False,False,False,False,False,False,False]
     residuals = [True] * ai_count
     #search2_value_loss_types = ['myloss','myloss','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss','myloss'] * 2
     search2_value_loss_types = ['myloss','myloss','myloss','myloss','myloss','myloss','myloss','myloss','myloss','myloss'] * 2
@@ -469,7 +506,7 @@ def build_experiment_frame_config():
         lr_vs = [0.99] * ai_count,
         lr_hs = [0.99] * ai_count,
         out_cs = [1.0] * ai_count,
-        search3_cs = [1.0] * ai_count,
+        search3_cs = [2.0] * ai_count,
         search2_max_frontiers = [30000] * ai_count,
         search2_torch_batch_sizes = [
             64 if original_transformer_attention[ai_index] else 100

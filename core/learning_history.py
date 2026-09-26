@@ -78,6 +78,7 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "valueTargetStartToEndDelta": _finite_number(metrics.get("valueTargetStartToEndDelta")),
         "valueEffectiveStateCount": _finite_number(metrics.get("valueEffectiveStateCount")),
         "valueSequenceCount": _safe_optional_int(metrics.get("valueSequenceCount")),
+        "fixedValidation": _fixed_validation(metrics.get("fixedValidation")),
         "updatesDuringSolve": int(metrics.get("updatesDuringSolve", 0) or 0),
         "trainingDataCount": int(metrics.get("trainingDataCount", 0) or 0),
         "retainedDataCount": int(metrics.get("retainedDataCount", 0) or 0),
@@ -130,7 +131,7 @@ def _validate_record(record: Any) -> None:
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
-        "valueSequenceCount",
+        "valueSequenceCount", "fixedValidation",
     }
     if not isinstance(record, dict) or not required.issubset(record) or set(record) - required - optional:
         raise ValueError("Invalid learning history record")
@@ -156,6 +157,7 @@ def _validate_record(record: Any) -> None:
         or value_sequence_count < 0
     ):
         raise ValueError("Invalid learning history valueSequenceCount")
+    _validate_fixed_validation(record.get("fixedValidation"))
     _validate_optional_number(record["learningSeconds"])
     _validate_number_mapping(record["learningRate"], {"base", "lrC", "momentumV", "momentumH"})
     _validate_number_mapping(record["updateScales"], {"shared", "policy", "value"})
@@ -166,6 +168,58 @@ def _validate_number_mapping(value: Any, keys: set[str]) -> None:
         raise ValueError("Invalid learning history numeric mapping")
     for number in value.values():
         _validate_optional_number(number)
+
+
+def _fixed_validation(value: Any) -> dict[str, Any] | None:
+    """Copy the compact held-out metrics while dropping invalid numeric values."""
+    if not isinstance(value, dict):
+        return None
+    fixture_id = value.get("fixtureId")
+    fixture_lengths = value.get("fixtureLengths")
+    if not isinstance(fixture_id, str) or not fixture_id or not isinstance(fixture_lengths, (tuple, list)):
+        return None
+    if any(isinstance(length, bool) or not isinstance(length, int) or length < 1 for length in fixture_lengths):
+        return None
+    result: dict[str, Any] = {
+        "fixtureId": fixture_id,
+        "fixtureLengths": list(fixture_lengths),
+        "fixtureCount": _safe_optional_int(value.get("fixtureCount")),
+        "stateCount": _safe_optional_int(value.get("stateCount")),
+    }
+    for key in _FIXED_VALIDATION_NUMBERS:
+        result[key] = _finite_number(value.get(key))
+    return result
+
+
+_FIXED_VALIDATION_NUMBERS = frozenset({
+    "policyTop1Accuracy", "policyTop3Accuracy", "policyTargetProbability",
+    "policyCrossEntropy", "valueRankCorrelation", "valuePearsonCorrelation",
+    "valuePredictionMean", "valuePredictionStd", "valueTargetMean",
+    "valueTargetStd", "valueMae", "valueBce", "valuePathCrossEntropy",
+})
+
+
+def _validate_fixed_validation(value: Any) -> None:
+    if value is None:
+        return
+    expected = {
+        "fixtureId", "fixtureLengths", "fixtureCount", "stateCount",
+        *_FIXED_VALIDATION_NUMBERS,
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError("Invalid learning history fixedValidation")
+    if not isinstance(value["fixtureId"], str) or not value["fixtureId"]:
+        raise ValueError("Invalid learning history fixedValidation fixture")
+    if not isinstance(value["fixtureLengths"], list) or any(
+        isinstance(length, bool) or not isinstance(length, int) or length < 1
+        for length in value["fixtureLengths"]
+    ):
+        raise ValueError("Invalid learning history fixedValidation fixture lengths")
+    for key in ("fixtureCount", "stateCount"):
+        if value[key] is None or isinstance(value[key], bool) or not isinstance(value[key], int) or value[key] < 0:
+            raise ValueError("Invalid learning history fixedValidation count")
+    for key in _FIXED_VALIDATION_NUMBERS:
+        _validate_optional_number(value[key])
 
 
 def _validate_optional_number(value: Any) -> None:

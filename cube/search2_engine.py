@@ -209,21 +209,27 @@ class Search2Engine:
             if node_value > root_value + 0.0001:
                 counter[0] += 1
 
-            if self._should_stop(best_key, node_value, root_value, counter, search_budget):
+            end_reason = self._stop_reason(best_key, node_value, root_value, counter, search_budget)
+            if end_reason is not None:
                 result_key, value_history = self._improving_result_key_and_history(value_by_key, best_key, root_value)
-                result = SearchResult(False, result_key, root_value, value_history, value_history[-1], counter, search_mode='search2', end_reason='budget')
+                result = SearchResult(False, result_key, root_value, value_history, value_history[-1], counter, search_mode='search2', end_reason=end_reason)
                 return best_value, best_key, root_value, result
 
         return best_value, best_key, root_value, None
 
-    def _should_stop(self, best_key, node_value, root_value, counter, search_budget):
+    def _stop_reason(self, best_key, node_value, root_value, counter, search_budget):
+        """Name why Search2 stopped so failed solves remain diagnosable."""
         search_improved = (
             len(best_key) >= 1
             and node_value > root_value + self.ai.skip_difference
             and self.ai.skip_search
         )
         budget_exhausted = (counter[1] >= search_budget)
-        return search_improved or budget_exhausted
+        if search_improved:
+            return 'improvement'
+        if budget_exhausted:
+            return 'budget'
+        return None
 
     def _enqueue_search_candidates(self, frontier, key_list, move_priors):
         candidate_indices = np.where(move_priors >= 1)
@@ -253,7 +259,7 @@ class Search2Engine:
         for move in self.cube.invert_moves(best_key):
             self.cube.make_move(move)
         best_key, value_history = self._improving_result_key_and_history(value_by_key, best_key, value_by_key[()])
-        end_reason = 'solved' if is_perfect else 'budget'
+        end_reason = 'solved' if is_perfect else 'frontier_exhausted'
         return SearchResult(is_perfect, best_key, value_history[0], value_history, value_history[-1], counter, search_mode='search2', end_reason=end_reason)
 
     def _apply_moves(self, key):

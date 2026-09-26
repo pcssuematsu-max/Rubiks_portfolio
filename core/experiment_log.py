@@ -12,7 +12,7 @@ from statistics import median
 from typing import Any
 
 
-EXPERIMENT_LOG_SCHEMA_VERSION = 3
+EXPERIMENT_LOG_SCHEMA_VERSION = 4
 EXPERIMENT_LOG_FILE_NAME = "ai-experiments.jsonl"
 EXPERIMENT_CSV_FILE_NAME = "ai-experiments.csv"
 EXPERIMENT_SUMMARY_FILE_NAME = "ai-experiment-summary.json"
@@ -46,7 +46,7 @@ CSV_FIELDS = (
     "searchMode", "aiIndex", "solveIndex", "stage", "succeeded",
     "searchSucceeded", "fallbackUsed", "outcome",
     "elapsedSeconds", "setupMoveCount", "moveCount", "score", "rootScore",
-    "bestScore", "endReason", "stats", "setup", "moves", "aiSettings",
+    "bestScore", "endReason", "stats", "directSearch", "setup", "moves", "aiSettings",
 )
 
 
@@ -82,6 +82,7 @@ class ExperimentLogRecord:
     best_score: float | None
     end_reason: str | None
     stats: tuple[Any, ...]
+    direct_search: dict[str, Any]
     ai_settings: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
@@ -110,6 +111,9 @@ class ExperimentLogRecord:
             "bestScore": self.best_score,
             "endReason": self.end_reason,
             "stats": list(self.stats),
+            # Preserve the direct-search result before a greedy fallback
+            # replaces the session's display/result state.
+            "directSearch": self.direct_search,
             "setup": list(self.setup),
             "moves": list(self.moves),
             "aiSettings": self.ai_settings,
@@ -313,7 +317,8 @@ def completed_experiment_record(
     solve_index: int, stage: int, succeeded: bool, search_succeeded: bool,
     fallback_used: bool, elapsed_seconds: float,
     setup, moves, root_score: float | None, best_score: float | None,
-    end_reason: str | None, stats = (), ai_settings: dict[str, Any] | None = None,
+    end_reason: str | None, stats = (), direct_search: dict[str, Any] | None = None,
+    ai_settings: dict[str, Any] | None = None,
 ) -> ExperimentLogRecord:
     """Create a normalized record at the instant a solve completes."""
     normalized_type = str(puzzle_type).strip().lower() or "unknown"
@@ -344,6 +349,7 @@ def completed_experiment_record(
         best_score = best_score,
         end_reason = None if end_reason is None else str(end_reason),
         stats = tuple(_json_scalar(value) for value in normalized_stats),
+        direct_search = _normalize_json_object(direct_search),
         ai_settings = _normalize_ai_settings(ai_settings),
     )
 
@@ -365,6 +371,24 @@ def _json_scalar(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     return str(value)
+
+
+def _normalize_json_object(value: Any) -> dict[str, Any]:
+    """Return a JSON-safe object while retaining nested search diagnostics."""
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): _normalize_json_value(item)
+        for key,item in value.items()
+    }
+
+
+def _normalize_json_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return _normalize_json_object(value)
+    if isinstance(value, (list, tuple)):
+        return [_normalize_json_value(item) for item in value]
+    return _json_scalar(value)
 
 
 def _normalize_experiment_record(payload: Any, line_number: int) -> dict[str, Any]:
@@ -394,6 +418,9 @@ def _normalize_experiment_record(payload: Any, line_number: int) -> dict[str, An
         "elapsedSeconds": _safe_float(payload["elapsedSeconds"]),
         "moveCount": _safe_int(payload["moveCount"]),
         "score": _safe_float(payload.get("score")),
+        "directSearch": _normalize_json_object(
+            payload.get("directSearch") if schema_version >= 4 else {}
+        ),
         "setup": list(payload.get("setup", [])),
         "moves": list(payload.get("moves", [])),
         "aiSettings": _normalize_ai_settings(

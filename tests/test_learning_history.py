@@ -58,6 +58,39 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['learningRate']['base'], 0.001)
             self.assertEqual(saved['updateScales']['value'], 2.0)
 
+    def test_writes_fixed_validation_metrics_when_available(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'learning.json'
+            ai = _FakeAI()
+            ai.last_training_metrics = dict(ai.last_training_metrics)
+            ai.last_training_metrics['fixedValidation'] = {
+                'fixtureId': 'canonical-inverse-v1',
+                'fixtureLengths': [12, 24, 36],
+                'fixtureCount': 9,
+                'stateCount': 216,
+                'policyTop1Accuracy': 0.2,
+                'policyTop3Accuracy': 0.5,
+                'policyTargetProbability': 0.1,
+                'policyCrossEntropy': 2.3,
+                'valueRankCorrelation': 0.4,
+                'valuePearsonCorrelation': 0.5,
+                'valuePredictionMean': 0.6,
+                'valuePredictionStd': 0.2,
+                'valueTargetMean': 0.3,
+                'valueTargetStd': 0.1,
+                'valueMae': 0.2,
+                'valueBce': 0.7,
+                'valuePathCrossEntropy': None,
+            }
+            record = completed_learning_record(3, ai, 1.0)
+            LearningHistoryStore(path).append(record)
+
+            saved = LearningHistoryStore(path).records()[0]
+
+            self.assertEqual(saved['fixedValidation']['fixtureId'], 'canonical-inverse-v1')
+            self.assertEqual(saved['fixedValidation']['stateCount'], 216)
+            self.assertAlmostEqual(saved['fixedValidation']['valueRankCorrelation'], 0.4)
+
     def test_ai_training_metrics_uses_processed_batch_count_as_update_count(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         ai._record_training_metrics(2.0, 4.0, 30, 18, 4)
