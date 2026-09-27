@@ -18,8 +18,11 @@ class FixedValidationTests(unittest.TestCase):
         self.assertTrue(np.array_equal(ai.cube.state, state_before))
         self.assertEqual(first, second)
         self.assertEqual(first['fixtureId'], FIXTURE_ID)
-        self.assertEqual(first['fixtureLengths'], [12, 24, 36])
-        self.assertEqual(first['stateCount'], 216)
+        self.assertEqual(first['fixtureLengths'], [12, 24, 36, 48, 60])
+        self.assertEqual(first['stateCount'], 540)
+        self.assertEqual(first['byLength']['12']['stateCount'], 36)
+        self.assertEqual(first['byLength']['60']['stateCount'], 180)
+        self.assertIn('policyTop1Accuracy', first['byLength']['48'])
         self.assertIn('valuePathCrossEntropy', first)
         self.assertNotIn('valueMae', first)
         self.assertGreaterEqual(first['policyTop1Accuracy'], 0.0)
@@ -34,4 +37,3 @@ class FixedValidationTests(unittest.TestCase):
         self.assertIn('valueBce', metrics)
         self.assertNotIn('valuePathCrossEntropy', metrics)
         self.assertGreaterEqual(metrics['valueMae'], 0.0)
-

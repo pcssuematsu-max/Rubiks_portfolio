@@ -14,8 +14,11 @@ import random
 import numpy as np
 
 
-FIXTURE_ID = "canonical-inverse-v1"
-FIXTURE_LENGTHS = (12, 24, 36)
+FIXTURE_ID = "canonical-inverse-v2"
+# Keep the original short and medium probes, then add two long held-out
+# trajectories.  They are reported separately so a gain on easy positions
+# cannot conceal a plateau at 40+ moves.
+FIXTURE_LENGTHS = (12, 24, 36, 48, 60)
 FIXTURES_PER_LENGTH = 3
 _FIXTURE_SEED = 20260926
 
@@ -33,25 +36,55 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
     cube = ai.cube
     original_state = cube.state.copy()
     try:
-        states, policy_targets, value_targets, path_slices = _fixture_tensors(ai)
+        states, policy_targets, value_targets, path_slices, length_slices = _fixture_tensors(ai)
         outputs = ai.predict(states, policy = True, value = True, loss = False, retain_cache = False)
     finally:
         cube.state[:] = original_state
 
     policy_logits = np.asarray(outputs[:-1], dtype = "f")
     raw_values = np.asarray(outputs[-1], dtype = "f").reshape(-1)
-    probabilities = _softmax_columns(policy_logits)
-    columns = np.arange(policy_targets.size)
-    ranks = np.argsort(np.argsort(-policy_logits, axis = 0), axis = 0)
-    target_probabilities = probabilities[policy_targets, columns]
-    top1 = ranks[policy_targets, columns] == 0
-    top3 = ranks[policy_targets, columns] < min(3, policy_logits.shape[0])
 
     metrics: dict[str, object] = {
         "fixtureId": FIXTURE_ID,
         "fixtureLengths": list(FIXTURE_LENGTHS),
         "fixtureCount": FIXTURES_PER_LENGTH * len(FIXTURE_LENGTHS),
         "stateCount": int(policy_targets.size),
+    }
+    metrics.update(_quality_metrics(
+        ai,
+        policy_logits,
+        raw_values,
+        policy_targets,
+        value_targets,
+        path_slices,
+    ))
+    metrics["byLength"] = {
+        str(length): {
+            "fixtureCount": FIXTURES_PER_LENGTH,
+            "stateCount": int(length_slice.stop - length_slice.start),
+            **_quality_metrics(
+                ai,
+                policy_logits[:, length_slice],
+                raw_values[length_slice],
+                policy_targets[length_slice],
+                value_targets[length_slice],
+                _relative_path_slices(path_slices, length_slice),
+            ),
+        }
+        for length, length_slice in length_slices.items()
+    }
+    return metrics
+
+
+def _quality_metrics(ai, policy_logits, raw_values, policy_targets, value_targets, path_slices):
+    """Return comparable policy/value quality metrics for one fixture group."""
+    probabilities = _softmax_columns(policy_logits)
+    columns = np.arange(policy_targets.size)
+    ranks = np.argsort(np.argsort(-policy_logits, axis = 0), axis = 0)
+    target_probabilities = probabilities[policy_targets, columns]
+    top1 = ranks[policy_targets, columns] == 0
+    top3 = ranks[policy_targets, columns] < min(3, policy_logits.shape[0])
+    metrics = {
         "policyTop1Accuracy": float(np.mean(top1)),
         "policyTop3Accuracy": float(np.mean(top3)),
         "policyTargetProbability": float(np.mean(target_probabilities)),
@@ -63,7 +96,6 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
         "valueTargetMean": float(np.mean(value_targets)),
         "valueTargetStd": float(np.std(value_targets)),
     }
-
     if getattr(ai, "search_mode", "") == "search3":
         predicted_probability = _sigmoid(raw_values)
         metrics["valueMae"] = float(np.mean(np.abs(predicted_probability - value_targets)))
@@ -84,9 +116,11 @@ def _fixture_tensors(ai):
     policy_targets = []
     value_targets = []
     path_slices = []
+    length_slices = {}
     gamma = float(getattr(ai, "value_target_gamma", (1 / 2) ** (1 / 20)))
 
     for length in FIXTURE_LENGTHS:
+        length_start = len(policy_targets)
         for fixture_index in range(FIXTURES_PER_LENGTH):
             scramble = _fixture_scramble(cube, length, fixture_index)
             solution = tuple(cube.invert_moves(scramble))
@@ -100,12 +134,25 @@ def _fixture_tensors(ai):
                 value_targets.append(gamma ** remaining_steps)
                 cube.make_move(move)
             path_slices.append(slice(start, len(policy_targets)))
+        length_slices[length] = slice(length_start, len(policy_targets))
 
     return (
         np.asarray(state_columns, dtype = "f").T,
         np.asarray(policy_targets, dtype = int),
         np.asarray(value_targets, dtype = "f"),
         tuple(path_slices),
+        length_slices,
+    )
+
+
+def _relative_path_slices(path_slices, outer_slice):
+    """Translate trajectory slices into the coordinates of a fixture group."""
+    start = outer_slice.start
+    stop = outer_slice.stop
+    return tuple(
+        slice(path_slice.start - start, path_slice.stop - start)
+        for path_slice in path_slices
+        if path_slice.start >= start and path_slice.stop <= stop
     )
 
 

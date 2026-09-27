@@ -330,6 +330,15 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 ("2U ","3F2","2U'","2D ","3F2","2D'"),
                 ("2U "," S2","2U'","2D'"," S2","2D "),
                 ("2U "," S2","2U'","2D "," S2","2D'"),
+
+                ("2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"),
+                (" L2","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," L2"),
+                (" U ","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," U'"),
+                (" U "," L2","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," L2"," U'"),
+                (" U'","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," U "),
+                (" U'"," L2","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," L2"," U "),
+                (" U2","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," U2"),
+                (" U2"," L2","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," L2"," U2"),
             ],
             [
             ],
@@ -558,6 +567,17 @@ def build_experiment_frame_config():
         ],
         original_train_recent_ratios = [
             0.5 if original_transformer_attention[ai_index] else 0.0
+            for ai_index in range(ai_count)
+        ],
+        # Reserve part of each Transformer Search3 learning pass for older,
+        # long solution lines.  Search2 and the linear baseline keep their
+        # previous sampler, so this remains a targeted experiment.
+        original_train_long_sequence_min_steps = [
+            20 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0
+            for ai_index in range(ai_count)
+        ],
+        original_train_long_sequence_ratios = [
+            0.25 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0.0
             for ai_index in range(ai_count)
         ],
         w1_initializers = w1_initializers,

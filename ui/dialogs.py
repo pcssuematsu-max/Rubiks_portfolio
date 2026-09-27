@@ -868,10 +868,11 @@ class LearningHistoryDialog(Tk.Toplevel):
         mae = [record.get('valueMae') for record in visible]
         delta = [record.get('valueStartToEndDelta') for record in visible]
         target_delta = [record.get('valueTargetStartToEndDelta') for record in visible]
-        fixed_top1 = [self._fixed_validation_value(record, 'policyTop1Accuracy') for record in visible]
-        fixed_top3 = [self._fixed_validation_value(record, 'policyTop3Accuracy') for record in visible]
-        fixed_correlation = [self._fixed_validation_value(record, 'valueRankCorrelation') for record in visible]
-        fixed_mae = [self._fixed_validation_value(record, 'valueMae') for record in visible]
+        fixture_id = self._latest_fixed_validation_fixture_id(visible)
+        fixed_top1 = [self._fixed_validation_value(record, 'policyTop1Accuracy', fixture_id) for record in visible]
+        fixed_top3 = [self._fixed_validation_value(record, 'policyTop3Accuracy', fixture_id) for record in visible]
+        fixed_correlation = [self._fixed_validation_value(record, 'valueRankCorrelation', fixture_id) for record in visible]
+        fixed_mae = [self._fixed_validation_value(record, 'valueMae', fixture_id) for record in visible]
         self.chart.create_text(8, 8, text = '学習loss  policy=orange  value/sample=cyan（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
         if not visible or not any(item is not None for item in policy + value):
             self.chart.create_text(width // 2, height // 2, text = 'loss data がまだありません', fill = '#A0A0A0', tags = 'trend')
@@ -906,7 +907,8 @@ class LearningHistoryDialog(Tk.Toplevel):
             )
         else:
             self.chart.create_text(width // 2, 250, text = 'Search3 quality は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
-        self.chart.create_text(8, 338, text = '固定検証（学習に使わない同一局面）  P@1=orange  P@3=yellow  Value順位相関=green  Search3 MAE=magenta', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        fixture_label = fixture_id or '未記録'
+        self.chart.create_text(8, 338, text = f'固定検証（{fixture_label}、学習に使わない同一局面）  P@1=orange  P@3=yellow  Value順位相関=green  Search3 MAE=magenta', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
         if any(item is not None for item in fixed_top1 + fixed_top3 + fixed_correlation + fixed_mae):
             self._draw_loss_series(fixed_top1, '#E68A00', 25, width - 12, 368, 418)
             self._draw_loss_series(fixed_top3, '#E6D200', 25, width - 12, 368, 418)
@@ -976,7 +978,28 @@ class LearningHistoryDialog(Tk.Toplevel):
             value_parts.append(f"Value MAE={self._number(validation.get('valueMae'))}")
         if validation.get('valuePathCrossEntropy') is not None:
             value_parts.append(f"Value path CE={self._number(validation.get('valuePathCrossEntropy'))}")
-        return '  '.join(value_parts) + f"  states={validation.get('stateCount', '--')}"
+        return (
+            '  '.join(value_parts)
+            + f"  states={validation.get('stateCount', '--')}"
+            + self._fixed_validation_length_text(validation)
+        )
+
+    def _fixed_validation_length_text(self, validation):
+        """Show hard held-out trajectories separately when v2 data exists."""
+        by_length = validation.get('byLength')
+        if not isinstance(by_length, dict) or len(by_length) == 0:
+            return ''
+        long_lengths = sorted((int(length) for length in by_length if int(length) >= 48))
+        if len(long_lengths) == 0:
+            return ''
+        parts = []
+        for length in long_lengths:
+            metrics = by_length[str(length)]
+            parts.append(
+                f"{length}手:P@1={self._rate(metrics.get('policyTop1Accuracy'))}"
+                f"/Value順位={self._number(metrics.get('valueRankCorrelation'))}"
+            )
+        return '  長手数[' + '  '.join(parts) + ']'
 
     def _fixed_validation_calibration_text(self, record):
         validation = record.get('fixedValidation') or {}
@@ -989,9 +1012,20 @@ class LearningHistoryDialog(Tk.Toplevel):
         )
 
     @staticmethod
-    def _fixed_validation_value(record, key):
+    def _latest_fixed_validation_fixture_id(records):
+        for record in reversed(records):
+            validation = record.get('fixedValidation') or {}
+            fixture_id = validation.get('fixtureId')
+            if isinstance(fixture_id, str) and fixture_id:
+                return fixture_id
+        return None
+
+    @staticmethod
+    def _fixed_validation_value(record, key, fixture_id = None):
         validation = record.get('fixedValidation')
-        return None if not validation else validation.get(key)
+        if not validation or (fixture_id is not None and validation.get('fixtureId') != fixture_id):
+            return None
+        return validation.get(key)
 
     @staticmethod
     def _number(value):

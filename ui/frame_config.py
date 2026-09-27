@@ -79,6 +79,8 @@ class FrameConfig:
     original_train_state_batch_sizes: Optional[Sequence[int]] = None
     original_train_max_batches: Optional[Sequence[int]] = None
     original_train_recent_ratios: Optional[Sequence[float]] = None
+    original_train_long_sequence_min_steps: Optional[Sequence[int]] = None
+    original_train_long_sequence_ratios: Optional[Sequence[float]] = None
     w1_initializers: Optional[Sequence[Any]] = None
     max_search2_data: int = 8000
     max_search3_data_per_ai: int = 2000
@@ -132,6 +134,8 @@ class FrameConfig:
         self._validate_ai_sequence_length('original_train_state_batch_sizes', self.original_train_state_batch_sizes, ai_count)
         self._validate_ai_sequence_length('original_train_max_batches', self.original_train_max_batches, ai_count)
         self._validate_ai_sequence_length('original_train_recent_ratios', self.original_train_recent_ratios, ai_count)
+        self._validate_ai_sequence_length('original_train_long_sequence_min_steps', self.original_train_long_sequence_min_steps, ai_count)
+        self._validate_ai_sequence_length('original_train_long_sequence_ratios', self.original_train_long_sequence_ratios, ai_count)
         self._validate_ai_sequence_length('w1_initializers', self.w1_initializers, ai_count)
         self._validate_ai_sequence_length('transform_idx', self.transform_idx, ai_count)
         self._validate_ai_sequence_length('flip_inside_idx', self.flip_inside_idx, ai_count)

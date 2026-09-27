@@ -72,11 +72,28 @@ class LearnManager:
             f"P@1={metrics['policyTop1Accuracy'] * 100:.1f}% "
             f"P@3={metrics['policyTop3Accuracy'] * 100:.1f}% "
             f"Value順位相関={self._format_validation_number(metrics.get('valueRankCorrelation'))}"
+            f"{self._long_validation_log_text(metrics)}"
         )
 
     @staticmethod
     def _format_validation_number(value):
         return '--' if value is None else f'{value:.3f}'
+
+    @classmethod
+    def _long_validation_log_text(cls, metrics):
+        """Add the hardest held-out probe when v2 metrics are available."""
+        by_length = metrics.get('byLength')
+        if not isinstance(by_length, dict) or len(by_length) == 0:
+            return ''
+        longest = max(by_length, key = lambda length: int(length))
+        quality = by_length[longest]
+        top1 = quality.get('policyTop1Accuracy')
+        if top1 is None:
+            return ''
+        return (
+            f"  {longest}手:P@1={top1 * 100:.1f}%"
+            f" Value順位相関={cls._format_validation_number(quality.get('valueRankCorrelation'))}"
+        )
 
     def record_learning_history(self, index, ai, elapsed_seconds):
         """Persist one completed AI learning point without interrupting learning."""

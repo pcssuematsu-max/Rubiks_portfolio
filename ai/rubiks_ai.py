@@ -25,7 +25,7 @@ from ai.transformer_variance import transformer_parameter_target_variance
 
 
 class Rubiks_3_AI:
-    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
+    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
         if cube == None:
             self.cube = Rubiks_3(size = cube_size)
         else:
@@ -47,6 +47,11 @@ class Rubiks_3_AI:
         self.train_state_batch_size = int(train_state_batch_size) if train_state_batch_size is not None else (16 if self.use_piece_tokens else 0)
         self.train_max_batches = int(train_max_batches) if train_max_batches is not None else (8 if self.use_piece_tokens else 0)
         self.train_recent_ratio = float(train_recent_ratio) if train_recent_ratio is not None else (0.5 if self.use_piece_tokens else 0.0)
+        # A reserved replay share prevents long successful lines from being
+        # drowned out by the much more common short search segments.  Both
+        # defaults disable the feature for existing profiles.
+        self.train_long_sequence_min_steps = max(0,int(train_long_sequence_min_steps or 0))
+        self.train_long_sequence_ratio = float(train_long_sequence_ratio or 0.0)
         self.torch_training_device = 'cpu' if self.use_transformer_attention else 'auto'
         self.activation = Activation
         self.ips = self.cube.ips
@@ -2097,6 +2102,8 @@ class Rubiks_3_AI:
             f'data={summary["selected_items"]}/{summary["original_items"]} '
             f'states={summary["selected_states"]} '
             f'recent_batches={summary["recent_batches"]} '
+            f'long_batches={summary["long_batches"]} '
+            f'long>={summary["long_min_steps"]}({summary["long_eligible_items"]}) '
             f'random_batches={summary["random_batches"]} '
             f'kept_for_later={summary["remainder_items"]} '
             f'index={summary["selected_index_min"]}-{summary["selected_index_max"]}'
@@ -2230,12 +2237,16 @@ class Rubiks_3_AI:
         return batches,[]
 
     def _build_sampled_training_batches(self, indices, data_source, batch_size, state_batch_size, state_count_fn):
-        """Transformer向けに、新しいdataとランダムdataを分けてsampleする。"""
+        """Transformer向けに直近・長手数・ランダムdataを分けてsampleする。"""
         all_indices = list(indices)
         max_batches = int(getattr(self,'train_max_batches',0))
         recent_ratio = min(max(float(getattr(self,'train_recent_ratio',0.0)),0.0),1.0)
         recent_count = min(max_batches,int(round(max_batches * recent_ratio)))
-        random_count = max_batches - recent_count
+        long_min_steps = max(0,int(getattr(self,'train_long_sequence_min_steps',0)))
+        long_ratio = min(max(float(getattr(self,'train_long_sequence_ratio',0.0)),0.0),1.0)
+        # The long replay slot comes from the non-recent pool.  This makes it
+        # a true replay mechanism rather than merely relabelling fresh data.
+        long_count = min(max_batches - recent_count,int(round(max_batches * long_ratio)))
         original_batches,_ = self._pack_training_batches(
             all_indices,
             data_source,
@@ -2255,7 +2266,33 @@ class Rubiks_3_AI:
         )
         recent_items = set(self._flatten_batches(recent_batches))
 
-        random_order = [data_index for data_index in all_indices if data_index not in recent_items]
+        long_order = [
+            data_index for data_index in all_indices
+            if data_index not in recent_items
+            and self._replay_sequence_steps(data_source[data_index]) >= long_min_steps
+        ]
+        # A zero threshold or ratio is the exact old recent/random sampler.
+        if long_min_steps <= 0 or long_count <= 0:
+            long_order = []
+            long_count = 0
+        random.shuffle(long_order)
+        long_batches,_ = self._pack_training_batches(
+            long_order,
+            data_source,
+            batch_size,
+            state_batch_size,
+            state_count_fn,
+            max_batches = long_count,
+        )
+        long_items = set(self._flatten_batches(long_batches))
+
+        # When there are not enough long trajectories yet, give the unused
+        # slots back to ordinary random replay instead of reducing updates.
+        random_count = max_batches - len(recent_batches) - len(long_batches)
+        random_order = [
+            data_index for data_index in all_indices
+            if data_index not in recent_items and data_index not in long_items
+        ]
         random.shuffle(random_order)
         random_batches,_ = self._pack_training_batches(
             random_order,
@@ -2266,7 +2303,7 @@ class Rubiks_3_AI:
             max_batches = random_count,
         )
 
-        selected_batches = recent_batches + random_batches
+        selected_batches = recent_batches + long_batches + random_batches
         selected_items = set(self._flatten_batches(selected_batches))
         remainder_indices = [data_index for data_index in all_indices if data_index not in selected_items]
         self._last_training_sample_summary = self._training_sample_summary(
@@ -2274,12 +2311,21 @@ class Rubiks_3_AI:
             original_item_count = len(all_indices),
             selected_batches = selected_batches,
             recent_batch_count = len(recent_batches),
+            long_batch_count = len(long_batches),
             random_batch_count = len(random_batches),
+            long_min_steps = long_min_steps,
+            long_eligible_item_count = len(long_order),
             remainder_indices = remainder_indices,
             data_source = data_source,
             state_count_fn = state_count_fn,
         )
         return selected_batches,remainder_indices
+
+    @staticmethod
+    def _replay_sequence_steps(data_item):
+        """Return total remaining solution length when the sample records it."""
+        fallback = len(getattr(data_item,'moves',()))
+        return max(fallback,int(getattr(data_item,'steps_to_goal',fallback) or 0))
 
     def _flatten_batches(self, batches):
         items = []
@@ -2287,7 +2333,7 @@ class Rubiks_3_AI:
             items += batch
         return items
 
-    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, random_batch_count, remainder_indices, data_source, state_count_fn):
+    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, long_batch_count, random_batch_count, long_min_steps, long_eligible_item_count, remainder_indices, data_source, state_count_fn):
         selected_items = self._flatten_batches(selected_batches)
         selected_states = sum(int(state_count_fn(data_source[data_index])) for data_index in selected_items)
         if selected_items:
@@ -2300,7 +2346,10 @@ class Rubiks_3_AI:
             'original_batches': original_batch_count,
             'selected_batches': len(selected_batches),
             'recent_batches': recent_batch_count,
+            'long_batches': long_batch_count,
             'random_batches': random_batch_count,
+            'long_min_steps': long_min_steps,
+            'long_eligible_items': long_eligible_item_count,
             'original_items': original_item_count,
             'selected_items': len(selected_items),
             'selected_states': selected_states,

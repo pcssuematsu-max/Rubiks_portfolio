@@ -71,6 +71,7 @@ class SearchDataManager:
             end_reason = 'bootstrap',
             source_succeeded = True,
             solve_succeeded = True,
+            steps_to_goal = len(segment_moves),
         )
 
     def _bootstrap_value_targets(self, segment_length):
@@ -128,7 +129,12 @@ class SearchDataManager:
         if len(segment_moves) == 0:
             return None
 
-        value_targets = self.build_segment_value_targets(history_index, len(segment_moves))
+        remaining_steps = self.search3_remaining_length(history_index)
+        value_targets = self.build_segment_value_targets(
+            history_index,
+            len(segment_moves),
+            remaining_steps,
+        )
         rewards = value_targets.copy()
         value_trace_raw = self.rebuild_search3_value_trace_raw(
             history_item['scramble'],
@@ -156,11 +162,13 @@ class SearchDataManager:
             end_reason = getattr(search_result,'end_reason',None),
             source_succeeded = getattr(search_result,'succeeded',False),
             solve_succeeded = False,
+            steps_to_goal = remaining_steps,
         )
 
-    def build_segment_value_targets(self, history_index, segment_length):
+    def build_segment_value_targets(self, history_index, segment_length, remaining_length = None):
         """残り手数とgammaから、その探索区間のvalue target列を作る。"""
-        remaining_length = self.search3_remaining_length(history_index)
+        if remaining_length is None:
+            remaining_length = self.search3_remaining_length(history_index)
         value_targets = np.zeros(segment_length + 1,dtype = 'f')
         gamma = self.frame.value_target_gamma
         for move_index in range(segment_length + 1):

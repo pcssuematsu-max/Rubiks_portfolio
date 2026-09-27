@@ -188,6 +188,9 @@ def _fixed_validation(value: Any) -> dict[str, Any] | None:
     }
     for key in _FIXED_VALIDATION_NUMBERS:
         result[key] = _finite_number(value.get(key))
+    by_length = _fixed_validation_by_length(value.get("byLength"))
+    if by_length is not None:
+        result["byLength"] = by_length
     return result
 
 
@@ -199,6 +202,27 @@ _FIXED_VALIDATION_NUMBERS = frozenset({
 })
 
 
+def _fixed_validation_by_length(value: Any) -> dict[str, dict[str, Any]] | None:
+    """Copy optional per-scramble-length probes without invalidating v1 data."""
+    if not isinstance(value, dict) or len(value) == 0:
+        return None
+    result = {}
+    for length, metrics in value.items():
+        if not isinstance(length, str) or not length.isdecimal() or int(length) < 1:
+            return None
+        if not isinstance(metrics, dict):
+            return None
+        count = _safe_optional_int(metrics.get("fixtureCount"))
+        state_count = _safe_optional_int(metrics.get("stateCount"))
+        if count is None or state_count is None:
+            return None
+        copied = {"fixtureCount": count, "stateCount": state_count}
+        for key in _FIXED_VALIDATION_NUMBERS:
+            copied[key] = _finite_number(metrics.get(key))
+        result[length] = copied
+    return result
+
+
 def _validate_fixed_validation(value: Any) -> None:
     if value is None:
         return
@@ -206,7 +230,7 @@ def _validate_fixed_validation(value: Any) -> None:
         "fixtureId", "fixtureLengths", "fixtureCount", "stateCount",
         *_FIXED_VALIDATION_NUMBERS,
     }
-    if not isinstance(value, dict) or set(value) != expected:
+    if not isinstance(value, dict) or set(value) - expected - {"byLength"}:
         raise ValueError("Invalid learning history fixedValidation")
     if not isinstance(value["fixtureId"], str) or not value["fixtureId"]:
         raise ValueError("Invalid learning history fixedValidation fixture")
@@ -220,6 +244,15 @@ def _validate_fixed_validation(value: Any) -> None:
             raise ValueError("Invalid learning history fixedValidation count")
     for key in _FIXED_VALIDATION_NUMBERS:
         _validate_optional_number(value[key])
+    if "byLength" in value:
+        _validate_fixed_validation_by_length(value["byLength"])
+
+
+def _validate_fixed_validation_by_length(value: Any) -> None:
+    """Validate v2's per-length metrics while retaining v1 compatibility."""
+    normalized = _fixed_validation_by_length(value)
+    if normalized is None or normalized != value:
+        raise ValueError("Invalid learning history fixedValidation byLength")
 
 
 def _validate_optional_number(value: Any) -> None:

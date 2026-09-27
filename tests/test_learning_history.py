@@ -81,6 +81,25 @@ class LearningHistoryTests(unittest.TestCase):
                 'valueMae': 0.2,
                 'valueBce': 0.7,
                 'valuePathCrossEntropy': None,
+                'byLength': {
+                    '60': {
+                        'fixtureCount': 3,
+                        'stateCount': 180,
+                        'policyTop1Accuracy': 0.1,
+                        'policyTop3Accuracy': 0.2,
+                        'policyTargetProbability': 0.1,
+                        'policyCrossEntropy': 2.3,
+                        'valueRankCorrelation': 0.4,
+                        'valuePearsonCorrelation': 0.5,
+                        'valuePredictionMean': 0.6,
+                        'valuePredictionStd': 0.2,
+                        'valueTargetMean': 0.3,
+                        'valueTargetStd': 0.1,
+                        'valueMae': 0.2,
+                        'valueBce': 0.7,
+                        'valuePathCrossEntropy': None,
+                    },
+                },
             }
             record = completed_learning_record(3, ai, 1.0)
             LearningHistoryStore(path).append(record)
@@ -90,6 +109,7 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['fixedValidation']['fixtureId'], 'canonical-inverse-v1')
             self.assertEqual(saved['fixedValidation']['stateCount'], 216)
             self.assertAlmostEqual(saved['fixedValidation']['valueRankCorrelation'], 0.4)
+            self.assertEqual(saved['fixedValidation']['byLength']['60']['stateCount'], 180)
 
     def test_ai_training_metrics_uses_processed_batch_count_as_update_count(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)

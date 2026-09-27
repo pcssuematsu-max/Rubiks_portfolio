@@ -48,10 +48,14 @@ class Search3DepthScheduleTests(unittest.TestCase):
             search3_cs = (2.0,),
             search3_c_depth_maxes = (4.0,),
             search3_c_depth_ramp_depths = (12,),
+            original_train_long_sequence_min_steps = (20,),
+            original_train_long_sequence_ratios = (0.25,),
         )
 
         self.assertEqual(config.search3_c_depth_maxes, (4.0,))
         self.assertEqual(config.search3_c_depth_ramp_depths, (12,))
+        self.assertEqual(config.original_train_long_sequence_min_steps, (20,))
+        self.assertEqual(config.original_train_long_sequence_ratios, (0.25,))
 
     def test_runtime_settings_apply_the_depth_schedule(self):
         ai = SimpleNamespace(search3_C = 0.05)

@@ -54,6 +54,7 @@ class data_search3:
         end_reason=None,
         source_succeeded=False,
         solve_succeeded=False,
+        steps_to_goal=None,
     ):
         self.scramble = scramble
         self.moves = moves
@@ -76,6 +77,10 @@ class data_search3:
         self.source_succeeded = bool(source_succeeded)
         self.solve_succeeded = bool(solve_succeeded)
         self.succeeded = self.source_succeeded
+        # A search result can be one segment of a much longer completed
+        # solution.  Keep the remaining total so replay selection can target
+        # difficult starting positions rather than only long local segments.
+        self.steps_to_goal = max(0,int(len(moves) if steps_to_goal is None else steps_to_goal))
 
 
 class SearchResult:
