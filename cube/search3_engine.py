@@ -300,10 +300,13 @@ class Search3Engine:
         path_indices = []
         path_moves = []
         path_state_keys = {root_node.state_key}
+        selection_cs = []
         while True:
+            exploration_c = self._exploration_c(len(path_moves))
+            selection_cs.append(exploration_c)
             index = node.select_node(
                 self._find_invalid_indices(path_moves),
-                C = self._exploration_c(len(path_moves)),
+                C = exploration_c,
             )
             if index is None:
                 return {
@@ -313,6 +316,7 @@ class Search3Engine:
                     'path_indices': path_indices,
                     'path_moves': path_moves,
                     'node_value': 0.0,
+                    'selectionCs': selection_cs,
                 }
             move_label = self.cube.move_keys[index]
             path_indices.append(index)
@@ -330,6 +334,7 @@ class Search3Engine:
                     'path_indices': path_indices,
                     'path_moves': path_moves,
                     'node_value': 0.0,
+                    'selectionCs': selection_cs,
                 }
             try:
                 self.cube.make_move(move_label)
@@ -344,6 +349,7 @@ class Search3Engine:
                     'path_indices': path_indices,
                     'path_moves': path_moves,
                     'node_value': 0.0,
+                    'selectionCs': selection_cs,
                 }
             if self.cube.is_perfect():
                 return {
@@ -353,6 +359,7 @@ class Search3Engine:
                     'path_indices': path_indices,
                     'path_moves': path_moves,
                     'node_value': 1.0,
+                    'selectionCs': selection_cs,
                 }
 
             state_key = self._state_key()
@@ -364,6 +371,7 @@ class Search3Engine:
                     'path_nodes': path_nodes,
                     'path_indices': path_indices,
                     'path_moves': path_moves,
+                    'selectionCs': selection_cs,
                     'node_value': 0.0,
                 }
             if len(path_moves) >= max_depth:
@@ -377,6 +385,7 @@ class Search3Engine:
                     'path_nodes': path_nodes,
                     'path_indices': path_indices,
                     'path_moves': path_moves,
+                    'selectionCs': selection_cs,
                 }
             child_node = node.children.get(move_label)
             if child_node is None or child_node.state_key != state_key:
@@ -394,6 +403,7 @@ class Search3Engine:
                     'path_nodes': path_nodes,
                     'path_indices': path_indices,
                     'path_moves': path_moves,
+                    'selectionCs': selection_cs,
                 }
             path_state_keys.add(state_key)
             path_nodes.append(child_node)
@@ -430,6 +440,8 @@ class Search3Engine:
         max_depth = max(1, getattr(self.ai, 'search_depth3', 100))
         start_root_visits = root_node.visited.copy()
         total_playouts = 0
+        playout_depths = []
+        selection_cs = []
 
         while remaining_playouts > 0 and solved_move is None:
             current_batch_size = min(batch_size, remaining_playouts)
@@ -438,6 +450,8 @@ class Search3Engine:
             for _ in range(current_batch_size):
                 leaf_path = self._collect_leaf_path(root_node, max_depth)
                 processed_playouts += 1
+                playout_depths.append(len(leaf_path['path_moves']))
+                selection_cs.extend(leaf_path.get('selectionCs',()))
                 self._revert_path(leaf_path['path_moves'])
                 if leaf_path['resolved']:
                     self._backup_path(leaf_path['path_nodes'], leaf_path['path_indices'], leaf_path['node_value'])
@@ -456,6 +470,7 @@ class Search3Engine:
 
         local_visits = root_node.visited - start_root_visits
         stats = np.array([np.max(local_visits), total_playouts], dtype='i')
+        search_diagnostics = self._search_diagnostics(playout_depths, selection_cs)
 
         if solved_move is not None:
             best_moves = self._legal_prefix(solved_move)
@@ -465,7 +480,7 @@ class Search3Engine:
             value_trace = self._value_trace_for_moves(root_value, best_moves)
             if len(value_trace) > 0:
                 value_trace[-1] = best_value
-            result = SearchResult(True, best_moves, root_value, value_trace, best_value, stats, local_visits.copy(), self.ai.search_mode, 'solved', root_value_raw=root_value_raw, value_trace_raw=raw_value_trace, best_value_raw=raw_best_value)
+            result = SearchResult(True, best_moves, root_value, value_trace, best_value, stats, local_visits.copy(), self.ai.search_mode, 'solved', root_value_raw=root_value_raw, value_trace_raw=raw_value_trace, best_value_raw=raw_best_value, search_diagnostics=search_diagnostics)
             self.prune_caches()
             return result
 
@@ -478,8 +493,32 @@ class Search3Engine:
         best_value_raw = raw_value_trace[-1]
         best_value = sigmoid(best_value_raw)
         value_trace = self._value_trace_for_moves(root_value, best_moves)
-        result = SearchResult(False, best_moves, root_value, value_trace, best_value, stats, local_visits.copy(), self.ai.search_mode, 'budget', root_value_raw=root_value_raw, value_trace_raw=raw_value_trace, best_value_raw=best_value_raw)
+        result = SearchResult(False, best_moves, root_value, value_trace, best_value, stats, local_visits.copy(), self.ai.search_mode, 'budget', root_value_raw=root_value_raw, value_trace_raw=raw_value_trace, best_value_raw=best_value_raw, search_diagnostics=search_diagnostics)
         self.prune_caches()
+        return result
+
+    @staticmethod
+    def _search_diagnostics(playout_depths, selection_cs):
+        """Summarize actual PUCT depth and C use for experiment logs."""
+        depths = np.asarray(playout_depths, dtype = 'f')
+        coefficients = np.asarray(selection_cs, dtype = 'f')
+        if depths.size == 0:
+            return {}
+        result = {
+            'playoutDepthMin': int(np.min(depths)),
+            'playoutDepthMedian': float(np.median(depths)),
+            'playoutDepthMean': float(np.mean(depths)),
+            'playoutDepthMax': int(np.max(depths)),
+            'playoutDepthAtLeast20Count': int(np.count_nonzero(depths >= 20)),
+            'playoutDepthAtLeast20Rate': float(np.mean(depths >= 20)),
+        }
+        if coefficients.size > 0:
+            result.update({
+                'selectionCount': int(coefficients.size),
+                'selectionCMin': float(np.min(coefficients)),
+                'selectionCMean': float(np.mean(coefficients)),
+                'selectionCMax': float(np.max(coefficients)),
+            })
         return result
 
     def _bounded_budget_moves(self, root_value, moves):

@@ -440,7 +440,30 @@ class SolveSessionManager:
                 'visitedRootChildCount': self._nonzero_count(policy_target),
                 'treeNodeCount': self._optional_len(getattr(getattr(AI, 'search3_engine', None), 'node_cache', None)),
             })
+            attempt.update(self._search3_depth_diagnostics(search_result))
         self.frame.solve_state.direct_search_attempts.append(attempt)
+
+    @classmethod
+    def _search3_depth_diagnostics(cls, search_result):
+        """Copy compact depth/C diagnostics emitted by Search3Engine."""
+        diagnostics = getattr(search_result, 'search_diagnostics', None)
+        if not isinstance(diagnostics, dict):
+            return {}
+        result = {}
+        for key in (
+            'playoutDepthMin', 'playoutDepthMedian', 'playoutDepthMean',
+            'playoutDepthMax', 'playoutDepthAtLeast20Count',
+            'playoutDepthAtLeast20Rate', 'selectionCount', 'selectionCMin',
+            'selectionCMean', 'selectionCMax',
+        ):
+            value = diagnostics.get(key)
+            if key in ('playoutDepthMin', 'playoutDepthMax', 'playoutDepthAtLeast20Count', 'selectionCount'):
+                value = cls._optional_int(value)
+            else:
+                value = cls._optional_float(value)
+            if value is not None:
+                result[key] = value
+        return result
 
     @staticmethod
     def _search_stats(search_result):
@@ -464,6 +487,16 @@ class SolveSessionManager:
             return int(value)
         except (TypeError, ValueError, OverflowError):
             return None
+
+    @staticmethod
+    def _optional_float(value):
+        if value is None:
+            return None
+        try:
+            result = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return result if isfinite(result) else None
 
     @staticmethod
     def _optional_len(value):
@@ -1359,6 +1392,7 @@ class SolveSessionManager:
                 'maxC': getattr(ai, 'search3_C_depth_max', getattr(ai, 'search3_C', None)),
                 'rampDepth': getattr(ai, 'search3_C_depth_ramp_depth', 0),
             },
+            'search3RankLossMix': getattr(ai, 'search3_rank_loss_mix', None),
             'torchPredict': getattr(ai, 'use_torch_predict', None),
             'torchTraining': getattr(ai, 'use_torch_training', None),
         }

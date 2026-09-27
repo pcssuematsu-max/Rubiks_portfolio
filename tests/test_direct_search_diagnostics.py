@@ -44,6 +44,11 @@ class DirectSearchDiagnosticsTests(unittest.TestCase):
         second = SearchResult(
             False, ('U',), 0.3, [0.3, 0.4], 0.4, np.array([3, 50]),
             policy_target=np.array([0, 0, 3]), search_mode='search3', end_reason='budget',
+            search_diagnostics={
+                'playoutDepthMedian': 17.5,
+                'playoutDepthAtLeast20Rate': 0.4,
+                'selectionCMean': 2.8,
+            },
         )
 
         self.manager._record_direct_search_attempt(ai, first, 0.2)
@@ -54,7 +59,15 @@ class DirectSearchDiagnosticsTests(unittest.TestCase):
         self.assertEqual(summary['totals']['playoutCount'], 90)
         self.assertEqual(summary['totals']['maxRootChildVisits'], 3)
         self.assertEqual(summary['finalAttempt']['treeNodeCount'], 2)
+        self.assertEqual(summary['finalAttempt']['playoutDepthMedian'], 17.5)
+        self.assertEqual(summary['finalAttempt']['selectionCMean'], 2.8)
 
         self.state.reset_direct_search_diagnostics()
         self.assertEqual(self.manager._direct_search_summary(), {})
 
+    def test_experiment_settings_keep_the_search3_rank_loss_coefficient(self):
+        settings = SolveSessionManager._experiment_ai_settings(
+            SimpleNamespace(search3_rank_loss_mix = 0.05)
+        )
+
+        self.assertEqual(settings['search3RankLossMix'], 0.05)

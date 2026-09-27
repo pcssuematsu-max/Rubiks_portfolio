@@ -649,7 +649,8 @@ class ExperimentSummaryDialog(Tk.Toplevel):
             f"wd={settings.get('weightDecayRate', '--')} "
             f"scale={scales.get('shared', '--')}/{scales.get('policy', '--')}/{scales.get('value', '--')} "
             f"S2 frontier={search2.get('maxFrontier', '--')} batch={search2.get('batchSize', '--')} "
-            f"loss={search2.get('valueLossType', '--')} {search3_text}"
+            f"loss={search2.get('valueLossType', '--')} {search3_text} "
+            f"S3rank={settings.get('search3RankLossMix', '--')}"
         )
 
     @staticmethod
@@ -803,10 +804,12 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"最新: P={self._number(latest['policyLoss'])}  V={self._number(latest['valueLoss'])}  "
                 f"updates={latest['updatesDuringSolve']}  data={latest['trainingDataCount']}→{latest['retainedDataCount']}\n"
                 f"Search3 quality: {self._search3_quality_text(latest)}\n"
+                f"学習抽出: {self._training_sample_text(latest)}\n"
                 f"固定検証: {self._fixed_validation_text(latest)}\n"
                 f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
                 f"update scale={self._number(update_scales['shared'])}/"
-                f"{self._number(update_scales['policy'])}/{self._number(update_scales['value'])}"
+                f"{self._number(update_scales['policy'])}/{self._number(update_scales['value'])}  "
+                f"S3 rank={self._number(latest.get('search3RankLossMix'))}"
             )
         )
         lines = ['直近の学習履歴（新しい順）']
@@ -820,13 +823,16 @@ class LearningHistoryDialog(Tk.Toplevel):
             )
             if record.get('valueBcePerState') is not None:
                 lines.append(f"  Search3 quality: {self._search3_quality_text(record)}")
+            if record.get('trainingSample') is not None:
+                lines.append(f"  学習抽出: {self._training_sample_text(record)}")
             if record.get('fixedValidation') is not None:
                 lines.append(f"  固定検証: {self._fixed_validation_text(record)}")
                 lines.append(f"    Value分布: {self._fixed_validation_calibration_text(record)}")
             lines.append(
                 f"  lr={self._number(lr['base'])} lr_C={self._number(lr['lrC'])} "
                 f"momentum={self._number(lr['momentumV'])}/{self._number(lr['momentumH'])}  "
-                f"scale={self._number(scales['shared'])}/{self._number(scales['policy'])}/{self._number(scales['value'])}"
+                f"scale={self._number(scales['shared'])}/{self._number(scales['policy'])}/{self._number(scales['value'])} "
+                f"S3rank={self._number(record.get('search3RankLossMix'))}"
             )
         self._set_details('\n'.join(lines))
 
@@ -963,6 +969,29 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"Δtarget={self._number(record.get('valueTargetStartToEndDelta'))}  "
             f"states={self._number(record.get('valueEffectiveStateCount'))}  "
             f"seq={record.get('valueSequenceCount', '--')}"
+        )
+
+    def _training_sample_text(self, record):
+        """Explain the persisted Transformer replay mixture concisely."""
+        sample = record.get('trainingSample')
+        if not sample:
+            return '（全件学習、または未記録）'
+        prefix = (
+            f"batch={sample.get('selectedBatchCount', '--')}/"
+            f"{sample.get('originalBatchCount', '--')} "
+            f"recent={sample.get('recentBatchCount', '--')} "
+            f"random={sample.get('randomBatchCount', '--')}"
+        )
+        minimum = sample.get('longSequenceMinSteps', 0)
+        if not minimum:
+            return prefix + '  長手数replay=off'
+        return (
+            prefix
+            + f"  長手数≥{minimum}: eligible={sample.get('longEligibleItemCount', '--')}"
+            + f" reserved={sample.get('longReservedItemCount', '--')}"
+            + f" selected={sample.get('longSelectedItemCount', '--')}"
+            + f" mean/max={self._number(sample.get('longSelectedStepMean'))}/"
+            + f"{sample.get('longSelectedStepMax', '--')}"
         )
 
     def _fixed_validation_text(self, record):

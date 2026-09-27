@@ -42,6 +42,18 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(node.select_node(C = 0.2), 0)
         self.assertEqual(node.select_node(C = 2.0), 1)
 
+    def test_search_diagnostics_report_actual_depth_and_coefficient_use(self):
+        diagnostics = Search3Engine._search_diagnostics(
+            [1, 12, 20, 30],
+            [2.0, 2.5, 3.0, 4.0],
+        )
+
+        self.assertEqual(diagnostics['playoutDepthMedian'], 16.0)
+        self.assertEqual(diagnostics['playoutDepthAtLeast20Count'], 2)
+        self.assertEqual(diagnostics['playoutDepthAtLeast20Rate'], 0.5)
+        self.assertEqual(diagnostics['selectionCMean'], 2.875)
+        self.assertEqual(diagnostics['selectionCMax'], 4.0)
+
     def test_frame_config_validates_per_ai_depth_schedule(self):
         config = FrameConfig(
             ai_search_modes = ('search3',),

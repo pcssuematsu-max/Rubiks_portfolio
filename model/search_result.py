@@ -102,6 +102,7 @@ class SearchResult:
         root_value_raw=None,
         value_trace_raw=None,
         best_value_raw=None,
+        search_diagnostics=None,
     ):
         self.succeeded = succeeded
         self.moves = tuple(moves)
@@ -111,6 +112,7 @@ class SearchResult:
         self.root_value_raw = root_value if root_value_raw is None else root_value_raw
         self.value_trace_raw = list(value_trace) if value_trace_raw is None else list(value_trace_raw)
         self.best_value_raw = best_value if best_value_raw is None else best_value_raw
+        self.search_diagnostics = {} if search_diagnostics is None else dict(search_diagnostics)
         self.stats = stats
         self.policy_target = policy_target
         self.search_mode = search_mode

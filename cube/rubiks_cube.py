@@ -644,7 +644,7 @@ class Rubiks_3:
 
             self._add_myperm2('ME4[FL>FR;UL>UR]', (' E ', ' R2', " E'", ' R2', " S'", " R'", ' S2', ' R2', ' S2', " R'", ' S '))
             self._add_myperm2('ME4[FL>RF;RF>LF;UL>RU;UR>UL]', (' E2', " L'", ' B2', ' L ', " E'", " L'", ' B2', ' L ', " E'", ' S ', " R'", ' E ', ' R2', " E'", " R'", " S'"))
-            self._add_myperm2('ME4[FL>FR;RF>FL;UL>RU;UR>UL]', (' L2', ' B2', ' D2', ' E2', " R'", " E'", ' R2', ' B2', ' E ', " R'", " E'", ' R ', ' B2', " R'", " E'", ' D2', ' B2', ' L2'))
+            self._add_myperm2('ME4[FL>FR;RF>FL;UL>RU;UR>UL]', (' S ', " R'", ' E ', ' R2', " E'", " R'", " S'", " E'", " R'", ' F2', ' R ', ' E ', " R'", ' F2', ' R '))
             self._add_myperm2('ME4[FL>FR;UL>RU]', (' E ', ' R2', " E'", ' R2', ' E2', ' R ', ' E2', ' R2', ' E2', ' R ', ' E2', ' D ', ' S ', " D'", ' R2', ' D ', " S'", " D'", ' R2'))
             self._add_myperm2('ME4[FL>RF;UL>RU]', (' L2', ' B2', ' D2', ' S ', ' R ', ' D2', " R'", ' S ', ' R ', ' S2', ' D2', ' S2', ' D2', " R'", " S'", ' R ', ' D2', " R'", " S'", ' D2', ' B2', ' L2'))
 

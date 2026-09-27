@@ -339,6 +339,16 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 (" U'"," L2","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," L2"," U "),
                 (" U2","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," U2"),
                 (" U2"," L2","2D2"," R2"," F2","2D2"," F2"," R2","2R "," B ","2R'"," F ","2R "," B'","2R'"," F'","2D2"," L2"," U2"),
+
+                (" F'", " E'", ' F2', ' E ', " F'", ' M ', ' F2', " M'", ' F2', ' E ', ' F ', ' L2', " F'", ' E ', ' F ', " E'", ' L2', ' F2', ' E ', ' F ', ' E2'),
+                (' E ', " F'", ' M ', ' F2', " M'", " F'", ' L2', " E'", ' L2', ' D2', " B'", " E'", ' B2', ' E ', " B'", ' D2'),
+                (' D2', ' B ', ' U2', " B'", " M'", ' B ', ' U2', " B'", ' M ', ' D2', " F'", " M'", ' F2', ' M ', " F'", " E'", ' F2', ' E ', ' F2'),
+                (" M'", ' F ', ' M ', ' F2', " M'", ' F ', ' M ', " E'", ' F2', ' E ', ' F2', ' U2', " B'", " E'", ' B2', ' E ', " B'", ' U2'),
+                (' E2', " L'", ' B2', ' L ', " E'", " L'", ' B2', ' L ', " E'", ' S ', " R'", ' E ', ' R2', " E'", " R'", " S'"),
+                (' L2', ' B2', ' D2', ' E2', " R'", " E'", ' R2', ' B2', ' E ', " R'", " E'", ' R ', ' B2', " R'", " E'", ' D2', ' B2', ' L2'),
+                (' D2', ' L2', ' M2', " F'", " M'", ' F2', ' D2', ' M ', " F'", " M'", ' F ', ' D2', " F'", " M'", ' L2', ' D2', ' M ', ' U ', ' M ', " U'", ' B2', ' U ', " M'", ' U ', " M'", ' U2', ' B2'),
+                (' D2', ' L2', ' M2', " F'", " M'", ' F2', ' D2', ' M ', " F'", " M'", ' F ', ' D2', " F'", " M'", ' L2', ' D2'),
+
             ],
             [
             ],
@@ -412,7 +422,12 @@ def build_experiment_frame_config():
         for ai_index in range(ai_count)
     ]
     search2_rank_loss_apply_types = ['all'] * ai_count
-    search3_rank_loss_mixes = [0.0] * ai_count
+    # A/B: Transformer Search3 の半数だけに、同一経路の残り手数を
+    # 順序付ける弱い補助損失を加える。AI 18/19 は基準群として維持する。
+    search3_rank_loss_mixes = [
+        0.05 if ai_index in (10,11) else 0.0
+        for ai_index in range(ai_count)
+    ]
     w1_initializers = [
         [
 #        {'selector': {'correct': True, 'solve_group':'Corner'}, 'basis': [0 + 11 * i for i in range(5)], 'scale': -0.05},

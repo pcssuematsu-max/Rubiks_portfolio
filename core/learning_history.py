@@ -79,6 +79,7 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "valueEffectiveStateCount": _finite_number(metrics.get("valueEffectiveStateCount")),
         "valueSequenceCount": _safe_optional_int(metrics.get("valueSequenceCount")),
         "fixedValidation": _fixed_validation(metrics.get("fixedValidation")),
+        "trainingSample": _training_sample(metrics.get("trainingSample")),
         "updatesDuringSolve": int(metrics.get("updatesDuringSolve", 0) or 0),
         "trainingDataCount": int(metrics.get("trainingDataCount", 0) or 0),
         "retainedDataCount": int(metrics.get("retainedDataCount", 0) or 0),
@@ -95,6 +96,7 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
             "value": _finite_number(getattr(ai, "update_scale_value", None)),
         },
         "search2ValueLossType": str(getattr(ai, "search2_value_loss_type", "")),
+        "search3RankLossMix": _finite_number(getattr(ai, "search3_rank_loss_mix", None)),
     }
 
 
@@ -131,7 +133,7 @@ def _validate_record(record: Any) -> None:
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
-        "valueSequenceCount", "fixedValidation",
+        "valueSequenceCount", "fixedValidation", "trainingSample", "search3RankLossMix",
     }
     if not isinstance(record, dict) or not required.issubset(record) or set(record) - required - optional:
         raise ValueError("Invalid learning history record")
@@ -158,6 +160,8 @@ def _validate_record(record: Any) -> None:
     ):
         raise ValueError("Invalid learning history valueSequenceCount")
     _validate_fixed_validation(record.get("fixedValidation"))
+    _validate_training_sample(record.get("trainingSample"))
+    _validate_optional_number(record.get("search3RankLossMix"))
     _validate_optional_number(record["learningSeconds"])
     _validate_number_mapping(record["learningRate"], {"base", "lrC", "momentumV", "momentumH"})
     _validate_number_mapping(record["updateScales"], {"shared", "policy", "value"})
@@ -200,6 +204,39 @@ _FIXED_VALIDATION_NUMBERS = frozenset({
     "valuePredictionMean", "valuePredictionStd", "valueTargetMean",
     "valueTargetStd", "valueMae", "valueBce", "valuePathCrossEntropy",
 })
+
+
+_TRAINING_SAMPLE_INT_FIELDS = frozenset({
+    "originalBatchCount", "selectedBatchCount", "recentBatchCount",
+    "longBatchCount", "randomBatchCount", "originalItemCount",
+    "selectedItemCount", "selectedStateCount", "remainderItemCount",
+    "longSequenceMinSteps", "longEligibleItemCount", "longReservedItemCount",
+    "longSelectedItemCount", "longSelectedStepMax",
+})
+
+
+def _training_sample(value: Any) -> dict[str, Any] | None:
+    """Copy the optional sampled-replay mix recorded by Transformer learning."""
+    if not isinstance(value, dict):
+        return None
+    result = {}
+    for key in _TRAINING_SAMPLE_INT_FIELDS:
+        number = _safe_optional_int(value.get(key))
+        if number is None:
+            return None
+        result[key] = number
+    result["longSelectedStepMean"] = _finite_number(value.get("longSelectedStepMean"))
+    return result
+
+
+def _validate_training_sample(value: Any) -> None:
+    if value is None:
+        return
+    expected = set(_TRAINING_SAMPLE_INT_FIELDS) | {"longSelectedStepMean"}
+    if not isinstance(value, dict) or set(value) != expected:
+        raise ValueError("Invalid learning history trainingSample")
+    if _training_sample(value) != value:
+        raise ValueError("Invalid learning history trainingSample")
 
 
 def _fixed_validation_by_length(value: Any) -> dict[str, dict[str, Any]] | None:

@@ -1989,7 +1989,37 @@ class Rubiks_3_AI:
             'updatesDuringSolve': updates,
             'trainingDataCount': max(0,int(original_len)),
             'retainedDataCount': max(0,int(retained_len)),
+            'trainingSample': self._training_sample_history_metrics(),
         }
+
+    def _training_sample_history_metrics(self):
+        """Return the selected replay mix in a compact persistent form."""
+        summary = getattr(self, '_last_training_sample_summary', None)
+        if not isinstance(summary, dict):
+            return None
+        integer_fields = {
+            'originalBatchCount': 'original_batches',
+            'selectedBatchCount': 'selected_batches',
+            'recentBatchCount': 'recent_batches',
+            'longBatchCount': 'long_batches',
+            'randomBatchCount': 'random_batches',
+            'originalItemCount': 'original_items',
+            'selectedItemCount': 'selected_items',
+            'selectedStateCount': 'selected_states',
+            'remainderItemCount': 'remainder_items',
+            'longSequenceMinSteps': 'long_min_steps',
+            'longEligibleItemCount': 'long_eligible_items',
+            'longReservedItemCount': 'long_reserved_items',
+            'longSelectedItemCount': 'long_selected_items',
+            'longSelectedStepMax': 'long_selected_step_max',
+        }
+        result = {
+            field: max(0,int(summary.get(source,0) or 0))
+            for field,source in integer_fields.items()
+        }
+        mean_steps = summary.get('long_selected_step_mean')
+        result['longSelectedStepMean'] = None if mean_steps is None else float(mean_steps)
+        return result
 
     @staticmethod
     def _search3_quality_value(quality, numerator_key, denominator_key):
@@ -2104,6 +2134,8 @@ class Rubiks_3_AI:
             f'recent_batches={summary["recent_batches"]} '
             f'long_batches={summary["long_batches"]} '
             f'long>={summary["long_min_steps"]}({summary["long_eligible_items"]}) '
+            f'long_selected={summary["long_selected_items"]} '
+            f'long_steps={summary["long_selected_step_mean"]}/{summary["long_selected_step_max"]} '
             f'random_batches={summary["random_batches"]} '
             f'kept_for_later={summary["remainder_items"]} '
             f'index={summary["selected_index_min"]}-{summary["selected_index_max"]}'
@@ -2305,6 +2337,7 @@ class Rubiks_3_AI:
 
         selected_batches = recent_batches + long_batches + random_batches
         selected_items = set(self._flatten_batches(selected_batches))
+        reserved_long_items = self._flatten_batches(long_batches)
         remainder_indices = [data_index for data_index in all_indices if data_index not in selected_items]
         self._last_training_sample_summary = self._training_sample_summary(
             original_batch_count = len(original_batches),
@@ -2312,6 +2345,7 @@ class Rubiks_3_AI:
             selected_batches = selected_batches,
             recent_batch_count = len(recent_batches),
             long_batch_count = len(long_batches),
+            reserved_long_items = reserved_long_items,
             random_batch_count = len(random_batches),
             long_min_steps = long_min_steps,
             long_eligible_item_count = len(long_order),
@@ -2340,9 +2374,17 @@ class Rubiks_3_AI:
             items += batch
         return items
 
-    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, long_batch_count, random_batch_count, long_min_steps, long_eligible_item_count, remainder_indices, data_source, state_count_fn):
+    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, long_batch_count, reserved_long_items, random_batch_count, long_min_steps, long_eligible_item_count, remainder_indices, data_source, state_count_fn):
         selected_items = self._flatten_batches(selected_batches)
         selected_states = sum(int(state_count_fn(data_source[data_index])) for data_index in selected_items)
+        if long_min_steps > 0:
+            selected_long_steps = [
+                self._replay_sequence_steps(data_source[data_index])
+                for data_index in selected_items
+                if self._replay_sequence_steps(data_source[data_index]) >= long_min_steps
+            ]
+        else:
+            selected_long_steps = []
         if selected_items:
             selected_index_min = min(selected_items)
             selected_index_max = max(selected_items)
@@ -2354,6 +2396,16 @@ class Rubiks_3_AI:
             'selected_batches': len(selected_batches),
             'recent_batches': recent_batch_count,
             'long_batches': long_batch_count,
+            'long_reserved_items': len(reserved_long_items),
+            'long_selected_items': len(selected_long_steps),
+            'long_selected_step_mean': (
+                None if len(selected_long_steps) == 0
+                else float(np.mean(selected_long_steps))
+            ),
+            'long_selected_step_max': (
+                None if len(selected_long_steps) == 0
+                else int(np.max(selected_long_steps))
+            ),
             'random_batches': random_batch_count,
             'long_min_steps': long_min_steps,
             'long_eligible_items': long_eligible_item_count,

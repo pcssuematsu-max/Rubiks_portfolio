@@ -33,9 +33,16 @@ class LongSequenceReplayTests(unittest.TestCase):
         self.assertEqual(summary['long_batches'], 2)
         self.assertEqual(summary['long_min_steps'], 20)
         self.assertEqual(summary['long_eligible_items'], 4)
+        self.assertEqual(summary['long_reserved_items'], 2)
+        self.assertGreaterEqual(summary['long_selected_items'], 2)
+        self.assertGreaterEqual(summary['long_selected_step_mean'], 20)
         self.assertGreaterEqual(sum(len(data[index].moves) >= 20 for index in selected), 2)
         self.assertEqual(set(selected) | set(remainder), set(range(len(data))))
         self.assertEqual(set(selected) & set(remainder), set())
+        self.assertEqual(
+            ai._training_sample_history_metrics()['longReservedItemCount'],
+            2,
+        )
 
     def test_missing_long_data_falls_back_to_random_batches(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)

@@ -19,6 +19,7 @@ class _FakeAI:
     update_scale_policy = 0.5
     update_scale_value = 2.0
     search2_value_loss_type = 'myloss2'
+    search3_rank_loss_mix = 0.05
     last_training_metrics = {
         'policyLoss': 0.12,
         'valueLoss': 0.34,
@@ -33,6 +34,23 @@ class _FakeAI:
         'updatesDuringSolve': 8,
         'trainingDataCount': 100,
         'retainedDataCount': 60,
+        'trainingSample': {
+            'originalBatchCount': 50,
+            'selectedBatchCount': 10,
+            'recentBatchCount': 5,
+            'longBatchCount': 3,
+            'randomBatchCount': 2,
+            'originalItemCount': 100,
+            'selectedItemCount': 20,
+            'selectedStateCount': 320,
+            'remainderItemCount': 80,
+            'longSequenceMinSteps': 20,
+            'longEligibleItemCount': 30,
+            'longReservedItemCount': 6,
+            'longSelectedItemCount': 7,
+            'longSelectedStepMean': 29.5,
+            'longSelectedStepMax': 48,
+        },
     }
 
 
@@ -57,6 +75,9 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['updatesDuringSolve'], 8)
             self.assertEqual(saved['learningRate']['base'], 0.001)
             self.assertEqual(saved['updateScales']['value'], 2.0)
+            self.assertEqual(saved['trainingSample']['longReservedItemCount'], 6)
+            self.assertEqual(saved['trainingSample']['longSelectedStepMean'], 29.5)
+            self.assertEqual(saved['search3RankLossMix'], 0.05)
 
     def test_writes_fixed_validation_metrics_when_available(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
