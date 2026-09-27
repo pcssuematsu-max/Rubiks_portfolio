@@ -2325,7 +2325,14 @@ class Rubiks_3_AI:
     def _replay_sequence_steps(data_item):
         """Return total remaining solution length when the sample records it."""
         fallback = len(getattr(data_item,'moves',()))
-        return max(fallback,int(getattr(data_item,'steps_to_goal',fallback) or 0))
+        recorded_steps = getattr(data_item,'steps_to_goal',fallback)
+        try:
+            return max(fallback,int(recorded_steps or 0))
+        except (TypeError,ValueError):
+            # Search2 records a per-state distance tuple under the same
+            # legacy name.  It is not a total remaining length, so preserve
+            # the previous local-move interpretation for that data.
+            return fallback
 
     def _flatten_batches(self, batches):
         items = []

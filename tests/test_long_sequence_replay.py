@@ -62,3 +62,8 @@ class LongSequenceReplayTests(unittest.TestCase):
         item = SimpleNamespace(moves = (0, 1), steps_to_goal = 42)
 
         self.assertEqual(Rubiks_3_AI._replay_sequence_steps(item), 42)
+
+    def test_replay_keeps_search2_distance_tuples_as_local_move_lengths(self):
+        item = SimpleNamespace(moves = (0, 1, 2), steps_to_goal = (3, 2, 1, 0))
+
+        self.assertEqual(Rubiks_3_AI._replay_sequence_steps(item), 3)
