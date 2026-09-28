@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,71 @@ from core.ai_discoveries import AiDiscoveryStore
 
 
 DISCOVERIES_FILE_NAME = "ai-discoveries.json"
+PUBLIC_EFFECT_COUNT_LIMIT = 5
+COMPACT_EFFECT_COUNT_LIMIT = 10
+COMPACT_MOVE_COUNT_LIMIT = 10
+FEATURED_EFFECT_COMPONENT_PATTERNS = frozenset(
+    tuple(sorted(parts))
+    for parts in (
+        ("C2", "CtrCore4", "ME2"),
+        ("C2", "CtrCore6", "ME2"),
+        ("C2", "CtrCore4"),
+        ("C2", "CtrCore6"),
+    )
+)
+
+
+def _effect_component_type(effect_part: str) -> str:
+    if effect_part.startswith("C2"):
+        return "C2"
+    if effect_part.startswith("CtrCore4"):
+        return "CtrCore4"
+    if effect_part.startswith("CtrCore6"):
+        return "CtrCore6"
+    if effect_part.startswith("ME2"):
+        return "ME2"
+    return effect_part
+
+
+def is_public_discovery(discovery: dict) -> bool:
+    """Match the static site's public AI Discovery selection rules."""
+    effect_count = discovery.get("effectCount")
+    moves = discovery.get("moves")
+    effect_class = discovery.get("effectClass")
+    if not isinstance(effect_count, int) or effect_count <= 0:
+        return False
+    if not isinstance(moves, list) or not moves:
+        return False
+    if not isinstance(effect_class, str) or not effect_class:
+        return False
+    if not all(isinstance(discovery.get(field), str) and discovery[field] for field in (
+        "effectName", "effectLabel",
+    )):
+        return False
+    if not isinstance(discovery.get("orientationCount"), int):
+        return False
+    featured_pattern = tuple(sorted(
+        _effect_component_type(part) for part in effect_class.split("+")
+    ))
+    return (
+        effect_count <= PUBLIC_EFFECT_COUNT_LIMIT
+        or (
+            effect_count <= COMPACT_EFFECT_COUNT_LIMIT
+            and len(moves) <= COMPACT_MOVE_COUNT_LIMIT
+        )
+        or featured_pattern in FEATURED_EFFECT_COMPONENT_PATTERNS
+    )
+
+
+def compact_public_payload(payload: dict) -> dict:
+    """Return only records the public Web viewer can actually display."""
+    compacted = dict(payload)
+    compacted["discoveries"] = [
+        discovery for discovery in payload["discoveries"]
+        if is_public_discovery(discovery)
+    ]
+    compacted["updatedAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return compacted
 
 
 def default_web_target() -> Path | None:
@@ -39,7 +105,7 @@ def publish_discoveries(source: Path, target: Path) -> int:
     if not target.parent.is_dir():
         raise ValueError(f"target directory does not exist: {target.parent}")
 
-    payload = AiDiscoveryStore(source)._read()
+    payload = compact_public_payload(AiDiscoveryStore(source)._read())
     content = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     with tempfile.NamedTemporaryFile(
         "w", encoding="utf-8", dir=target.parent, prefix=f".{target.name}.", delete=False
