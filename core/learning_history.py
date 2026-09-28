@@ -80,6 +80,7 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "valueSequenceCount": _safe_optional_int(metrics.get("valueSequenceCount")),
         "fixedValidation": _fixed_validation(metrics.get("fixedValidation")),
         "trainingSample": _training_sample(metrics.get("trainingSample")),
+        "gradientMetrics": _gradient_metrics(metrics.get("gradientMetrics")),
         "updatesDuringSolve": int(metrics.get("updatesDuringSolve", 0) or 0),
         "trainingDataCount": int(metrics.get("trainingDataCount", 0) or 0),
         "retainedDataCount": int(metrics.get("retainedDataCount", 0) or 0),
@@ -133,7 +134,7 @@ def _validate_record(record: Any) -> None:
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
-        "valueSequenceCount", "fixedValidation", "trainingSample", "search3RankLossMix",
+        "valueSequenceCount", "fixedValidation", "trainingSample", "gradientMetrics", "search3RankLossMix",
     }
     if not isinstance(record, dict) or not required.issubset(record) or set(record) - required - optional:
         raise ValueError("Invalid learning history record")
@@ -161,6 +162,7 @@ def _validate_record(record: Any) -> None:
         raise ValueError("Invalid learning history valueSequenceCount")
     _validate_fixed_validation(record.get("fixedValidation"))
     _validate_training_sample(record.get("trainingSample"))
+    _validate_gradient_metrics(record.get("gradientMetrics"))
     _validate_optional_number(record.get("search3RankLossMix"))
     _validate_optional_number(record["learningSeconds"])
     _validate_number_mapping(record["learningRate"], {"base", "lrC", "momentumV", "momentumH"})
@@ -213,6 +215,40 @@ _TRAINING_SAMPLE_INT_FIELDS = frozenset({
     "longSequenceMinSteps", "longEligibleItemCount", "longReservedItemCount",
     "longSelectedItemCount", "longSelectedStepMax",
 })
+
+
+_GRADIENT_METRIC_NUMBER_FIELDS = frozenset({
+    "globalL2Mean", "globalL2Max", "globalRmsMean",
+    "policyHeadL2Mean", "valueHeadL2Mean", "trunkL2Mean",
+    "policyGradientShareMean", "valueGradientShareMean",
+})
+
+
+def _gradient_metrics(value: Any) -> dict[str, Any] | None:
+    """Copy optional per-learning raw-gradient aggregates."""
+    if not isinstance(value, dict):
+        return None
+    update_count = _safe_optional_int(value.get("updateCount"))
+    if update_count is None:
+        return None
+    result = {"updateCount": update_count}
+    for key in _GRADIENT_METRIC_NUMBER_FIELDS:
+        number = _finite_number(value.get(key))
+        if number is None or number < 0.0:
+            return None
+        result[key] = number
+    for key in ("policyGradientShareMean", "valueGradientShareMean"):
+        if result[key] > 1.0:
+            return None
+    return result
+
+
+def _validate_gradient_metrics(value: Any) -> None:
+    if value is None:
+        return
+    expected = {"updateCount", *_GRADIENT_METRIC_NUMBER_FIELDS}
+    if not isinstance(value, dict) or set(value) != expected or _gradient_metrics(value) != value:
+        raise ValueError("Invalid learning history gradientMetrics")
 
 
 def _training_sample(value: Any) -> dict[str, Any] | None:

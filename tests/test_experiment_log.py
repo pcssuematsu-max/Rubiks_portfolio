@@ -188,6 +188,26 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertEqual(rows[0]['aiIndex'], '0')
             self.assertIn('learningRate', rows[0]['aiSettings'])
 
+    def test_summarizes_direct_success_in_setup_length_bands(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            store = ExperimentLogStore(
+                output_directory / 'runs.jsonl',
+                output_directory / 'runs.csv',
+            )
+            store.append(self._record('search3', 3, 1.0, True, False, setup_length = 12))
+            store.append(self._record('search3', 3, 1.0, False, True, setup_length = 12))
+            store.append(self._record('search3', 4, 1.0, False, True, setup_length = 28))
+
+            group = store.summarize()['groups'][0]
+            bands = {band['label']: band for band in group['setupLengthBands']}
+
+            self.assertEqual(bands['0-19']['classifiedRunCount'], 2)
+            self.assertEqual(bands['0-19']['directSearchSuccessCount'], 1)
+            self.assertEqual(bands['0-19']['directSearchSuccessRate'], 0.5)
+            self.assertEqual(bands['20-29']['directSearchSuccessRate'], 0.0)
+            self.assertEqual(bands['30-39']['runCount'], 0)
+
     def test_extends_a_legacy_csv_header_before_appending_settings(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             output_directory = Path(temporary_directory)
@@ -219,6 +239,7 @@ class ExperimentLogStoreTests(unittest.TestCase):
         fallback_used,
         ai_index = 0,
         ai_settings = None,
+        setup_length = 1,
     ):
         succeeded = search_succeeded or fallback_used
         return completed_experiment_record(
@@ -232,7 +253,7 @@ class ExperimentLogStoreTests(unittest.TestCase):
             search_succeeded = search_succeeded,
             fallback_used = fallback_used,
             elapsed_seconds = elapsed_seconds,
-            setup = ("R",),
+            setup = tuple("R" for _ in range(setup_length)),
             moves = tuple("R" for _ in range(move_count)),
             root_score = 0.1,
             best_score = 0.2,

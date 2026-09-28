@@ -292,6 +292,7 @@ class Frame(Tk.Frame):
                 train_recent_ratio = self._ai_original_train_recent_ratio(ai_index),
                 train_long_sequence_min_steps = self._ai_original_train_long_sequence_min_steps(ai_index),
                 train_long_sequence_ratio = self._ai_original_train_long_sequence_ratio(ai_index),
+                gradient_log_enabled = self._ai_gradient_log_enabled(ai_index),
                 search2_value_loss_type = self._ai_search2_value_loss_type(ai_index),
                 search2_value_loss_margin = self._ai_search2_value_loss_margin(ai_index),
                 search2_rank_loss_mix = self._ai_search2_rank_loss_mix(ai_index),
@@ -402,6 +403,12 @@ class Frame(Tk.Frame):
         if ratios is None:
             return None
         return float(ratios[ai_index])
+
+    def _ai_gradient_log_enabled(self, ai_index):
+        flags = getattr(self.config, 'gradient_log_enableds', None)
+        if flags is None:
+            return False
+        return bool(flags[ai_index])
 
     def _ai_w1_initializers(self, ai_index):
         initializers = getattr(self.config, 'w1_initializers', None)

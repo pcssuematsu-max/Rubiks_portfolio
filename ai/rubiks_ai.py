@@ -25,7 +25,7 @@ from ai.transformer_variance import transformer_parameter_target_variance
 
 
 class Rubiks_3_AI:
-    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
+    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
         if cube == None:
             self.cube = Rubiks_3(size = cube_size)
         else:
@@ -52,6 +52,10 @@ class Rubiks_3_AI:
         # defaults disable the feature for existing profiles.
         self.train_long_sequence_min_steps = max(0,int(train_long_sequence_min_steps or 0))
         self.train_long_sequence_ratio = float(train_long_sequence_ratio or 0.0)
+        # Keep only compact batch aggregates.  The full gradient tensors are
+        # deliberately never written to the learning history.
+        self.gradient_log_enabled = bool(gradient_log_enabled)
+        self._last_training_gradient_metrics = None
         self.torch_training_device = 'cpu' if self.use_transformer_attention else 'auto'
         self.activation = Activation
         self.ips = self.cube.ips
@@ -1990,7 +1994,31 @@ class Rubiks_3_AI:
             'trainingDataCount': max(0,int(original_len)),
             'retainedDataCount': max(0,int(retained_len)),
             'trainingSample': self._training_sample_history_metrics(),
+            'gradientMetrics': self._gradient_history_metrics(),
         }
+
+    def _gradient_history_metrics(self):
+        """Return compact raw-gradient aggregates for one learning pass."""
+        summary = getattr(self, '_last_training_gradient_metrics', None)
+        if not isinstance(summary, dict) or int(summary.get('update_count', 0)) <= 0:
+            return None
+        update_count = int(summary['update_count'])
+        mean_fields = {
+            'globalL2Mean': 'global_l2_sum',
+            'globalRmsMean': 'global_rms_sum',
+            'policyHeadL2Mean': 'policy_l2_sum',
+            'valueHeadL2Mean': 'value_l2_sum',
+            'trunkL2Mean': 'trunk_l2_sum',
+            'policyGradientShareMean': 'policy_share_sum',
+            'valueGradientShareMean': 'value_share_sum',
+        }
+        result = {
+            field: float(summary.get(source, 0.0)) / update_count
+            for field, source in mean_fields.items()
+        }
+        result['updateCount'] = update_count
+        result['globalL2Max'] = float(summary.get('global_l2_max', 0.0))
+        return result
 
     def _training_sample_history_metrics(self):
         """Return the selected replay mix in a compact persistent form."""
@@ -2081,6 +2109,7 @@ class Rubiks_3_AI:
 
         epoch_state['new_indices'] += remainder_indices
         self._last_training_search3_quality_metrics = epoch_state.get('search3_quality_metrics')
+        self._last_training_gradient_metrics = epoch_state.get('gradient_metrics')
         self._report_final_search2_value_debug(epoch_state)
         return (
             epoch_state['err'],
@@ -2434,7 +2463,105 @@ class Rubiks_3_AI:
             'last_batch_item_count': 0,
             'search2_value_loss_components': None,
             'search3_quality_metrics': None,
+            'gradient_metrics': self._new_gradient_metrics(),
         }
+
+    def _new_gradient_metrics(self):
+        """Create a lightweight collector, or disable it for this AI."""
+        if not getattr(self, 'gradient_log_enabled', False):
+            return None
+        return {
+            'update_count': 0,
+            'global_l2_sum': 0.0,
+            'global_l2_max': 0.0,
+            'global_rms_sum': 0.0,
+            'policy_l2_sum': 0.0,
+            'value_l2_sum': 0.0,
+            'trunk_l2_sum': 0.0,
+            'policy_share_sum': 0.0,
+            'value_share_sum': 0.0,
+        }
+
+    @staticmethod
+    def _gradient_group_for_key(key):
+        if key in {'WO_P', 'BO_P', 'WM_P', 'BM_P', 'BNgP', 'BNbP'} or key.endswith('P'):
+            return 'policy'
+        if key in {'WO_V', 'BO_V', 'WM_V', 'BM_V', 'BNgV', 'BNbV'} or key.endswith('V'):
+            return 'value'
+        return 'trunk'
+
+    def _record_gradient_arrays(self, epoch_state, gradients):
+        """Aggregate pre-optimizer gradients once per processed batch.
+
+        RMS is independent of model width, while L2 retains the absolute
+        update pressure.  Policy/value shares expose one head drowning out
+        the other without persisting parameter-level data.
+        """
+        collector = epoch_state.get('gradient_metrics')
+        if collector is None:
+            return
+        squared = {'policy': 0.0, 'value': 0.0, 'trunk': 0.0}
+        element_count = 0
+        for key, gradient in gradients.items():
+            if gradient is None or self._is_non_trainable_param(key):
+                continue
+            values = np.asarray(gradient)
+            if values.size == 0:
+                continue
+            finite = values[np.isfinite(values)]
+            if finite.size == 0:
+                continue
+            squared[self._gradient_group_for_key(key)] += float(np.sum(finite.astype('d') ** 2))
+            element_count += int(finite.size)
+        total_squared = sum(squared.values())
+        if element_count <= 0 or total_squared < 0.0:
+            return
+        total_l2 = math.sqrt(total_squared)
+        collector['update_count'] += 1
+        collector['global_l2_sum'] += total_l2
+        collector['global_l2_max'] = max(collector['global_l2_max'], total_l2)
+        collector['global_rms_sum'] += math.sqrt(total_squared / element_count)
+        collector['policy_l2_sum'] += math.sqrt(squared['policy'])
+        collector['value_l2_sum'] += math.sqrt(squared['value'])
+        collector['trunk_l2_sum'] += math.sqrt(squared['trunk'])
+        if total_squared > 0.0:
+            collector['policy_share_sum'] += squared['policy'] / total_squared
+            collector['value_share_sum'] += squared['value'] / total_squared
+
+    def _numpy_gradient_dict(self):
+        """Map NumPy backprop buffers to parameter names before updates."""
+        gradients = {
+            'WO_P': self.policy_layer.dW,
+            'BO_P': self.policy_layer.dB,
+            'WO_V': self.value_layer.dW,
+            'BO_V': self.value_layer.dB,
+            'WM_P': self.policy_mid.dW,
+            'BM_P': self.policy_mid.dB,
+            'WM_V': self.value_mid.dW,
+            'BM_V': self.value_mid.dB,
+        }
+        for key in self.affines:
+            gradients['W' + key[-1]] = self.layers[key].dW
+            gradients['B' + key[-1]] = self.layers[key].dB
+        for key in self.attentions:
+            suffix = key[3:]
+            layer = self.layers[key]
+            gradients['WQ' + suffix] = layer.dWQ
+            gradients['WK' + suffix] = layer.dWK
+            gradients['WV' + suffix] = layer.dWV
+        if self.Batch_Normalize:
+            gradients.update({
+                'BNgP': self.policy_BN.dg,
+                'BNbP': self.policy_BN.db,
+                'BNgV': self.value_BN.dg,
+                'BNbV': self.value_BN.db,
+            })
+            for key in self.BNs:
+                gradients['BNg' + key[-1]] = self.layers[key].dg
+                gradients['BNb' + key[-1]] = self.layers[key].db
+        for key, layer in self.activation_betas:
+            gradients[key] = layer.dbeta
+        return gradients
 
     def _iter_training_batches(self, batches):
         """学習対象 index を batch 単位で順に返す。"""
@@ -2471,6 +2598,7 @@ class Rubiks_3_AI:
         dO2 = self._backprop_value_search3()
         dO += dO2
         self._backprop_trunk(dO)
+        self._record_gradient_arrays(epoch_state, self._numpy_gradient_dict())
         self._update_output_momentum()
         self._update_affine_momentum()
         self._update_attention_momentum()
@@ -2495,6 +2623,7 @@ class Rubiks_3_AI:
         dO2 = self._backprop_value()
         dO += dO2
         self._backprop_trunk(dO)
+        self._record_gradient_arrays(epoch_state, self._numpy_gradient_dict())
         self._update_output_momentum()
         self._update_affine_momentum()
         self._update_attention_momentum()
@@ -2539,6 +2668,7 @@ class Rubiks_3_AI:
         epoch_state = self._update_training_maxima(L0,L1,batch_indices,epoch_state)
         epoch_state['last_batch_item_count'] = len(d_lis)
         self._accumulate_search2_value_loss_components(epoch_state,self._last_search2_value_loss_components,len(d_lis))
+        self._record_gradient_arrays(epoch_state, grad_by_key)
         self._apply_torch_grad_updates(grad_by_key)
         del grad_by_key
         self.clear_training_cache(collect = False)
@@ -2576,6 +2706,7 @@ class Rubiks_3_AI:
         if debug_out is not None and debug_inputs is not None:
             self._last_search3_debug_summary = self._build_search3_debug_summary(debug_out, debug_inputs)
         self._maybe_report_search3_value_debug(epoch_state,L1)
+        self._record_gradient_arrays(epoch_state, grad_by_key)
         self._apply_torch_grad_updates(grad_by_key)
         del debug_inputs, debug_out, grad_by_key
         self.clear_training_cache(collect = False)

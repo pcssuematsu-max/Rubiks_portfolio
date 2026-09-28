@@ -105,11 +105,16 @@ class LearnManager:
             return
         policy_loss = record['policyLoss']
         value_loss = record['valueLoss']
+        gradients = record.get('gradientMetrics')
+        gradient_text = '' if gradients is None else (
+            f" gradRMS={gradients['globalRmsMean']:.4g}"
+            f" P/V={gradients['policyGradientShareMean']:.0%}/{gradients['valueGradientShareMean']:.0%}"
+        )
         self.frame.append_log(
             f"学習履歴: AI {index} {record['searchMode']} "
             f"P={policy_loss if policy_loss is not None else '-'} "
             f"V={value_loss if value_loss is not None else '-'} "
-            f"updates={record['updatesDuringSolve']} を保存しました。"
+            f"updates={record['updatesDuringSolve']}{gradient_text} を保存しました。"
         )
 
     def run_learning(self, index, ai):

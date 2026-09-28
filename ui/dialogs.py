@@ -586,6 +586,7 @@ class ExperimentSummaryDialog(Tk.Toplevel):
                     f"直接手数={self._format_numbers(group['directSolutionMoves'])} / "
                     f"時間={self._format_numbers(group['elapsedSeconds'])}"
                 )
+                lines.append(f"  設定手数別: {self._setup_length_bands_text(group)}")
                 lines.append(f"  設定: {self._settings_text(group.get('aiSettings', {}))}")
         self._set_text('\n'.join(lines))
 
@@ -653,6 +654,21 @@ class ExperimentSummaryDialog(Tk.Toplevel):
             f"S3rank={settings.get('search3RankLossMix', '--')}"
         )
 
+    @classmethod
+    def _setup_length_bands_text(cls, group):
+        """Format direct success by initial setup length for a fair comparison."""
+        parts = []
+        for band in group.get('setupLengthBands', ()):
+            count = band.get('classifiedRunCount', 0)
+            if count == 0:
+                continue
+            parts.append(
+                f"{band.get('label', '?')}手="
+                f"{band.get('directSearchSuccessCount', 0)}/{count}"
+                f"({cls._format_rate(band.get('directSearchSuccessRate'))})"
+            )
+        return '  '.join(parts) if parts else 'データなし'
+
     @staticmethod
     def _format_summary(summary):
         total = summary['totalRuns']
@@ -714,14 +730,15 @@ class LearningHistoryDialog(Tk.Toplevel):
     """Show online losses alongside fixed held-out checkpoint quality."""
 
     CHART_WIDTH = 760
-    CHART_HEIGHT = 440
+    CHART_HEIGHT = 540
     CHART_HISTORY_LIMIT = 60
     RECENT_SOLVE_LIMIT = 100
     READING_GUIDE = (
         '見る順  ① 実力: 直接探索成功率が上がる  '
         '② Policy: CE/state が下がる  '
         '③ Value: BCE/state・MAE が下がり、Δpred が Δtarget に近づく  '
-        '④ 固定検証: P@1/P@3・Value順位相関が上がる\n'
+        '④ 勾配: RMSが発散せず、Policy/Value比が急変しない  '
+        '⑤ 固定検証: P@1/P@3・Value順位相関が上がる\n'
         '注意  P / V sample は系列が長いほど増えるため、良し悪しの判断には使わない。'
     )
 
@@ -730,7 +747,7 @@ class LearningHistoryDialog(Tk.Toplevel):
         self.frame = frame
         self.font = ('Century Gothic', 11, 'bold')
         self.title('学習履歴')
-        self.geometry('820x920')
+        self.geometry('820x1020')
         self.ai_var = Tk.StringVar(value = 'AI 0')
         self._build_widgets()
 
@@ -805,6 +822,7 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"updates={latest['updatesDuringSolve']}  data={latest['trainingDataCount']}→{latest['retainedDataCount']}\n"
                 f"Search3 quality: {self._search3_quality_text(latest)}\n"
                 f"学習抽出: {self._training_sample_text(latest)}\n"
+                f"勾配: {self._gradient_metrics_text(latest)}\n"
                 f"固定検証: {self._fixed_validation_text(latest)}\n"
                 f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
                 f"update scale={self._number(update_scales['shared'])}/"
@@ -825,6 +843,8 @@ class LearningHistoryDialog(Tk.Toplevel):
                 lines.append(f"  Search3 quality: {self._search3_quality_text(record)}")
             if record.get('trainingSample') is not None:
                 lines.append(f"  学習抽出: {self._training_sample_text(record)}")
+            if record.get('gradientMetrics') is not None:
+                lines.append(f"  勾配: {self._gradient_metrics_text(record)}")
             if record.get('fixedValidation') is not None:
                 lines.append(f"  固定検証: {self._fixed_validation_text(record)}")
                 lines.append(f"    Value分布: {self._fixed_validation_calibration_text(record)}")
@@ -879,6 +899,9 @@ class LearningHistoryDialog(Tk.Toplevel):
         fixed_top3 = [self._fixed_validation_value(record, 'policyTop3Accuracy', fixture_id) for record in visible]
         fixed_correlation = [self._fixed_validation_value(record, 'valueRankCorrelation', fixture_id) for record in visible]
         fixed_mae = [self._fixed_validation_value(record, 'valueMae', fixture_id) for record in visible]
+        gradient_rms = [self._gradient_metric_value(record, 'globalRmsMean') for record in visible]
+        gradient_policy_share = [self._gradient_metric_value(record, 'policyGradientShareMean') for record in visible]
+        gradient_value_share = [self._gradient_metric_value(record, 'valueGradientShareMean') for record in visible]
         self.chart.create_text(8, 8, text = '学習loss  policy=orange  value/sample=cyan（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
         if not visible or not any(item is not None for item in policy + value):
             self.chart.create_text(width // 2, height // 2, text = 'loss data がまだありません', fill = '#A0A0A0', tags = 'trend')
@@ -913,15 +936,31 @@ class LearningHistoryDialog(Tk.Toplevel):
             )
         else:
             self.chart.create_text(width // 2, 250, text = 'Search3 quality は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
-        fixture_label = fixture_id or '未記録'
-        self.chart.create_text(8, 338, text = f'固定検証（{fixture_label}、学習に使わない同一局面）  P@1=orange  P@3=yellow  Value順位相関=green  Search3 MAE=magenta', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
-        if any(item is not None for item in fixed_top1 + fixed_top3 + fixed_correlation + fixed_mae):
-            self._draw_loss_series(fixed_top1, '#E68A00', 25, width - 12, 368, 418)
-            self._draw_loss_series(fixed_top3, '#E6D200', 25, width - 12, 368, 418)
-            self._draw_loss_series(fixed_correlation, '#78C850', 25, width - 12, 368, 418)
-            self._draw_loss_series(fixed_mae, '#DE5CE6', 25, width - 12, 368, 418)
+        self.chart.create_text(8, 338, text = '勾配（学習batchごとの平均、生の勾配）  RMS=cyan  Policy比=orange  Value比=magenta（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if any(item is not None for item in gradient_rms + gradient_policy_share + gradient_value_share):
+            self._draw_loss_series(gradient_rms, '#49C7D4', 25, width - 12, 368, 418)
+            self._draw_loss_series(gradient_policy_share, '#E68A00', 25, width - 12, 368, 418)
+            self._draw_loss_series(gradient_value_share, '#DE5CE6', 25, width - 12, 368, 418)
             self.chart.create_text(
                 8, 430,
+                text = (
+                    f'RMS {self._series_range(gradient_rms)}  '
+                    f'Policy比 {self._series_range(gradient_policy_share)}  '
+                    f'Value比 {self._series_range(gradient_value_share)}'
+                ),
+                fill = '#A0A0A0', anchor = 'sw', font = ('Menlo', 9), tags = 'trend',
+            )
+        else:
+            self.chart.create_text(width // 2, 390, text = '勾配は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
+        fixture_label = fixture_id or '未記録'
+        self.chart.create_text(8, 448, text = f'固定検証（{fixture_label}、学習に使わない同一局面）  P@1=orange  P@3=yellow  Value順位相関=green  Search3 MAE=magenta', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if any(item is not None for item in fixed_top1 + fixed_top3 + fixed_correlation + fixed_mae):
+            self._draw_loss_series(fixed_top1, '#E68A00', 25, width - 12, 478, 528)
+            self._draw_loss_series(fixed_top3, '#E6D200', 25, width - 12, 478, 528)
+            self._draw_loss_series(fixed_correlation, '#78C850', 25, width - 12, 478, 528)
+            self._draw_loss_series(fixed_mae, '#DE5CE6', 25, width - 12, 478, 528)
+            self.chart.create_text(
+                8, 538,
                 text = (
                     f'P@1 {self._series_range(fixed_top1)}  P@3 {self._series_range(fixed_top3)}  '
                     f'Value順位相関 {self._series_range(fixed_correlation)}  '
@@ -930,7 +969,7 @@ class LearningHistoryDialog(Tk.Toplevel):
                 fill = '#A0A0A0', anchor = 'sw', font = ('Menlo', 9), tags = 'trend',
             )
         else:
-            self.chart.create_text(width // 2, 390, text = '固定検証は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
+            self.chart.create_text(width // 2, 500, text = '固定検証は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
 
     def _draw_loss_series(self, values, color, x0, x1, y0, y1):
         numeric = [float(value) for value in values if value is not None]
@@ -994,6 +1033,21 @@ class LearningHistoryDialog(Tk.Toplevel):
             + f"{sample.get('longSelectedStepMax', '--')}"
         )
 
+    def _gradient_metrics_text(self, record):
+        metrics = record.get('gradientMetrics')
+        if not metrics:
+            return '（未記録）'
+        return (
+            f"RMS={self._number(metrics.get('globalRmsMean'))}  "
+            f"L2 mean/max={self._number(metrics.get('globalL2Mean'))}/"
+            f"{self._number(metrics.get('globalL2Max'))}  "
+            f"P/V/trunk={self._number(metrics.get('policyHeadL2Mean'))}/"
+            f"{self._number(metrics.get('valueHeadL2Mean'))}/"
+            f"{self._number(metrics.get('trunkL2Mean'))}  "
+            f"P比={self._rate(metrics.get('policyGradientShareMean'))}  "
+            f"V比={self._rate(metrics.get('valueGradientShareMean'))}"
+        )
+
     def _fixed_validation_text(self, record):
         validation = record.get('fixedValidation')
         if not validation:
@@ -1014,21 +1068,19 @@ class LearningHistoryDialog(Tk.Toplevel):
         )
 
     def _fixed_validation_length_text(self, validation):
-        """Show hard held-out trajectories separately when v2 data exists."""
+        """Show every held-out trajectory length separately when v2 exists."""
         by_length = validation.get('byLength')
         if not isinstance(by_length, dict) or len(by_length) == 0:
             return ''
-        long_lengths = sorted((int(length) for length in by_length if int(length) >= 48))
-        if len(long_lengths) == 0:
-            return ''
+        lengths = sorted(int(length) for length in by_length)
         parts = []
-        for length in long_lengths:
+        for length in lengths:
             metrics = by_length[str(length)]
             parts.append(
                 f"{length}手:P@1={self._rate(metrics.get('policyTop1Accuracy'))}"
                 f"/Value順位={self._number(metrics.get('valueRankCorrelation'))}"
             )
-        return '  長手数[' + '  '.join(parts) + ']'
+        return '  手数別[' + '  '.join(parts) + ']'
 
     def _fixed_validation_calibration_text(self, record):
         validation = record.get('fixedValidation') or {}
@@ -1055,6 +1107,11 @@ class LearningHistoryDialog(Tk.Toplevel):
         if not validation or (fixture_id is not None and validation.get('fixtureId') != fixture_id):
             return None
         return validation.get(key)
+
+    @staticmethod
+    def _gradient_metric_value(record, key):
+        metrics = record.get('gradientMetrics') or {}
+        return metrics.get(key)
 
     @staticmethod
     def _number(value):

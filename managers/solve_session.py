@@ -1393,6 +1393,7 @@ class SolveSessionManager:
                 'rampDepth': getattr(ai, 'search3_C_depth_ramp_depth', 0),
             },
             'search3RankLossMix': getattr(ai, 'search3_rank_loss_mix', None),
+            'gradientLogging': bool(getattr(ai, 'gradient_log_enabled', False)),
             'torchPredict': getattr(ai, 'use_torch_predict', None),
             'torchTraining': getattr(ai, 'use_torch_training', None),
         }

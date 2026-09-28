@@ -13,6 +13,13 @@ from typing import Any
 
 
 EXPERIMENT_LOG_SCHEMA_VERSION = 4
+SETUP_LENGTH_BANDS = (
+    (0, 19, "0-19"),
+    (20, 29, "20-29"),
+    (30, 39, "30-39"),
+    (40, 49, "40-49"),
+    (50, None, "50+"),
+)
 EXPERIMENT_LOG_FILE_NAME = "ai-experiments.jsonl"
 EXPERIMENT_CSV_FILE_NAME = "ai-experiments.csv"
 EXPERIMENT_SUMMARY_FILE_NAME = "ai-experiment-summary.json"
@@ -416,6 +423,7 @@ def _normalize_experiment_record(payload: Any, line_number: int) -> dict[str, An
         "fallbackUsed": _safe_bool(fallback_used),
         "outcome": str(outcome),
         "elapsedSeconds": _safe_float(payload["elapsedSeconds"]),
+        "setupMoveCount": _safe_int(payload.get("setupMoveCount", len(payload.get("setup", [])))),
         "moveCount": _safe_int(payload["moveCount"]),
         "score": _safe_float(payload.get("score")),
         "directSearch": _normalize_json_object(
@@ -472,6 +480,9 @@ def _summarize_group(
         "elapsedSeconds": _number_summary(elapsed),
         "directSolutionMoves": _number_summary(direct_moves),
         "completedSolutionMoves": _number_summary(completed_moves),
+        # Keep direct-search success stratified by the initial setup length.
+        # A changed scramble mix must not look like a model improvement.
+        "setupLengthBands": _setup_length_bands(rows),
         "interestingDiscoveries": [
             {
                 "timestamp": row["timestamp"],
@@ -490,6 +501,35 @@ def _summarize_group(
         summary["aiIndex"] = ai_index
         summary["aiSettings"] = ai_settings or {}
     return summary
+
+
+def _setup_length_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Summarize direct-search quality without mixing setup difficulty."""
+    result = []
+    for minimum, maximum, label in SETUP_LENGTH_BANDS:
+        band_rows = [
+            row for row in rows
+            if row.get("setupMoveCount") is not None
+            and int(row["setupMoveCount"]) >= minimum
+            and (maximum is None or int(row["setupMoveCount"]) <= maximum)
+        ]
+        classified = [row for row in band_rows if row["outcome"] != "legacy_unknown"]
+        direct = [row for row in band_rows if row["outcome"] == "search_success"]
+        fallback = [
+            row for row in band_rows
+            if row["outcome"] in ("greedy_fallback_success", "greedy_fallback_failed")
+        ]
+        result.append({
+            "label": label,
+            "minimum": minimum,
+            "maximum": maximum,
+            "runCount": len(band_rows),
+            "classifiedRunCount": len(classified),
+            "directSearchSuccessCount": len(direct),
+            "directSearchSuccessRate": _rate(len(direct), len(classified)),
+            "fallbackCount": len(fallback),
+        })
+    return result
 
 
 def _number_summary(values: list[float | int]) -> dict[str, float | int | None]:

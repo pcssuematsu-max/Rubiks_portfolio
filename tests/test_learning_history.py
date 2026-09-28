@@ -143,6 +143,57 @@ class LearningHistoryTests(unittest.TestCase):
         self.assertEqual(ai.last_training_metrics['retainedDataCount'], 18)
         self.assertIsNone(ai.last_training_metrics['valueBcePerState'])
 
+    def test_gradient_metrics_are_compacted_and_persisted(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai._last_training_gradient_metrics = {
+            'update_count': 2,
+            'global_l2_sum': 10.0,
+            'global_l2_max': 7.0,
+            'global_rms_sum': 0.4,
+            'policy_l2_sum': 3.0,
+            'value_l2_sum': 5.0,
+            'trunk_l2_sum': 8.0,
+            'policy_share_sum': 0.3,
+            'value_share_sum': 0.5,
+        }
+        metrics = ai._gradient_history_metrics()
+
+        self.assertEqual(metrics['updateCount'], 2)
+        self.assertEqual(metrics['globalL2Mean'], 5.0)
+        self.assertEqual(metrics['globalL2Max'], 7.0)
+        self.assertEqual(metrics['globalRmsMean'], 0.2)
+        self.assertEqual(metrics['policyGradientShareMean'], 0.15)
+        self.assertEqual(metrics['valueGradientShareMean'], 0.25)
+
+        fake_ai = _FakeAI()
+        fake_ai.last_training_metrics = dict(fake_ai.last_training_metrics)
+        fake_ai.last_training_metrics['gradientMetrics'] = metrics
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'learning.json'
+            LearningHistoryStore(path).append(completed_learning_record(3, fake_ai, 1.0))
+            saved = LearningHistoryStore(path).records()[0]
+        self.assertEqual(saved['gradientMetrics'], metrics)
+
+    def test_gradient_collector_separates_policy_value_and_trunk(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.gradient_log_enabled = True
+        epoch_state = {'gradient_metrics': ai._new_gradient_metrics()}
+        ai._record_gradient_arrays(epoch_state, {
+            'WO_P': np.array([3.0, 4.0]),
+            'WO_V': np.array([12.0]),
+            'W1': np.array([5.0]),
+        })
+        ai._last_training_gradient_metrics = epoch_state['gradient_metrics']
+        metrics = ai._gradient_history_metrics()
+
+        self.assertAlmostEqual(metrics['globalL2Mean'], 13.928388, places = 5)
+        self.assertAlmostEqual(metrics['globalRmsMean'], 6.964194, places = 5)
+        self.assertEqual(metrics['policyHeadL2Mean'], 5.0)
+        self.assertEqual(metrics['valueHeadL2Mean'], 12.0)
+        self.assertEqual(metrics['trunkL2Mean'], 5.0)
+        self.assertAlmostEqual(metrics['policyGradientShareMean'], 25.0 / 194.0)
+        self.assertAlmostEqual(metrics['valueGradientShareMean'], 144.0 / 194.0)
+
     def test_search3_quality_metrics_are_weighted_by_state_and_keep_sequence_deltas(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         metrics = ai._search3_quality_metrics(
