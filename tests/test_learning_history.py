@@ -50,6 +50,7 @@ class _FakeAI:
             'longSelectedItemCount': 7,
             'longSelectedStepMean': 29.5,
             'longSelectedStepMax': 48,
+            'longReplayRatio': 0.25,
         },
     }
 
@@ -77,6 +78,7 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['updateScales']['value'], 2.0)
             self.assertEqual(saved['trainingSample']['longReservedItemCount'], 6)
             self.assertEqual(saved['trainingSample']['longSelectedStepMean'], 29.5)
+            self.assertEqual(saved['trainingSample']['longReplayRatio'], 0.25)
             self.assertEqual(saved['search3RankLossMix'], 0.05)
 
     def test_writes_fixed_validation_metrics_when_available(self):

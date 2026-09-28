@@ -216,6 +216,8 @@ _TRAINING_SAMPLE_INT_FIELDS = frozenset({
     "longSelectedItemCount", "longSelectedStepMax",
 })
 
+_TRAINING_SAMPLE_NUMBER_FIELDS = frozenset({"longReplayRatio"})
+
 
 _GRADIENT_METRIC_NUMBER_FIELDS = frozenset({
     "globalL2Mean", "globalL2Max", "globalRmsMean",
@@ -262,14 +264,22 @@ def _training_sample(value: Any) -> dict[str, Any] | None:
             return None
         result[key] = number
     result["longSelectedStepMean"] = _finite_number(value.get("longSelectedStepMean"))
+    # The replay ratio was added after the first sampled-replay histories.
+    # Preserve those existing local records while including it going forward.
+    if "longReplayRatio" in value:
+        ratio = _finite_number(value.get("longReplayRatio"))
+        if ratio is None or not 0.0 <= ratio <= 1.0:
+            return None
+        result["longReplayRatio"] = ratio
     return result
 
 
 def _validate_training_sample(value: Any) -> None:
     if value is None:
         return
-    expected = set(_TRAINING_SAMPLE_INT_FIELDS) | {"longSelectedStepMean"}
-    if not isinstance(value, dict) or set(value) != expected:
+    required = set(_TRAINING_SAMPLE_INT_FIELDS) | {"longSelectedStepMean"}
+    allowed = required | set(_TRAINING_SAMPLE_NUMBER_FIELDS)
+    if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
         raise ValueError("Invalid learning history trainingSample")
     if _training_sample(value) != value:
         raise ValueError("Invalid learning history trainingSample")

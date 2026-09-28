@@ -2047,6 +2047,10 @@ class Rubiks_3_AI:
         }
         mean_steps = summary.get('long_selected_step_mean')
         result['longSelectedStepMean'] = None if mean_steps is None else float(mean_steps)
+        result['longReplayRatio'] = min(
+            1.0,
+            max(0.0, float(getattr(self, 'train_long_sequence_ratio', 0.0))),
+        )
         return result
 
     @staticmethod

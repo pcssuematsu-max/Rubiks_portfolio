@@ -208,6 +208,46 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertEqual(bands['20-29']['directSearchSuccessRate'], 0.0)
             self.assertEqual(bands['30-39']['runCount'], 0)
 
+    def test_summarizes_search3_outcomes_by_observed_playout_depth(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            store = ExperimentLogStore(
+                output_directory / 'runs.jsonl',
+                output_directory / 'runs.csv',
+            )
+            store.append(self._record(
+                'search3', 3, 1.0, True, False,
+                direct_search = {'finalAttempt': {
+                    'playoutDepthMedian': 4.0,
+                    'playoutDepthMean': 4.5,
+                    'treeNodeCount': 120,
+                    'selectionCMean': 2.5,
+                }},
+            ))
+            store.append(self._record(
+                'search3', 3, 1.0, False, True,
+                direct_search = {'finalAttempt': {
+                    'playoutDepthMedian': 4.0,
+                    'playoutDepthMean': 5.0,
+                    'treeNodeCount': 180,
+                    'selectionCMean': 3.0,
+                }},
+            ))
+
+            group = store.summarize()['groups'][0]
+            bands = {band['label']: band for band in group['search3DepthBands']}
+            medium = bands['3-5']
+
+            self.assertEqual(medium['runCount'], 2)
+            self.assertEqual(medium['directSearchSuccessRate'], 0.5)
+            self.assertEqual(medium['averageNodeCount'], 150.0)
+            self.assertEqual(medium['averageSelectionC'], 2.75)
+            self.assertEqual(medium['averagePlayoutDepth'], 4.75)
+            self.assertEqual(
+                store.recent_ai_search3_depth_bands(0)[1]['averageNodeCount'],
+                150.0,
+            )
+
     def test_extends_a_legacy_csv_header_before_appending_settings(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             output_directory = Path(temporary_directory)
@@ -240,6 +280,7 @@ class ExperimentLogStoreTests(unittest.TestCase):
         ai_index = 0,
         ai_settings = None,
         setup_length = 1,
+        direct_search = None,
     ):
         succeeded = search_succeeded or fallback_used
         return completed_experiment_record(
@@ -259,4 +300,5 @@ class ExperimentLogStoreTests(unittest.TestCase):
             best_score = 0.2,
             end_reason = "solved" if succeeded else "budget",
             ai_settings = ai_settings,
+            direct_search = direct_search,
         )

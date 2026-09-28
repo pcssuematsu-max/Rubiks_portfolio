@@ -20,6 +20,13 @@ SETUP_LENGTH_BANDS = (
     (40, 49, "40-49"),
     (50, None, "50+"),
 )
+SEARCH3_PLAYOUT_DEPTH_BANDS = (
+    (0, 2, "0-2"),
+    (3, 5, "3-5"),
+    (6, 9, "6-9"),
+    (10, 19, "10-19"),
+    (20, None, "20+"),
+)
 EXPERIMENT_LOG_FILE_NAME = "ai-experiments.jsonl"
 EXPERIMENT_CSV_FILE_NAME = "ai-experiments.csv"
 EXPERIMENT_SUMMARY_FILE_NAME = "ai-experiment-summary.json"
@@ -249,6 +256,22 @@ class ExperimentLogStore:
             "directSearchSuccessRate": _rate(len(direct),len(classified)),
             "fallbackCount": len(fallback),
         }
+
+    def recent_ai_search3_depth_bands(
+        self,
+        ai_index: int,
+        *,
+        puzzle: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Return recent Search3 outcomes binned by observed playout depth."""
+        rows = [
+            row for row in self._read_records("jsonl")
+            if row["aiIndex"] == int(ai_index)
+            and row["searchMode"] in ("search3", "transformer")
+            and (puzzle is None or row["puzzle"] == puzzle)
+        ]
+        return _search3_depth_bands(rows[-max(1, int(limit)):])
 
     def export_summary(self, path: Path | None = None, source = "jsonl") -> Path:
         """Write compact JSON and CSV summaries ready for Web or spreadsheet use."""
@@ -483,6 +506,7 @@ def _summarize_group(
         # Keep direct-search success stratified by the initial setup length.
         # A changed scramble mix must not look like a model improvement.
         "setupLengthBands": _setup_length_bands(rows),
+        "search3DepthBands": _search3_depth_bands(rows),
         "interestingDiscoveries": [
             {
                 "timestamp": row["timestamp"],
@@ -530,6 +554,50 @@ def _setup_length_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "fallbackCount": len(fallback),
         })
     return result
+
+
+def _search3_depth_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Aggregate Search3 attempts by the reached playout-depth band."""
+    diagnostic_rows = []
+    for row in rows:
+        if row.get("searchMode") not in ("search3", "transformer"):
+            continue
+        attempt = row.get("directSearch", {}).get("finalAttempt", {})
+        depth = _safe_float(attempt.get("playoutDepthMedian"))
+        if depth is not None:
+            diagnostic_rows.append((row, attempt, depth))
+
+    result = []
+    for minimum, maximum, label in SEARCH3_PLAYOUT_DEPTH_BANDS:
+        band_rows = [
+            item for item in diagnostic_rows
+            if item[2] >= minimum and (maximum is None or item[2] <= maximum)
+        ]
+        classified = [item for item in band_rows if item[0]["outcome"] != "legacy_unknown"]
+        direct = [item for item in band_rows if item[0]["outcome"] == "search_success"]
+        node_counts = [_safe_float(item[1].get("treeNodeCount")) for item in band_rows]
+        coefficients = [_safe_float(item[1].get("selectionCMean")) for item in band_rows]
+        mean_depths = [_safe_float(item[1].get("playoutDepthMean")) for item in band_rows]
+        result.append({
+            "label": label,
+            "minimum": minimum,
+            "maximum": maximum,
+            "runCount": len(band_rows),
+            "classifiedRunCount": len(classified),
+            "directSearchSuccessCount": len(direct),
+            "directSearchSuccessRate": _rate(len(direct), len(classified)),
+            "averageNodeCount": _mean_number(node_counts),
+            "averageSelectionC": _mean_number(coefficients),
+            "averagePlayoutDepth": _mean_number(mean_depths),
+        })
+    return result
+
+
+def _mean_number(values: list[float | None]) -> float | None:
+    numeric = [value for value in values if value is not None]
+    if not numeric:
+        return None
+    return round(float(sum(numeric) / len(numeric)), 6)
 
 
 def _number_summary(values: list[float | int]) -> dict[str, float | int | None]:

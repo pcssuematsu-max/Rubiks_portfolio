@@ -731,8 +731,10 @@ class LearningHistoryDialog(Tk.Toplevel):
 
     CHART_WIDTH = 760
     CHART_HEIGHT = 540
+    DEPTH_CHART_HEIGHT = 180
     CHART_HISTORY_LIMIT = 60
     RECENT_SOLVE_LIMIT = 100
+    RECENT_SEARCH_DEPTH_LIMIT = 200
     READING_GUIDE = (
         '見る順  ① 実力: 直接探索成功率が上がる  '
         '② Policy: CE/state が下がる  '
@@ -747,7 +749,7 @@ class LearningHistoryDialog(Tk.Toplevel):
         self.frame = frame
         self.font = ('Century Gothic', 11, 'bold')
         self.title('学習履歴')
-        self.geometry('820x1020')
+        self.geometry('820x1100')
         self.ai_var = Tk.StringVar(value = 'AI 0')
         self._build_widgets()
 
@@ -788,7 +790,15 @@ class LearningHistoryDialog(Tk.Toplevel):
             highlightthickness = 0,
         )
         self.chart.pack(fill = 'x', padx = 8)
-        self.details = ScrolledText(self, height = 11, wrap = Tk.WORD, font = ('Menlo', 10))
+        self.depth_chart = Tk.Canvas(
+            self,
+            width = self.CHART_WIDTH,
+            height = self.DEPTH_CHART_HEIGHT,
+            bg = '#202020',
+            highlightthickness = 0,
+        )
+        self.depth_chart.pack(fill = 'x', padx = 8, pady = (6, 0))
+        self.details = ScrolledText(self, height = 7, wrap = Tk.WORD, font = ('Menlo', 10))
         self.details.pack(fill = 'both', expand = True, padx = 8, pady = 8)
         self.details.configure(state = Tk.DISABLED)
 
@@ -798,14 +808,17 @@ class LearningHistoryDialog(Tk.Toplevel):
         except (OSError, ValueError) as error:
             self.summary_label.configure(text = '学習履歴を読めませんでした。')
             self._draw_chart([])
+            self._draw_search3_depth_chart([])
             self._set_details(str(error))
             return
         ai_index = int(self.ai_var.get().replace('AI ', ''))
         selected = [record for record in records if record['aiIndex'] == ai_index]
+        depth_bands = self._recent_search3_depth_bands(ai_index, selected)
         self._draw_chart(selected)
-        self._show_records(ai_index, selected)
+        self._draw_search3_depth_chart(depth_bands)
+        self._show_records(ai_index, selected, depth_bands)
 
-    def _show_records(self, ai_index, records):
+    def _show_records(self, ai_index, records, depth_bands):
         if not records:
             self.summary_label.configure(text = f'AI {ai_index}: まだ保存済みの学習履歴はありません。')
             self._set_details('学習を実行すると、loss・更新回数・学習率・Search方式がここへ蓄積されます。')
@@ -824,6 +837,7 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"学習抽出: {self._training_sample_text(latest)}\n"
                 f"勾配: {self._gradient_metrics_text(latest)}\n"
                 f"固定検証: {self._fixed_validation_text(latest)}\n"
+                f"Search3 深さ別: {self._search3_depth_summary_text(depth_bands)}\n"
                 f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
                 f"update scale={self._number(update_scales['shared'])}/"
                 f"{self._number(update_scales['policy'])}/{self._number(update_scales['value'])}  "
@@ -854,7 +868,25 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"scale={self._number(scales['shared'])}/{self._number(scales['policy'])}/{self._number(scales['value'])} "
                 f"S3rank={self._number(record.get('search3RankLossMix'))}"
             )
+        if depth_bands:
+            lines += ['', 'Search3 深さ別（直近の探索ログ、深さ帯は playout 深さ中央値）']
+            lines += [f'  {self._search3_depth_band_text(band)}' for band in depth_bands if band.get('runCount', 0)]
         self._set_details('\n'.join(lines))
+
+    def _recent_search3_depth_bands(self, ai_index, records):
+        if not records or records[-1].get('searchMode') not in ('search3', 'transformer'):
+            return []
+        puzzle_type = getattr(self.frame, 'puzzle_type', '')
+        cube_size = getattr(self.frame, 'cube_size', None)
+        puzzle = None if cube_size is None else f'{puzzle_type}-{cube_size}x{cube_size}'
+        try:
+            return ExperimentLogStore().recent_ai_search3_depth_bands(
+                ai_index,
+                puzzle = puzzle,
+                limit = self.RECENT_SEARCH_DEPTH_LIMIT,
+            )
+        except (OSError, ValueError):
+            return []
 
     def _recent_direct_search_result(self, ai_index, latest):
         """Format the current AI's direct-search outcome without mixing puzzles."""
@@ -898,7 +930,9 @@ class LearningHistoryDialog(Tk.Toplevel):
         fixed_top1 = [self._fixed_validation_value(record, 'policyTop1Accuracy', fixture_id) for record in visible]
         fixed_top3 = [self._fixed_validation_value(record, 'policyTop3Accuracy', fixture_id) for record in visible]
         fixed_correlation = [self._fixed_validation_value(record, 'valueRankCorrelation', fixture_id) for record in visible]
-        fixed_mae = [self._fixed_validation_value(record, 'valueMae', fixture_id) for record in visible]
+        fixed_long_top1 = [self._fixed_validation_length_value(record, '60', 'policyTop1Accuracy', fixture_id) for record in visible]
+        fixed_long_correlation = [self._fixed_validation_length_value(record, '60', 'valueRankCorrelation', fixture_id) for record in visible]
+        long_replay_share = [self._long_replay_share(record) for record in visible]
         gradient_rms = [self._gradient_metric_value(record, 'globalRmsMean') for record in visible]
         gradient_policy_share = [self._gradient_metric_value(record, 'policyGradientShareMean') for record in visible]
         gradient_value_share = [self._gradient_metric_value(record, 'valueGradientShareMean') for record in visible]
@@ -953,25 +987,66 @@ class LearningHistoryDialog(Tk.Toplevel):
         else:
             self.chart.create_text(width // 2, 390, text = '勾配は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
         fixture_label = fixture_id or '未記録'
-        self.chart.create_text(8, 448, text = f'固定検証（{fixture_label}、学習に使わない同一局面）  P@1=orange  P@3=yellow  Value順位相関=green  Search3 MAE=magenta', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
-        if any(item is not None for item in fixed_top1 + fixed_top3 + fixed_correlation + fixed_mae):
+        self.chart.create_text(8, 448, text = f'固定検証・長手数 replay（{fixture_label}）  全体P@1=orange  60手P@1=yellow  全体Value順位=green  60手順位=magenta  長手数採用比=cyan', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if any(item is not None for item in fixed_top1 + fixed_long_top1 + fixed_correlation + fixed_long_correlation + long_replay_share):
             self._draw_loss_series(fixed_top1, '#E68A00', 25, width - 12, 478, 528)
-            self._draw_loss_series(fixed_top3, '#E6D200', 25, width - 12, 478, 528)
+            self._draw_loss_series(fixed_long_top1, '#E6D200', 25, width - 12, 478, 528)
             self._draw_loss_series(fixed_correlation, '#78C850', 25, width - 12, 478, 528)
-            self._draw_loss_series(fixed_mae, '#DE5CE6', 25, width - 12, 478, 528)
+            self._draw_loss_series(fixed_long_correlation, '#DE5CE6', 25, width - 12, 478, 528)
+            self._draw_loss_series(long_replay_share, '#49C7D4', 25, width - 12, 478, 528)
             self.chart.create_text(
                 8, 538,
                 text = (
-                    f'P@1 {self._series_range(fixed_top1)}  P@3 {self._series_range(fixed_top3)}  '
-                    f'Value順位相関 {self._series_range(fixed_correlation)}  '
-                    f'S3 MAE {self._series_range(fixed_mae)}'
+                    f'全体P@1 {self._series_range(fixed_top1)}  60手P@1 {self._series_range(fixed_long_top1)}  '
+                    f'全体順位 {self._series_range(fixed_correlation)}  60手順位 {self._series_range(fixed_long_correlation)}  '
+                    f'長手数採用比 {self._series_range(long_replay_share)}'
                 ),
                 fill = '#A0A0A0', anchor = 'sw', font = ('Menlo', 9), tags = 'trend',
             )
         else:
             self.chart.create_text(width // 2, 500, text = '固定検証は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
 
-    def _draw_loss_series(self, values, color, x0, x1, y0, y1):
+    def _draw_search3_depth_chart(self, bands):
+        """Draw observed Search3 depth/outcome trade-offs for the selected AI."""
+        chart = self.depth_chart
+        width = self.CHART_WIDTH
+        height = self.DEPTH_CHART_HEIGHT
+        chart.delete('depth')
+        chart.create_rectangle(0, 0, width, height, fill = '#202020', outline = '', tags = 'depth')
+        active = [band for band in bands if band.get('runCount', 0) > 0]
+        chart.create_text(
+            8, 8,
+            text = 'Search3 深さ別（直近200探索、帯は playout 深さ中央値）  直接成功率=orange  平均ノード数=cyan  実効C=magenta（各系列は個別スケール）',
+            fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 9), tags = 'depth',
+        )
+        if not active:
+            chart.create_text(width // 2, height // 2, text = 'Search3 深さ診断は次の探索から表示されます', fill = '#A0A0A0', tags = 'depth')
+            return
+        success = [band.get('directSearchSuccessRate') for band in active]
+        nodes = [band.get('averageNodeCount') for band in active]
+        coefficients = [band.get('averageSelectionC') for band in active]
+        self._draw_loss_series(success, '#E68A00', 25, width - 12, 36, 130, canvas = chart, tag = 'depth')
+        self._draw_loss_series(nodes, '#49C7D4', 25, width - 12, 36, 130, canvas = chart, tag = 'depth')
+        self._draw_loss_series(coefficients, '#DE5CE6', 25, width - 12, 36, 130, canvas = chart, tag = 'depth')
+        chart.create_text(
+            8, 138,
+            text = (
+                f'成功率 {self._series_range(success)}  ノード数 {self._series_range(nodes)}  '
+                f'C {self._series_range(coefficients)}'
+            ),
+            fill = '#A0A0A0', anchor = 'nw', font = ('Menlo', 9), tags = 'depth',
+        )
+        count = max(1, len(active) - 1)
+        for index, band in enumerate(active):
+            x = 25 + (width - 37) * index / count
+            chart.create_text(
+                x, 168,
+                text = f"d{band.get('label', '?')}\nn={band.get('runCount', 0)}",
+                fill = '#D8D8D8', anchor = 's', font = ('Menlo', 8), tags = 'depth',
+            )
+
+    def _draw_loss_series(self, values, color, x0, x1, y0, y1, canvas = None, tag = 'trend'):
+        canvas = self.chart if canvas is None else canvas
         numeric = [float(value) for value in values if value is not None]
         if not numeric:
             return
@@ -988,7 +1063,7 @@ class LearningHistoryDialog(Tk.Toplevel):
             ratio = 0.5 if span == 0 else (float(item) - minimum) / span
             y = y1 - (y1 - y0) * ratio
             if previous is not None:
-                self.chart.create_line(*previous, x, y, fill = color, width = 2, tags = 'trend')
+                canvas.create_line(*previous, x, y, fill = color, width = 2, tags = tag)
             previous = (x, y)
     @staticmethod
     def _series_range(values):
@@ -1029,9 +1104,19 @@ class LearningHistoryDialog(Tk.Toplevel):
             + f"  長手数≥{minimum}: eligible={sample.get('longEligibleItemCount', '--')}"
             + f" reserved={sample.get('longReservedItemCount', '--')}"
             + f" selected={sample.get('longSelectedItemCount', '--')}"
+            + f" ratio={self._rate(sample.get('longReplayRatio'))}"
             + f" mean/max={self._number(sample.get('longSelectedStepMean'))}/"
             + f"{sample.get('longSelectedStepMax', '--')}"
         )
+
+    @staticmethod
+    def _long_replay_share(record):
+        sample = record.get('trainingSample') or {}
+        selected = sample.get('selectedItemCount')
+        long_selected = sample.get('longSelectedItemCount')
+        if not isinstance(selected, (int, float)) or not isinstance(long_selected, (int, float)) or selected <= 0:
+            return None
+        return float(long_selected) / float(selected)
 
     def _gradient_metrics_text(self, record):
         metrics = record.get('gradientMetrics')
@@ -1092,6 +1177,22 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"Pearson={self._number(validation.get('valuePearsonCorrelation'))}"
         )
 
+    def _search3_depth_summary_text(self, bands):
+        active = [band for band in bands if band.get('runCount', 0) > 0]
+        if not active:
+            return '（未記録）'
+        return '  '.join(self._search3_depth_band_text(band) for band in active)
+
+    def _search3_depth_band_text(self, band):
+        return (
+            f"d{band.get('label', '?')}: direct="
+            f"{band.get('directSearchSuccessCount', 0)}/{band.get('classifiedRunCount', 0)}"
+            f"({self._rate(band.get('directSearchSuccessRate'))}) "
+            f"nodes={self._number(band.get('averageNodeCount'))} "
+            f"C={self._number(band.get('averageSelectionC'))} "
+            f"depthMean={self._number(band.get('averagePlayoutDepth'))}"
+        )
+
     @staticmethod
     def _latest_fixed_validation_fixture_id(records):
         for record in reversed(records):
@@ -1107,6 +1208,15 @@ class LearningHistoryDialog(Tk.Toplevel):
         if not validation or (fixture_id is not None and validation.get('fixtureId') != fixture_id):
             return None
         return validation.get(key)
+
+    @staticmethod
+    def _fixed_validation_length_value(record, length, key, fixture_id = None):
+        validation = record.get('fixedValidation') or {}
+        if fixture_id is not None and validation.get('fixtureId') != fixture_id:
+            return None
+        by_length = validation.get('byLength') or {}
+        metrics = by_length.get(str(length))
+        return None if not isinstance(metrics, dict) else metrics.get(key)
 
     @staticmethod
     def _gradient_metric_value(record, key):
