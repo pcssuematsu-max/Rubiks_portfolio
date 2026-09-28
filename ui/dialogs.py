@@ -637,6 +637,7 @@ class ExperimentSummaryDialog(Tk.Toplevel):
         search2 = settings.get('search2', {})
         scales = settings.get('updateScales', {})
         depth_schedule = settings.get('search3DepthSchedule', {})
+        budget = settings.get('search3Budget', {})
         ramp_depth = depth_schedule.get('rampDepth', 0) if isinstance(depth_schedule, dict) else 0
         if ramp_depth:
             search3_text = (
@@ -645,13 +646,19 @@ class ExperimentSummaryDialog(Tk.Toplevel):
             )
         else:
             search3_text = f"S3C={settings.get('search3C', '--')}"
+        if isinstance(budget, dict):
+            stages = budget.get('stagePlayouts', [])
+            stages_text = '/'.join(str(value) for value in stages) if stages else '--'
+            budget_text = f" S3budget={budget.get('mode', '--')}({stages_text})"
+        else:
+            budget_text = ''
         return (
             f"model={settings.get('model', '--')} lr={settings.get('learningRate', '--')} "
             f"wd={settings.get('weightDecayRate', '--')} "
             f"scale={scales.get('shared', '--')}/{scales.get('policy', '--')}/{scales.get('value', '--')} "
             f"S2 frontier={search2.get('maxFrontier', '--')} batch={search2.get('batchSize', '--')} "
             f"loss={search2.get('valueLossType', '--')} {search3_text} "
-            f"S3rank={settings.get('search3RankLossMix', '--')}"
+            f"S3rank={settings.get('search3RankLossMix', '--')}{budget_text}"
         )
 
     @classmethod

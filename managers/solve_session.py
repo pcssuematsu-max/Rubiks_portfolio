@@ -439,8 +439,14 @@ class SolveSessionManager:
                 'playoutCount': stats[1],
                 'visitedRootChildCount': self._nonzero_count(policy_target),
                 'treeNodeCount': self._optional_len(getattr(getattr(AI, 'search3_engine', None), 'node_cache', None)),
+                'predictionCacheCount': self._optional_len(getattr(getattr(AI, 'search3_engine', None), 'prediction_cache', None)),
             })
             attempt.update(self._search3_depth_diagnostics(search_result))
+            budget_playouts = attempt.get('budgetConsumedPlayoutCount')
+            if budget_playouts is not None:
+                # A fixed Search3 result contains only its final 1,000-playout
+                # stage in ``stats``; use the summary to log the full call.
+                attempt['playoutCount'] = budget_playouts
         self.frame.solve_state.direct_search_attempts.append(attempt)
 
     @classmethod
@@ -463,6 +469,36 @@ class SolveSessionManager:
                 value = cls._optional_float(value)
             if value is not None:
                 result[key] = value
+        budget = diagnostics.get('budgetSummary')
+        if isinstance(budget, dict):
+            mode = budget.get('mode')
+            stop_reason = budget.get('stopReason')
+            if mode is not None:
+                result['budgetMode'] = str(mode)
+            if stop_reason is not None:
+                result['budgetStopReason'] = str(stop_reason)
+            for source_key, target_key in (
+                ('stageCount', 'budgetStageCount'),
+                ('requestedPlayoutCount', 'budgetRequestedPlayoutCount'),
+                ('consumedPlayoutCount', 'budgetConsumedPlayoutCount'),
+            ):
+                value = cls._optional_int(budget.get(source_key))
+                if value is not None:
+                    result[target_key] = value
+            stages = budget.get('stages')
+            if isinstance(stages, list):
+                result['budgetStages'] = [
+                    {
+                        key: value
+                        for key, value in stage.items()
+                        if key in (
+                            'stageIndex', 'playoutLimit', 'consumedPlayoutCount',
+                            'rootVisitShare', 'bestImprovement',
+                            'playoutDepthMean', 'decision',
+                        )
+                    }
+                    for stage in stages if isinstance(stage, dict)
+                ]
         return result
 
     @staticmethod
@@ -532,7 +568,7 @@ class SolveSessionManager:
             values = [attempt[key] for attempt in attempts if attempt.get(key) is not None]
             if values:
                 totals[key] = sum(values)
-        for key in ('frontierPeak', 'maxRootChildVisits', 'visitedRootChildCount', 'treeNodeCount'):
+        for key in ('frontierPeak', 'maxRootChildVisits', 'visitedRootChildCount', 'treeNodeCount', 'predictionCacheCount'):
             values = [attempt[key] for attempt in attempts if attempt.get(key) is not None]
             if values:
                 totals[key] = max(values)
@@ -1391,6 +1427,15 @@ class SolveSessionManager:
             'search3DepthSchedule': {
                 'maxC': getattr(ai, 'search3_C_depth_max', getattr(ai, 'search3_C', None)),
                 'rampDepth': getattr(ai, 'search3_C_depth_ramp_depth', 0),
+            },
+            'search3Budget': {
+                'mode': getattr(ai, 'search3_budget_mode', 'fixed'),
+                'stagePlayouts': list(getattr(ai, 'search3_budget_stage_playouts', ())),
+                'confidenceVisitShare': getattr(ai, 'search3_budget_confidence_visit_share', None),
+                'minImprovement': getattr(ai, 'search3_budget_min_improvement', None),
+                'minPlayoutDepth': getattr(ai, 'search3_budget_min_playout_depth', None),
+                'maxNodeCache': getattr(ai, 'search3_max_node_cache', None),
+                'maxPredictionCache': getattr(ai, 'search3_max_prediction_cache', None),
             },
             'search3RankLossMix': getattr(ai, 'search3_rank_loss_mix', None),
             'gradientLogging': bool(getattr(ai, 'gradient_log_enabled', False)),

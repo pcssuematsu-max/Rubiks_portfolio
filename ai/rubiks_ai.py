@@ -265,6 +265,14 @@ class Rubiks_3_AI:
         self.release_search_memory_each_step = False
         self.search_num3 = 1000
         self.search_repeat3 = 10
+        # ``fixed`` preserves the legacy 1,000 x 10 allocation.  The
+        # progressive mode probes first, advances only on a confident root
+        # move, then spends the remaining budget on unresolved positions.
+        self.search3_budget_mode = 'fixed'
+        self.search3_budget_stage_playouts = (1000,3000,6000)
+        self.search3_budget_confidence_visit_share = 0.70
+        self.search3_budget_min_improvement = 0.05
+        self.search3_budget_min_playout_depth = 3.0
         self.search_batch3 = 40
         self.search_depth3 = 200
         self.search3_C = 0.05
@@ -3213,6 +3221,15 @@ class Rubiks_3_AI:
             raise ValueError(self.search_mode)
 
     def _search3_with_repeats(self, progress_callback = None):
+        if self._search3_budget_mode() == 'progressive':
+            return self._search3_with_progressive_budget(progress_callback = progress_callback)
+        return self._search3_with_fixed_budget(progress_callback = progress_callback)
+
+    def _search3_budget_mode(self):
+        mode = str(getattr(self,'search3_budget_mode','fixed')).strip().lower()
+        return 'progressive' if mode in ('progressive','adaptive','staged') else 'fixed'
+
+    def _search3_with_fixed_budget(self, progress_callback = None):
         last_result = None
         attempt_results = []
         for attempt_index in range(self.search_repeat3):
@@ -3222,11 +3239,201 @@ class Rubiks_3_AI:
             if progress_callback is not None:
                 progress_callback(last_result)
             if last_result.end_reason == 'solved':
-                last_result.attempt_results = attempt_results
-                return last_result
+                return self._finalize_search3_budget_result(
+                    last_result,
+                    attempt_results,
+                    mode = 'fixed',
+                    stop_reason = 'solved',
+                )
         if last_result is not None:
-            last_result.attempt_results = attempt_results
+            return self._finalize_search3_budget_result(
+                last_result,
+                attempt_results,
+                mode = 'fixed',
+                stop_reason = 'budget_exhausted',
+            )
         return last_result
+
+    def _search3_with_progressive_budget(self, progress_callback = None):
+        """Use a cheap confidence probe before escalating Search3 budget.
+
+        A confident non-terminal root move is returned as ``improvement`` so
+        SolveSession applies just that move and continues Search3 from the
+        retained child root.  An unresolved, unpromising root is handed to
+        the existing greedy fallback instead of consuming the final tier.
+        """
+        stage_playouts = self._search3_progressive_stage_playouts()
+        attempt_results = []
+        stage_records = []
+        last_result = None
+        for stage_index, playout_limit in enumerate(stage_playouts, 1):
+            last_result = self.search3(playout_limit)
+            last_result.attempt_index = stage_index
+            attempt_results.append(last_result)
+            stage_record = self._search3_budget_stage_record(
+                last_result,
+                stage_index,
+                playout_limit,
+            )
+            stage_records.append(stage_record)
+            if last_result.end_reason == 'solved':
+                stage_record['decision'] = 'solved'
+                if progress_callback is not None:
+                    progress_callback(last_result)
+                return self._finalize_search3_budget_result(
+                    last_result,
+                    attempt_results,
+                    mode = 'progressive',
+                    stop_reason = 'solved',
+                    stage_records = stage_records,
+                )
+
+            if self._search3_confident_root_move(last_result):
+                stage_record['decision'] = 'advance_confident'
+                self._mark_search3_progress_result(last_result)
+                if progress_callback is not None:
+                    progress_callback(last_result)
+                return self._finalize_search3_budget_result(
+                    last_result,
+                    attempt_results,
+                    mode = 'progressive',
+                    stop_reason = 'advance_confident',
+                    stage_records = stage_records,
+                )
+
+            is_final_stage = stage_index == len(stage_playouts)
+            if is_final_stage:
+                stage_record['decision'] = 'budget_exhausted'
+                if progress_callback is not None:
+                    progress_callback(last_result)
+                return self._finalize_search3_budget_result(
+                    last_result,
+                    attempt_results,
+                    mode = 'progressive',
+                    stop_reason = 'budget_exhausted',
+                    stage_records = stage_records,
+                )
+
+            # The middle tier is always reached after an inconclusive probe.
+            # The final tier is reserved for a branch that is both deepening
+            # and improving according to the current evaluator.
+            if stage_index == 1 or self._search3_promising_branch(last_result):
+                stage_record['decision'] = 'escalate'
+                if progress_callback is not None:
+                    progress_callback(last_result)
+                continue
+
+            stage_record['decision'] = 'fallback_unpromising'
+            if progress_callback is not None:
+                progress_callback(last_result)
+            return self._finalize_search3_budget_result(
+                last_result,
+                attempt_results,
+                mode = 'progressive',
+                stop_reason = 'fallback_unpromising',
+                stage_records = stage_records,
+            )
+        return last_result
+
+    def _search3_progressive_stage_playouts(self):
+        values = getattr(self,'search3_budget_stage_playouts',(1000,3000,6000))
+        try:
+            stages = tuple(max(1,int(value)) for value in values)
+        except TypeError:
+            stages = ()
+        if len(stages) >= 3:
+            return stages[:3]
+        total = max(1,int(getattr(self,'search_num3',1000))) * max(1,int(getattr(self,'search_repeat3',10)))
+        probe = max(1,total // 10)
+        middle = max(1,total * 3 // 10)
+        return (probe,middle,max(1,total - probe - middle))
+
+    def _search3_root_visit_share(self, result):
+        try:
+            max_visits = float(result.stats[0])
+            playouts = float(result.stats[1])
+        except (IndexError,TypeError,ValueError):
+            return 0.0
+        return max(0.0,min(1.0,max_visits / playouts)) if playouts > 0 else 0.0
+
+    @staticmethod
+    def _search3_best_improvement(result):
+        try:
+            return float(result.best_value) - float(result.root_value)
+        except (TypeError,ValueError):
+            return 0.0
+
+    def _search3_confident_root_move(self, result):
+        return (
+            len(getattr(result,'moves',())) > 0
+            and self._search3_root_visit_share(result) >= float(
+                getattr(self,'search3_budget_confidence_visit_share',0.70)
+            )
+            and self._search3_best_improvement(result) >= float(
+                getattr(self,'search3_budget_min_improvement',0.05)
+            )
+        )
+
+    def _search3_promising_branch(self, result):
+        diagnostics = getattr(result,'search_diagnostics',{}) or {}
+        depth = float(diagnostics.get('playoutDepthMean',0.0) or 0.0)
+        return (
+            depth >= float(getattr(self,'search3_budget_min_playout_depth',3.0))
+            and self._search3_best_improvement(result) >= float(
+                getattr(self,'search3_budget_min_improvement',0.05)
+            )
+        )
+
+    @staticmethod
+    def _mark_search3_progress_result(result):
+        """Return one verified root move, then let the outer loop re-search."""
+        if len(result.moves) == 0:
+            return
+        result.moves = tuple(result.moves[:1])
+        result.value_trace = list(result.value_trace[:2])
+        result.value_trace_raw = list(result.value_trace_raw[:2])
+        if len(result.value_trace) > 1:
+            result.best_value = result.value_trace[-1]
+        if len(result.value_trace_raw) > 1:
+            result.best_value_raw = result.value_trace_raw[-1]
+        result.end_reason = 'improvement'
+
+    def _search3_budget_stage_record(self, result, stage_index, playout_limit):
+        diagnostics = getattr(result,'search_diagnostics',{}) or {}
+        return {
+            'stageIndex': int(stage_index),
+            'playoutLimit': int(playout_limit),
+            'consumedPlayoutCount': max(0,int(result.stats[1])) if len(result.stats) > 1 else 0,
+            'rootVisitShare': self._search3_root_visit_share(result),
+            'bestImprovement': self._search3_best_improvement(result),
+            'playoutDepthMean': diagnostics.get('playoutDepthMean'),
+            'decision': 'pending',
+        }
+
+    def _finalize_search3_budget_result(self, result, attempt_results, mode, stop_reason, stage_records = None):
+        result.attempt_results = attempt_results
+        diagnostics = dict(getattr(result,'search_diagnostics',{}) or {})
+        if stage_records is None:
+            stage_records = [
+                self._search3_budget_stage_record(
+                    attempt,
+                    index,
+                    max(1,int(attempt.stats[1])) if len(attempt.stats) > 1 else self.search_num3,
+                )
+                for index,attempt in enumerate(attempt_results,1)
+            ]
+        consumed = sum(record['consumedPlayoutCount'] for record in stage_records)
+        requested = sum(record['playoutLimit'] for record in stage_records)
+        diagnostics['budgetSummary'] = {
+            'mode': mode,
+            'stopReason': stop_reason,
+            'stageCount': len(stage_records),
+            'requestedPlayoutCount': requested,
+            'consumedPlayoutCount': consumed,
+            'stages': stage_records if mode == 'progressive' else [],
+        }
+        result.search_diagnostics = diagnostics
+        return result
 
     def _predict_search2(self, X):
         if not self._can_use_torch_predict(loss = False, retain_cache = False):

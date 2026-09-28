@@ -152,6 +152,13 @@ class Frame(Tk.Frame):
             search3_cs = config.search3_cs,
             search3_c_depth_maxes = config.search3_c_depth_maxes,
             search3_c_depth_ramp_depths = config.search3_c_depth_ramp_depths,
+            search3_budget_modes = config.search3_budget_modes,
+            search3_budget_stage_playouts = config.search3_budget_stage_playouts,
+            search3_budget_confidence_visit_shares = config.search3_budget_confidence_visit_shares,
+            search3_budget_min_improvements = config.search3_budget_min_improvements,
+            search3_budget_min_playout_depths = config.search3_budget_min_playout_depths,
+            search3_max_node_caches = config.search3_max_node_caches,
+            search3_max_prediction_caches = config.search3_max_prediction_caches,
             search2_max_frontiers = config.search2_max_frontiers,
             search2_torch_batch_sizes = config.search2_torch_batch_sizes,
             search2_value_loss_types = config.search2_value_loss_types,
@@ -506,6 +513,13 @@ class Frame(Tk.Frame):
                                    search3_cs = None,
                                    search3_c_depth_maxes = None,
                                    search3_c_depth_ramp_depths = None,
+                                   search3_budget_modes = None,
+                                   search3_budget_stage_playouts = None,
+                                   search3_budget_confidence_visit_shares = None,
+                                   search3_budget_min_improvements = None,
+                                   search3_budget_min_playout_depths = None,
+                                   search3_max_node_caches = None,
+                                   search3_max_prediction_caches = None,
                                    search2_max_frontiers = None,
                                    search2_torch_batch_sizes = None,
                                    search2_value_loss_types = None,
@@ -560,6 +574,28 @@ class Frame(Tk.Frame):
                 self.AIs[i].search3_C_depth_ramp_depth = max(0,int(search3_c_depth_ramp_depths[i]))
             else:
                 self.AIs[i].search3_C_depth_ramp_depth = 0
+            if search3_budget_modes is not None:
+                self.AIs[i].search3_budget_mode = str(search3_budget_modes[i])
+            if search3_budget_stage_playouts is not None:
+                self.AIs[i].search3_budget_stage_playouts = tuple(
+                    max(1,int(value)) for value in search3_budget_stage_playouts[i]
+                )
+            if search3_budget_confidence_visit_shares is not None:
+                self.AIs[i].search3_budget_confidence_visit_share = min(
+                    1.0,max(0.0,float(search3_budget_confidence_visit_shares[i]))
+                )
+            if search3_budget_min_improvements is not None:
+                self.AIs[i].search3_budget_min_improvement = float(search3_budget_min_improvements[i])
+            if search3_budget_min_playout_depths is not None:
+                self.AIs[i].search3_budget_min_playout_depth = max(
+                    0.0,float(search3_budget_min_playout_depths[i])
+                )
+            if search3_max_node_caches is not None:
+                self.AIs[i].search3_max_node_cache = max(0,int(search3_max_node_caches[i]))
+            if search3_max_prediction_caches is not None:
+                self.AIs[i].search3_max_prediction_cache = max(
+                    0,int(search3_max_prediction_caches[i])
+                )
             if search2_max_frontiers is not None:
                 self.AIs[i].search2_max_frontier = int(search2_max_frontiers[i])
             if search2_torch_batch_sizes is not None:

@@ -35,7 +35,10 @@ class DirectSearchDiagnosticsTests(unittest.TestCase):
     def test_search3_diagnostics_aggregate_playouts_and_reset_per_solve(self):
         ai = SimpleNamespace(
             search_mode='search3',
-            search3_engine=SimpleNamespace(node_cache={'a': object(), 'b': object()}),
+            search3_engine=SimpleNamespace(
+                node_cache={'a': object(), 'b': object()},
+                prediction_cache={'a': object()},
+            ),
         )
         first = SearchResult(
             False, ('R',), 0.2, [0.2, 0.3], 0.3, np.array([2, 40]),
@@ -59,6 +62,7 @@ class DirectSearchDiagnosticsTests(unittest.TestCase):
         self.assertEqual(summary['totals']['playoutCount'], 90)
         self.assertEqual(summary['totals']['maxRootChildVisits'], 3)
         self.assertEqual(summary['finalAttempt']['treeNodeCount'], 2)
+        self.assertEqual(summary['finalAttempt']['predictionCacheCount'], 1)
         self.assertEqual(summary['finalAttempt']['playoutDepthMedian'], 17.5)
         self.assertEqual(summary['finalAttempt']['selectionCMean'], 2.8)
 
@@ -71,3 +75,25 @@ class DirectSearchDiagnosticsTests(unittest.TestCase):
         )
 
         self.assertEqual(settings['search3RankLossMix'], 0.05)
+
+    def test_search3_budget_summary_uses_all_stages_for_playout_totals(self):
+        ai = SimpleNamespace(search_mode='search3', search3_engine=SimpleNamespace(node_cache={}))
+        result = SearchResult(
+            False, ('R',), 0.2, [0.2, 0.3], 0.3, np.array([40, 600]),
+            search_mode='search3', end_reason='budget',
+            search_diagnostics={'budgetSummary': {
+                'mode': 'progressive',
+                'stopReason': 'budget_exhausted',
+                'stageCount': 3,
+                'requestedPlayoutCount': 1000,
+                'consumedPlayoutCount': 1000,
+                'stages': [{'stageIndex': 3, 'decision': 'budget_exhausted'}],
+            }},
+        )
+
+        self.manager._record_direct_search_attempt(ai, result, 0.1)
+        final = self.manager._direct_search_summary()['finalAttempt']
+
+        self.assertEqual(final['playoutCount'], 1000)
+        self.assertEqual(final['budgetMode'], 'progressive')
+        self.assertEqual(final['budgetStopReason'], 'budget_exhausted')

@@ -766,6 +766,8 @@ def _normalize_ai_settings(value: Any) -> dict[str, Any]:
     for key, item in value.items():
         if isinstance(item, dict):
             normalized[str(key)] = _normalize_ai_settings(item)
+        elif isinstance(item, (list, tuple)):
+            normalized[str(key)] = [_json_scalar(child) for child in item]
         elif isinstance(item, (str, int, float, bool)) or item is None:
             normalized[str(key)] = _json_scalar(item)
     return normalized

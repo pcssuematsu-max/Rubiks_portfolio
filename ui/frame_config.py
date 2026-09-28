@@ -58,6 +58,13 @@ class FrameConfig:
     search3_cs: Optional[Sequence[float]] = None
     search3_c_depth_maxes: Optional[Sequence[float]] = None
     search3_c_depth_ramp_depths: Optional[Sequence[int]] = None
+    search3_budget_modes: Optional[Sequence[str]] = None
+    search3_budget_stage_playouts: Optional[Sequence[Sequence[int]]] = None
+    search3_budget_confidence_visit_shares: Optional[Sequence[float]] = None
+    search3_budget_min_improvements: Optional[Sequence[float]] = None
+    search3_budget_min_playout_depths: Optional[Sequence[float]] = None
+    search3_max_node_caches: Optional[Sequence[int]] = None
+    search3_max_prediction_caches: Optional[Sequence[int]] = None
     search2_max_frontiers: Optional[Sequence[int]] = None
     search2_torch_batch_sizes: Optional[Sequence[int]] = None
     search2_value_loss_types: Optional[Sequence[str]] = None
@@ -114,6 +121,13 @@ class FrameConfig:
         self._validate_ai_sequence_length('search3_cs', self.search3_cs, ai_count)
         self._validate_ai_sequence_length('search3_c_depth_maxes', self.search3_c_depth_maxes, ai_count)
         self._validate_ai_sequence_length('search3_c_depth_ramp_depths', self.search3_c_depth_ramp_depths, ai_count)
+        self._validate_ai_sequence_length('search3_budget_modes', self.search3_budget_modes, ai_count)
+        self._validate_ai_sequence_length('search3_budget_stage_playouts', self.search3_budget_stage_playouts, ai_count)
+        self._validate_ai_sequence_length('search3_budget_confidence_visit_shares', self.search3_budget_confidence_visit_shares, ai_count)
+        self._validate_ai_sequence_length('search3_budget_min_improvements', self.search3_budget_min_improvements, ai_count)
+        self._validate_ai_sequence_length('search3_budget_min_playout_depths', self.search3_budget_min_playout_depths, ai_count)
+        self._validate_ai_sequence_length('search3_max_node_caches', self.search3_max_node_caches, ai_count)
+        self._validate_ai_sequence_length('search3_max_prediction_caches', self.search3_max_prediction_caches, ai_count)
         self._validate_ai_sequence_length('search2_max_frontiers', self.search2_max_frontiers, ai_count)
         self._validate_ai_sequence_length('search2_torch_batch_sizes', self.search2_torch_batch_sizes, ai_count)
         self._validate_ai_sequence_length('search2_value_loss_types', self.search2_value_loss_types, ai_count)

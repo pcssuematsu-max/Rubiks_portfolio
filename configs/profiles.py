@@ -247,6 +247,8 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 ("2R ","2D'","2R2"),
                 (" U "," B2"," U'"),
                 (" R2"," F ","2R2"," F'"," R2"),
+                (" R2"," F ","2R'"," F'"," R2"),
+                (" R2"," F ","2R "," F'"," R2"),
             ],
             [
             ],
@@ -326,6 +328,21 @@ def build_experiment_frame_config():
         0.05 if ai_index in (10,11) else 0.0
         for ai_index in range(ai_count)
     ]
+    # Search3 budget allocation.  Linear Search3 also exercises the staged
+    # allocator (AI 3/5/7).  AI 10/11 share the rank-loss setting, and AI
+    # 18/19 are its no-rank-loss counterpart; use the first member of each
+    # Transformer pair as the progressive condition.
+    search3_budget_modes = ['fixed'] * ai_count
+    for ai_index in (3,5,7,10,18):
+        search3_budget_modes[ai_index] = 'progressive'
+    search3_budget_stage_playouts = [(1000,3000,6000)] * ai_count
+    search3_budget_confidence_visit_shares = [0.70] * ai_count
+    search3_budget_min_improvements = [0.05] * ai_count
+    search3_budget_min_playout_depths = [3.0] * ai_count
+    # Retain enough of the tree and evaluator cache to make the fixed 10k
+    # allocation comparable to a continuous 10k-playout PUCT call.
+    search3_max_node_caches = [10000] * ai_count
+    search3_max_prediction_caches = [10000] * ai_count
     w1_initializers = [
         [
 #        {'selector': {'correct': True, 'solve_group':'Corner'}, 'basis': [0 + 11 * i for i in range(5)], 'scale': -0.05},
@@ -435,6 +452,13 @@ def build_experiment_frame_config():
         # active.  Linear Search3 remains at the fixed C=2 baseline.
         search3_c_depth_maxes = [2.0] * 10 + [4.0] * 10,
         search3_c_depth_ramp_depths = [0] * 10 + [8] * 10,
+        search3_budget_modes = search3_budget_modes,
+        search3_budget_stage_playouts = search3_budget_stage_playouts,
+        search3_budget_confidence_visit_shares = search3_budget_confidence_visit_shares,
+        search3_budget_min_improvements = search3_budget_min_improvements,
+        search3_budget_min_playout_depths = search3_budget_min_playout_depths,
+        search3_max_node_caches = search3_max_node_caches,
+        search3_max_prediction_caches = search3_max_prediction_caches,
         search2_max_frontiers = [30000] * ai_count,
         search2_torch_batch_sizes = [
             64 if original_transformer_attention[ai_index] else 100

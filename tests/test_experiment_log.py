@@ -188,6 +188,24 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertEqual(rows[0]['aiIndex'], '0')
             self.assertIn('learningRate', rows[0]['aiSettings'])
 
+    def test_keeps_search3_budget_stage_settings_in_the_snapshot(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            store = ExperimentLogStore(
+                output_directory / 'runs.jsonl',
+                output_directory / 'runs.csv',
+            )
+            store.append(self._record(
+                'search3', 3, 1.0, True, False,
+                ai_settings={'search3Budget': {
+                    'mode': 'progressive', 'stagePlayouts': [1000, 3000, 6000],
+                }},
+            ))
+
+            settings = store.summarize()['aiGroups'][0]['aiSettings']
+            self.assertEqual(settings['search3Budget']['mode'], 'progressive')
+            self.assertEqual(settings['search3Budget']['stagePlayouts'], [1000, 3000, 6000])
+
     def test_summarizes_direct_success_in_setup_length_bands(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             output_directory = Path(temporary_directory)
