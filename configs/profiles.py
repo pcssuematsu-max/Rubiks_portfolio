@@ -169,41 +169,16 @@ def _default_initial_scramble_groups(size,puzzle_type):
     if size == 3:
         return (
             [
-                (" R "," U "," R'"," U'"," F'"," U "," F "),
-                (' U ', ' R2', " U'", ' B2', ' U ', ' B2', ' U ', ' R2', " U'", ' B2', " U'", ' B2'),
-                (' B ', " U'", " B'", ' U ', " B'", ' R2', ' F ', " D'", " F'", ' R2', ' L ', ' B ', ' R ', " B'", " L'", ' B ', " R'"),
-                (" F'", " U ", " F ", " U ", " R ", " U'", " R'"),
-                (" S "," E "," S'"," E'"),
-                (' F ', " R'", " F'", ' R2', " U'", " R'", " F'", " U'", ' F ', ' R ', ' U ', " R'"),
-                (" M "," U "," M2"," U2"," M2"," U "," M'"),
-                (' B2', " L'", ' B2', ' D2', " F'", " R'", ' F ', ' D2', " B'", ' L ', ' B '),
-                (' F2', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F ', " L'", ' F ', ' R ', " F'", ' L '),
-                (' B2', ' U2', ' B ', ' U2', " B'", ' U2', ' B2', ' L2', " F'", " L'", ' F ', " L'", ' U2', ' R ', " B'", " R'", ' U2'),
-                (" L "," R'",' F ', " R'", " F'", ' R2', " U'", " R'", " F'", " U'", ' F ', ' R ', ' U ', " L'"),
-                (" U2"," R "," U "," R'"," U'"," F'"," U "," F "," U2"),
-                (" U2"," F'", " U ", " F ", " U ", " R ", " U'", " R'"," U2"),
-                (" F'", ' U2', ' F ', ' R ', ' U ', " R'", " U'", " F'", " U'", ' F '),
-                (" U'", " F'", ' U2', ' F ', ' R ', ' U ', " R'", " U'", " F'", " U'", ' F ', " U "),
-                (" U "," M "," R "," F "," D'"," R2"," U'"," F'"," D2"," B'"," R'"," F "," L'"),
-                (" R "," U2"," D'"," S "," U'"," F "," R "," L "," D'"," R "," B'"," F2"," U2"),
-                (" L "," R "," U2"," L'"," R'"),
-                (" F "," B "," U2"," F'"," B'"),
-                (" R "," U ") * 7,
-                (" F "," U ") * 7,
-                (" R "," U'") * 7,
-                (" F "," U'") * 7,
-                (' F2', " U'", " F'", ' U ', ' F ', ' R ', " U'", " R'", " F'", ' L ', " F'", " L'"),
-                (' B2', " L'", ' B2', ' D2', " F'", " R'", ' F ', ' D2', " B'", ' L ', ' B '),
-                (' F2', " R'", ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' F ', " L'", ' F ', ' R ', " F'", ' L '),
-                (' B2', ' U2', ' B ', ' U2', " B'", ' U2', ' B2', ' L2', " F'", " L'", ' F ', " L'", ' U2', ' R ', " B'", " R'", ' U2'),
-                (' L2', " U'", ' L ', " U'", ' F2', ' D ', " R'", " D'", ' F2', ' U2', ' L '),
-                (' B ', " L'", " F'", ' L ', " B'", ' L2', ' F ', " L'", " F'", ' L2', ' F '),
-                (" D'", ' L ', " U'", " L'", ' D ', ' U ', ' L2', " U'", " L'", ' U ', ' L2'),
-
+                (" R "," U'"," F2"),
+                (" F "," U2"," R'"),
             ],
             [
+                (" E "," S "),
+                (" M "," E'"),
             ],
-            [],
+            [
+                (" F'", ' D ', " F'", ' U ', ' F ', " D'", " U'", ' F2', ' U ', ' F ', " U'", " F'"),
+            ],
             [],
             [],
             [],
@@ -246,6 +221,7 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 ("2F ","3U ","2F'"),
                 ("2R ","2D'","2R2"),
                 (" U "," B2"," U'"),
+                (" U'","2U "," M2"," S2"),
                 (" R2"," F ","2R2"," F'"," R2"),
                 (" R2"," F ","2R'"," F'"," R2"),
                 (" R2"," F ","2R "," F'"," R2"),
@@ -312,7 +288,6 @@ def build_experiment_frame_config():
     skip_search = [is_search2_ai[ai_index] for ai_index in range(ai_count)]
     weight_decay = [True] * ai_count
     activations = ['SiLU'] * ai_count
-    search3_progress = [False,False,False,True,False,True,False,True,False,False] + [True,True,False,False,False,False,False,False,False,False]
     residuals = [True] * ai_count
     #search2_value_loss_types = ['myloss','myloss','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss','myloss'] * 2
     search2_value_loss_types = ['myloss','myloss','myloss','myloss','myloss','myloss','myloss','myloss','myloss','myloss'] * 2
@@ -339,10 +314,17 @@ def build_experiment_frame_config():
     search3_budget_confidence_visit_shares = [0.70] * ai_count
     search3_budget_min_improvements = [0.05] * ai_count
     search3_budget_min_playout_depths = [3.0] * ai_count
+    # A growing root preference after the middle tier is another sign that
+    # additional Search3 budget can be useful, even before Value rises 0.05.
+    search3_budget_min_visit_share_gains = [0.03] * ai_count
     # Retain enough of the tree and evaluator cache to make the fixed 10k
     # allocation comparable to a continuous 10k-playout PUCT call.
     search3_max_node_caches = [10000] * ai_count
     search3_max_prediction_caches = [10000] * ai_count
+    # Keep fallback-prefix collection aligned with staged budget allocation.
+    # A progressive AI can therefore retain its direct-search segments and
+    # the greedy recovery trajectory as one connected training path.
+    search3_progress = [mode == 'progressive' for mode in search3_budget_modes]
     w1_initializers = [
         [
 #        {'selector': {'correct': True, 'solve_group':'Corner'}, 'basis': [0 + 11 * i for i in range(5)], 'scale': -0.05},
@@ -368,7 +350,7 @@ def build_experiment_frame_config():
 
     adam = weight_decay.copy()
 
-    cube_size = 7
+    cube_size = 3
     puzzle_type = 'cube'
     if cube_size >= 6:
         transform_idx = [0,49,50,3,52,5,54,7,24,25] * 2
@@ -457,6 +439,7 @@ def build_experiment_frame_config():
         search3_budget_confidence_visit_shares = search3_budget_confidence_visit_shares,
         search3_budget_min_improvements = search3_budget_min_improvements,
         search3_budget_min_playout_depths = search3_budget_min_playout_depths,
+        search3_budget_min_visit_share_gains = search3_budget_min_visit_share_gains,
         search3_max_node_caches = search3_max_node_caches,
         search3_max_prediction_caches = search3_max_prediction_caches,
         search2_max_frontiers = [30000] * ai_count,
@@ -484,7 +467,7 @@ def build_experiment_frame_config():
         ],
         residuals = residuals,
         update_scales = [
-            (5.0, 1.0, 20.0) if is_search2_ai[ai_index] else (5.0, 1.0, 10.0)
+            (5.0, 1.0, 20.0) if is_search2_ai[ai_index] else (5.0, 1.0, 1.0)
             for ai_index in range(ai_count)
         ],
         original_transformer_attention = original_transformer_attention,
@@ -507,15 +490,32 @@ def build_experiment_frame_config():
             0.5 if original_transformer_attention[ai_index] else 0.0
             for ai_index in range(ai_count)
         ],
-        # Reserve part of each Transformer Search3 learning pass for older,
-        # long solution lines.  Search2 and the linear baseline keep their
-        # previous sampler, so this remains a targeted experiment.
-        original_train_long_sequence_min_steps = [
+        # Keep an explicit middle-distance slice while replaying long lines.
+        # ``long_sequence_max`` caps the *actual* selected share, including
+        # fresh/recent data; the old reserved-only setting had risen above 80%.
+        # Search2 and the linear baseline retain their previous sampler.
+        original_train_medium_sequence_min_steps = [
             20 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0
+            for ai_index in range(ai_count)
+        ],
+        original_train_medium_sequence_max_steps = [
+            29 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0
+            for ai_index in range(ai_count)
+        ],
+        original_train_medium_sequence_ratios = [
+            0.25 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0.0
+            for ai_index in range(ai_count)
+        ],
+        original_train_long_sequence_min_steps = [
+            30 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0
             for ai_index in range(ai_count)
         ],
         original_train_long_sequence_ratios = [
             0.25 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0.0
+            for ai_index in range(ai_count)
+        ],
+        original_train_long_sequence_max_ratios = [
+            0.60 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0.0
             for ai_index in range(ai_count)
         ],
         # Save batch-level raw-gradient aggregates for every model.  This is

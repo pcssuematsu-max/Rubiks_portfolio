@@ -66,8 +66,13 @@ class Search3DepthScheduleTests(unittest.TestCase):
             search3_budget_confidence_visit_shares = (0.7,),
             search3_budget_min_improvements = (0.05,),
             search3_budget_min_playout_depths = (3.0,),
+            search3_budget_min_visit_share_gains = (0.03,),
             search3_max_node_caches = (10000,),
             search3_max_prediction_caches = (10000,),
+            original_train_medium_sequence_min_steps = (20,),
+            original_train_medium_sequence_max_steps = (29,),
+            original_train_medium_sequence_ratios = (0.25,),
+            original_train_long_sequence_max_ratios = (0.60,),
             original_train_long_sequence_min_steps = (20,),
             original_train_long_sequence_ratios = (0.25,),
         )
@@ -77,6 +82,7 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(config.search3_budget_modes, ('progressive',))
         self.assertEqual(config.search3_budget_stage_playouts, ((100, 300, 600),))
         self.assertEqual(config.search3_max_node_caches, (10000,))
+        self.assertEqual(config.original_train_medium_sequence_max_steps, (29,))
         self.assertEqual(config.original_train_long_sequence_min_steps, (20,))
         self.assertEqual(config.original_train_long_sequence_ratios, (0.25,))
 
@@ -98,6 +104,7 @@ class Search3DepthScheduleTests(unittest.TestCase):
             search3_budget_confidence_visit_shares = (0.7,),
             search3_budget_min_improvements = (0.05,),
             search3_budget_min_playout_depths = (3.0,),
+            search3_budget_min_visit_share_gains = (0.03,),
             search3_max_node_caches = (10000,),
             search3_max_prediction_caches = (10000,),
         )
@@ -108,6 +115,7 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(ai.search3_budget_mode, 'progressive')
         self.assertEqual(ai.search3_budget_stage_playouts, (100, 300, 600))
         self.assertEqual(ai.search3_budget_confidence_visit_share, 0.7)
+        self.assertEqual(ai.search3_budget_min_visit_share_gain, 0.03)
         self.assertEqual(ai.search3_max_node_cache, 10000)
         self.assertEqual(ai.search3_max_prediction_cache, 10000)
 
@@ -120,3 +128,11 @@ class Search3DepthScheduleTests(unittest.TestCase):
         )
         self.assertEqual(config.search3_max_node_caches[3], 10000)
         self.assertEqual(config.search3_max_prediction_caches[3], 10000)
+        self.assertEqual(config.original_train_medium_sequence_min_steps[10], 20)
+        self.assertEqual(config.original_train_medium_sequence_max_steps[10], 29)
+        self.assertEqual(config.original_train_long_sequence_min_steps[10], 30)
+        self.assertEqual(config.original_train_long_sequence_max_ratios[10], 0.60)
+        self.assertEqual(
+            config.search3_progress,
+            [mode == 'progressive' for mode in config.search3_budget_modes],
+        )

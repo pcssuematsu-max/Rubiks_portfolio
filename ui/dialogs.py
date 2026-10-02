@@ -638,6 +638,7 @@ class ExperimentSummaryDialog(Tk.Toplevel):
         scales = settings.get('updateScales', {})
         depth_schedule = settings.get('search3DepthSchedule', {})
         budget = settings.get('search3Budget', {})
+        replay = settings.get('search3Replay', {})
         ramp_depth = depth_schedule.get('rampDepth', 0) if isinstance(depth_schedule, dict) else 0
         if ramp_depth:
             search3_text = (
@@ -652,13 +653,21 @@ class ExperimentSummaryDialog(Tk.Toplevel):
             budget_text = f" S3budget={budget.get('mode', '--')}({stages_text})"
         else:
             budget_text = ''
+        if isinstance(replay, dict) and replay.get('mediumRatio') is not None:
+            replay_text = (
+                f" replay=M{replay.get('mediumMinSteps', '--')}-"
+                f"{replay.get('mediumMaxSteps', '--')}:{replay.get('mediumRatio', '--')} "
+                f"L{replay.get('longMinSteps', '--')}≤{replay.get('longMaxRatio', '--')}"
+            )
+        else:
+            replay_text = ''
         return (
             f"model={settings.get('model', '--')} lr={settings.get('learningRate', '--')} "
             f"wd={settings.get('weightDecayRate', '--')} "
             f"scale={scales.get('shared', '--')}/{scales.get('policy', '--')}/{scales.get('value', '--')} "
             f"S2 frontier={search2.get('maxFrontier', '--')} batch={search2.get('batchSize', '--')} "
             f"loss={search2.get('valueLossType', '--')} {search3_text} "
-            f"S3rank={settings.get('search3RankLossMix', '--')}{budget_text}"
+            f"S3rank={settings.get('search3RankLossMix', '--')}{budget_text}{replay_text}"
         )
 
     @classmethod

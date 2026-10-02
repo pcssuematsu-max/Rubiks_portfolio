@@ -63,6 +63,7 @@ class FrameConfig:
     search3_budget_confidence_visit_shares: Optional[Sequence[float]] = None
     search3_budget_min_improvements: Optional[Sequence[float]] = None
     search3_budget_min_playout_depths: Optional[Sequence[float]] = None
+    search3_budget_min_visit_share_gains: Optional[Sequence[float]] = None
     search3_max_node_caches: Optional[Sequence[int]] = None
     search3_max_prediction_caches: Optional[Sequence[int]] = None
     search2_max_frontiers: Optional[Sequence[int]] = None
@@ -86,8 +87,12 @@ class FrameConfig:
     original_train_state_batch_sizes: Optional[Sequence[int]] = None
     original_train_max_batches: Optional[Sequence[int]] = None
     original_train_recent_ratios: Optional[Sequence[float]] = None
+    original_train_medium_sequence_min_steps: Optional[Sequence[int]] = None
+    original_train_medium_sequence_max_steps: Optional[Sequence[int]] = None
+    original_train_medium_sequence_ratios: Optional[Sequence[float]] = None
     original_train_long_sequence_min_steps: Optional[Sequence[int]] = None
     original_train_long_sequence_ratios: Optional[Sequence[float]] = None
+    original_train_long_sequence_max_ratios: Optional[Sequence[float]] = None
     gradient_log_enableds: Optional[Sequence[bool]] = None
     w1_initializers: Optional[Sequence[Any]] = None
     max_search2_data: int = 8000
@@ -126,6 +131,7 @@ class FrameConfig:
         self._validate_ai_sequence_length('search3_budget_confidence_visit_shares', self.search3_budget_confidence_visit_shares, ai_count)
         self._validate_ai_sequence_length('search3_budget_min_improvements', self.search3_budget_min_improvements, ai_count)
         self._validate_ai_sequence_length('search3_budget_min_playout_depths', self.search3_budget_min_playout_depths, ai_count)
+        self._validate_ai_sequence_length('search3_budget_min_visit_share_gains', self.search3_budget_min_visit_share_gains, ai_count)
         self._validate_ai_sequence_length('search3_max_node_caches', self.search3_max_node_caches, ai_count)
         self._validate_ai_sequence_length('search3_max_prediction_caches', self.search3_max_prediction_caches, ai_count)
         self._validate_ai_sequence_length('search2_max_frontiers', self.search2_max_frontiers, ai_count)
@@ -149,8 +155,12 @@ class FrameConfig:
         self._validate_ai_sequence_length('original_train_state_batch_sizes', self.original_train_state_batch_sizes, ai_count)
         self._validate_ai_sequence_length('original_train_max_batches', self.original_train_max_batches, ai_count)
         self._validate_ai_sequence_length('original_train_recent_ratios', self.original_train_recent_ratios, ai_count)
+        self._validate_ai_sequence_length('original_train_medium_sequence_min_steps', self.original_train_medium_sequence_min_steps, ai_count)
+        self._validate_ai_sequence_length('original_train_medium_sequence_max_steps', self.original_train_medium_sequence_max_steps, ai_count)
+        self._validate_ai_sequence_length('original_train_medium_sequence_ratios', self.original_train_medium_sequence_ratios, ai_count)
         self._validate_ai_sequence_length('original_train_long_sequence_min_steps', self.original_train_long_sequence_min_steps, ai_count)
         self._validate_ai_sequence_length('original_train_long_sequence_ratios', self.original_train_long_sequence_ratios, ai_count)
+        self._validate_ai_sequence_length('original_train_long_sequence_max_ratios', self.original_train_long_sequence_max_ratios, ai_count)
         self._validate_ai_sequence_length('gradient_log_enableds', self.gradient_log_enableds, ai_count)
         self._validate_ai_sequence_length('w1_initializers', self.w1_initializers, ai_count)
         self._validate_ai_sequence_length('transform_idx', self.transform_idx, ai_count)

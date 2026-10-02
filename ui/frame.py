@@ -157,6 +157,7 @@ class Frame(Tk.Frame):
             search3_budget_confidence_visit_shares = config.search3_budget_confidence_visit_shares,
             search3_budget_min_improvements = config.search3_budget_min_improvements,
             search3_budget_min_playout_depths = config.search3_budget_min_playout_depths,
+            search3_budget_min_visit_share_gains = config.search3_budget_min_visit_share_gains,
             search3_max_node_caches = config.search3_max_node_caches,
             search3_max_prediction_caches = config.search3_max_prediction_caches,
             search2_max_frontiers = config.search2_max_frontiers,
@@ -297,8 +298,12 @@ class Frame(Tk.Frame):
                 train_state_batch_size = self._ai_original_train_state_batch_size(ai_index),
                 train_max_batches = self._ai_original_train_max_batches(ai_index),
                 train_recent_ratio = self._ai_original_train_recent_ratio(ai_index),
+                train_medium_sequence_min_steps = self._ai_original_train_medium_sequence_min_steps(ai_index),
+                train_medium_sequence_max_steps = self._ai_original_train_medium_sequence_max_steps(ai_index),
+                train_medium_sequence_ratio = self._ai_original_train_medium_sequence_ratio(ai_index),
                 train_long_sequence_min_steps = self._ai_original_train_long_sequence_min_steps(ai_index),
                 train_long_sequence_ratio = self._ai_original_train_long_sequence_ratio(ai_index),
+                train_long_sequence_max_ratio = self._ai_original_train_long_sequence_max_ratio(ai_index),
                 gradient_log_enabled = self._ai_gradient_log_enabled(ai_index),
                 search2_value_loss_type = self._ai_search2_value_loss_type(ai_index),
                 search2_value_loss_margin = self._ai_search2_value_loss_margin(ai_index),
@@ -399,6 +404,24 @@ class Frame(Tk.Frame):
             return None
         return float(ratios[ai_index])
 
+    def _ai_original_train_medium_sequence_min_steps(self, ai_index):
+        minimums = getattr(self.config, 'original_train_medium_sequence_min_steps', None)
+        if minimums is None:
+            return None
+        return max(0,int(minimums[ai_index]))
+
+    def _ai_original_train_medium_sequence_max_steps(self, ai_index):
+        maximums = getattr(self.config, 'original_train_medium_sequence_max_steps', None)
+        if maximums is None:
+            return None
+        return max(0,int(maximums[ai_index]))
+
+    def _ai_original_train_medium_sequence_ratio(self, ai_index):
+        ratios = getattr(self.config, 'original_train_medium_sequence_ratios', None)
+        if ratios is None:
+            return None
+        return float(ratios[ai_index])
+
     def _ai_original_train_long_sequence_min_steps(self, ai_index):
         minimums = getattr(self.config, 'original_train_long_sequence_min_steps', None)
         if minimums is None:
@@ -407,6 +430,12 @@ class Frame(Tk.Frame):
 
     def _ai_original_train_long_sequence_ratio(self, ai_index):
         ratios = getattr(self.config, 'original_train_long_sequence_ratios', None)
+        if ratios is None:
+            return None
+        return float(ratios[ai_index])
+
+    def _ai_original_train_long_sequence_max_ratio(self, ai_index):
+        ratios = getattr(self.config, 'original_train_long_sequence_max_ratios', None)
         if ratios is None:
             return None
         return float(ratios[ai_index])
@@ -518,6 +547,7 @@ class Frame(Tk.Frame):
                                    search3_budget_confidence_visit_shares = None,
                                    search3_budget_min_improvements = None,
                                    search3_budget_min_playout_depths = None,
+                                   search3_budget_min_visit_share_gains = None,
                                    search3_max_node_caches = None,
                                    search3_max_prediction_caches = None,
                                    search2_max_frontiers = None,
@@ -589,6 +619,10 @@ class Frame(Tk.Frame):
             if search3_budget_min_playout_depths is not None:
                 self.AIs[i].search3_budget_min_playout_depth = max(
                     0.0,float(search3_budget_min_playout_depths[i])
+                )
+            if search3_budget_min_visit_share_gains is not None:
+                self.AIs[i].search3_budget_min_visit_share_gain = max(
+                    0.0,float(search3_budget_min_visit_share_gains[i])
                 )
             if search3_max_node_caches is not None:
                 self.AIs[i].search3_max_node_cache = max(0,int(search3_max_node_caches[i]))

@@ -493,7 +493,7 @@ class SolveSessionManager:
                         for key, value in stage.items()
                         if key in (
                             'stageIndex', 'playoutLimit', 'consumedPlayoutCount',
-                            'rootVisitShare', 'bestImprovement',
+                            'rootVisitShare', 'rootVisitShareGain', 'bestImprovement',
                             'playoutDepthMean', 'decision',
                         )
                     }
@@ -1434,8 +1434,18 @@ class SolveSessionManager:
                 'confidenceVisitShare': getattr(ai, 'search3_budget_confidence_visit_share', None),
                 'minImprovement': getattr(ai, 'search3_budget_min_improvement', None),
                 'minPlayoutDepth': getattr(ai, 'search3_budget_min_playout_depth', None),
+                'minVisitShareGain': getattr(ai, 'search3_budget_min_visit_share_gain', None),
                 'maxNodeCache': getattr(ai, 'search3_max_node_cache', None),
                 'maxPredictionCache': getattr(ai, 'search3_max_prediction_cache', None),
+            },
+            'search3Replay': {
+                'recentRatio': getattr(ai, 'train_recent_ratio', None),
+                'mediumMinSteps': getattr(ai, 'train_medium_sequence_min_steps', None),
+                'mediumMaxSteps': getattr(ai, 'train_medium_sequence_max_steps', None),
+                'mediumRatio': getattr(ai, 'train_medium_sequence_ratio', None),
+                'longMinSteps': getattr(ai, 'train_long_sequence_min_steps', None),
+                'longReservedRatio': getattr(ai, 'train_long_sequence_ratio', None),
+                'longMaxRatio': getattr(ai, 'train_long_sequence_max_ratio', None),
             },
             'search3RankLossMix': getattr(ai, 'search3_rank_loss_mix', None),
             'gradientLogging': bool(getattr(ai, 'gradient_log_enabled', False)),

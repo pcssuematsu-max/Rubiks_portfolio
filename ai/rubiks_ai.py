@@ -25,7 +25,7 @@ from ai.transformer_variance import transformer_parameter_target_variance
 
 
 class Rubiks_3_AI:
-    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
+    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
         if cube == None:
             self.cube = Rubiks_3(size = cube_size)
         else:
@@ -50,8 +50,15 @@ class Rubiks_3_AI:
         # A reserved replay share prevents long successful lines from being
         # drowned out by the much more common short search segments.  Both
         # defaults disable the feature for existing profiles.
+        self.train_medium_sequence_min_steps = max(0,int(train_medium_sequence_min_steps or 0))
+        self.train_medium_sequence_max_steps = max(
+            self.train_medium_sequence_min_steps,
+            int(train_medium_sequence_max_steps or 0),
+        )
+        self.train_medium_sequence_ratio = float(train_medium_sequence_ratio or 0.0)
         self.train_long_sequence_min_steps = max(0,int(train_long_sequence_min_steps or 0))
         self.train_long_sequence_ratio = float(train_long_sequence_ratio or 0.0)
+        self.train_long_sequence_max_ratio = float(train_long_sequence_max_ratio or 0.0)
         # Keep only compact batch aggregates.  The full gradient tensors are
         # deliberately never written to the learning history.
         self.gradient_log_enabled = bool(gradient_log_enabled)
@@ -273,6 +280,7 @@ class Rubiks_3_AI:
         self.search3_budget_confidence_visit_share = 0.70
         self.search3_budget_min_improvement = 0.05
         self.search3_budget_min_playout_depth = 3.0
+        self.search3_budget_min_visit_share_gain = 0.03
         self.search_batch3 = 40
         self.search_depth3 = 200
         self.search3_C = 0.05
@@ -2037,6 +2045,7 @@ class Rubiks_3_AI:
             'originalBatchCount': 'original_batches',
             'selectedBatchCount': 'selected_batches',
             'recentBatchCount': 'recent_batches',
+            'mediumBatchCount': 'medium_batches',
             'longBatchCount': 'long_batches',
             'randomBatchCount': 'random_batches',
             'originalItemCount': 'original_items',
@@ -2044,6 +2053,11 @@ class Rubiks_3_AI:
             'selectedStateCount': 'selected_states',
             'remainderItemCount': 'remainder_items',
             'longSequenceMinSteps': 'long_min_steps',
+            'mediumSequenceMinSteps': 'medium_min_steps',
+            'mediumSequenceMaxSteps': 'medium_max_steps',
+            'mediumEligibleItemCount': 'medium_eligible_items',
+            'mediumReservedItemCount': 'medium_reserved_items',
+            'mediumSelectedItemCount': 'medium_selected_items',
             'longEligibleItemCount': 'long_eligible_items',
             'longReservedItemCount': 'long_reserved_items',
             'longSelectedItemCount': 'long_selected_items',
@@ -2058,6 +2072,10 @@ class Rubiks_3_AI:
         result['longReplayRatio'] = min(
             1.0,
             max(0.0, float(getattr(self, 'train_long_sequence_ratio', 0.0))),
+        )
+        result['longReplayMaxRatio'] = self._long_sequence_max_ratio()
+        result['longSelectedRatio'] = min(
+            1.0,max(0.0,float(summary.get('long_selected_ratio',0.0) or 0.0)),
         )
         return result
 
@@ -2173,9 +2191,13 @@ class Rubiks_3_AI:
             f'data={summary["selected_items"]}/{summary["original_items"]} '
             f'states={summary["selected_states"]} '
             f'recent_batches={summary["recent_batches"]} '
+            f'medium_batches={summary["medium_batches"]} '
             f'long_batches={summary["long_batches"]} '
+            f'medium={summary["medium_min_steps"]}-{summary["medium_max_steps"]}'
+            f'({summary["medium_selected_items"]}/{summary["medium_eligible_items"]}) '
             f'long>={summary["long_min_steps"]}({summary["long_eligible_items"]}) '
             f'long_selected={summary["long_selected_items"]} '
+            f'long_ratio={summary["long_selected_ratio"]:.3f}/{summary["long_max_ratio"]:.3f} '
             f'long_steps={summary["long_selected_step_mean"]}/{summary["long_selected_step_max"]} '
             f'random_batches={summary["random_batches"]} '
             f'kept_for_later={summary["remainder_items"]} '
@@ -2310,11 +2332,15 @@ class Rubiks_3_AI:
         return batches,[]
 
     def _build_sampled_training_batches(self, indices, data_source, batch_size, state_batch_size, state_count_fn):
-        """Transformer向けに直近・長手数・ランダムdataを分けてsampleする。"""
+        """Transformer向けに直近・中手数・長手数・ランダムdataをsampleする。"""
         all_indices = list(indices)
         max_batches = int(getattr(self,'train_max_batches',0))
         recent_ratio = min(max(float(getattr(self,'train_recent_ratio',0.0)),0.0),1.0)
         recent_count = min(max_batches,int(round(max_batches * recent_ratio)))
+        medium_min_steps = max(0,int(getattr(self,'train_medium_sequence_min_steps',0)))
+        medium_max_steps = max(medium_min_steps,int(getattr(self,'train_medium_sequence_max_steps',0)))
+        medium_ratio = min(max(float(getattr(self,'train_medium_sequence_ratio',0.0)),0.0),1.0)
+        medium_count = min(max_batches - recent_count,int(round(max_batches * medium_ratio)))
         long_min_steps = max(0,int(getattr(self,'train_long_sequence_min_steps',0)))
         long_ratio = min(max(float(getattr(self,'train_long_sequence_ratio',0.0)),0.0),1.0)
         # The long replay slot comes from the non-recent pool.  This makes it
@@ -2339,9 +2365,30 @@ class Rubiks_3_AI:
         )
         recent_items = set(self._flatten_batches(recent_batches))
 
-        long_order = [
+        medium_order = [
             data_index for data_index in all_indices
             if data_index not in recent_items
+            and self._replay_is_medium_sequence(
+                data_source[data_index], medium_min_steps, medium_max_steps,
+            )
+        ]
+        if medium_min_steps <= 0 or medium_count <= 0:
+            medium_order = []
+            medium_count = 0
+        random.shuffle(medium_order)
+        medium_batches,_ = self._pack_training_batches(
+            medium_order,
+            data_source,
+            batch_size,
+            state_batch_size,
+            state_count_fn,
+            max_batches = medium_count,
+        )
+        medium_items = set(self._flatten_batches(medium_batches))
+
+        long_order = [
+            data_index for data_index in all_indices
+            if data_index not in recent_items and data_index not in medium_items
             and self._replay_sequence_steps(data_source[data_index]) >= long_min_steps
         ]
         # A zero threshold or ratio is the exact old recent/random sampler.
@@ -2361,10 +2408,12 @@ class Rubiks_3_AI:
 
         # When there are not enough long trajectories yet, give the unused
         # slots back to ordinary random replay instead of reducing updates.
-        random_count = max_batches - len(recent_batches) - len(long_batches)
+        random_count = max_batches - len(recent_batches) - len(medium_batches) - len(long_batches)
         random_order = [
             data_index for data_index in all_indices
-            if data_index not in recent_items and data_index not in long_items
+            if data_index not in recent_items
+            and data_index not in medium_items
+            and data_index not in long_items
         ]
         random.shuffle(random_order)
         random_batches,_ = self._pack_training_batches(
@@ -2376,7 +2425,14 @@ class Rubiks_3_AI:
             max_batches = random_count,
         )
 
-        selected_batches = recent_batches + long_batches + random_batches
+        selected_batches = recent_batches + medium_batches + long_batches + random_batches
+        selected_batches = self._cap_long_replay_selection(
+            selected_batches,
+            all_indices,
+            data_source,
+            reserved_long_items = self._flatten_batches(long_batches),
+            long_min_steps = long_min_steps,
+        )
         selected_items = set(self._flatten_batches(selected_batches))
         reserved_long_items = self._flatten_batches(long_batches)
         remainder_indices = [data_index for data_index in all_indices if data_index not in selected_items]
@@ -2385,16 +2441,72 @@ class Rubiks_3_AI:
             original_item_count = len(all_indices),
             selected_batches = selected_batches,
             recent_batch_count = len(recent_batches),
+            medium_batch_count = len(medium_batches),
             long_batch_count = len(long_batches),
+            reserved_medium_items = self._flatten_batches(medium_batches),
             reserved_long_items = reserved_long_items,
             random_batch_count = len(random_batches),
+            medium_min_steps = medium_min_steps,
+            medium_max_steps = medium_max_steps,
             long_min_steps = long_min_steps,
+            long_max_ratio = self._long_sequence_max_ratio(),
+            medium_eligible_item_count = len(medium_order),
             long_eligible_item_count = len(long_order),
             remainder_indices = remainder_indices,
             data_source = data_source,
             state_count_fn = state_count_fn,
         )
         return selected_batches,remainder_indices
+
+    @staticmethod
+    def _replay_is_medium_sequence(data_item, minimum, maximum):
+        steps = Rubiks_3_AI._replay_sequence_steps(data_item)
+        return minimum > 0 and minimum <= steps <= maximum
+
+    def _long_sequence_max_ratio(self):
+        return min(max(float(getattr(self,'train_long_sequence_max_ratio',0.0)),0.0),1.0)
+
+    def _cap_long_replay_selection(self, batches, all_indices, data_source, reserved_long_items, long_min_steps):
+        """Replace non-reserved long items when recent replay exceeds its cap.
+
+        The recent half of the replay buffer can itself become almost entirely
+        long trajectories.  A reserved long quota alone therefore cannot keep
+        the effective mix balanced.  This item-level replacement preserves the
+        batch layout while bounding the observed long share.
+        """
+        maximum_ratio = self._long_sequence_max_ratio()
+        if maximum_ratio <= 0.0 or long_min_steps <= 0:
+            return batches
+        selected_items = self._flatten_batches(batches)
+        maximum_long = int(len(selected_items) * maximum_ratio)
+        protected = set(reserved_long_items)
+        long_items = [
+            data_index for data_index in selected_items
+            if self._replay_sequence_steps(data_source[data_index]) >= long_min_steps
+        ]
+        if len(long_items) <= maximum_long or len(long_items) <= len(protected):
+            return batches
+        selected_set = set(selected_items)
+        replacements = [
+            data_index for data_index in all_indices
+            if data_index not in selected_set
+            and self._replay_sequence_steps(data_source[data_index]) < long_min_steps
+        ]
+        random.shuffle(replacements)
+        replacement_index = 0
+        remaining_long = len(long_items)
+        for batch in batches:
+            for item_index,data_index in enumerate(batch):
+                if remaining_long <= maximum_long:
+                    return batches
+                if data_index in protected or self._replay_sequence_steps(data_source[data_index]) < long_min_steps:
+                    continue
+                if replacement_index >= len(replacements):
+                    return batches
+                batch[item_index] = replacements[replacement_index]
+                replacement_index += 1
+                remaining_long -= 1
+        return batches
 
     @staticmethod
     def _replay_sequence_steps(data_item):
@@ -2415,7 +2527,7 @@ class Rubiks_3_AI:
             items += batch
         return items
 
-    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, long_batch_count, reserved_long_items, random_batch_count, long_min_steps, long_eligible_item_count, remainder_indices, data_source, state_count_fn):
+    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, medium_batch_count, long_batch_count, reserved_medium_items, reserved_long_items, random_batch_count, medium_min_steps, medium_max_steps, long_min_steps, long_max_ratio, medium_eligible_item_count, long_eligible_item_count, remainder_indices, data_source, state_count_fn):
         selected_items = self._flatten_batches(selected_batches)
         selected_states = sum(int(state_count_fn(data_source[data_index])) for data_index in selected_items)
         if long_min_steps > 0:
@@ -2426,6 +2538,13 @@ class Rubiks_3_AI:
             ]
         else:
             selected_long_steps = []
+        selected_medium_steps = [
+            self._replay_sequence_steps(data_source[data_index])
+            for data_index in selected_items
+            if self._replay_is_medium_sequence(
+                data_source[data_index], medium_min_steps, medium_max_steps,
+            )
+        ]
         if selected_items:
             selected_index_min = min(selected_items)
             selected_index_max = max(selected_items)
@@ -2436,9 +2555,16 @@ class Rubiks_3_AI:
             'original_batches': original_batch_count,
             'selected_batches': len(selected_batches),
             'recent_batches': recent_batch_count,
+            'medium_batches': medium_batch_count,
             'long_batches': long_batch_count,
+            'medium_reserved_items': len(reserved_medium_items),
+            'medium_selected_items': len(selected_medium_steps),
             'long_reserved_items': len(reserved_long_items),
             'long_selected_items': len(selected_long_steps),
+            'long_selected_ratio': (
+                0.0 if len(selected_items) == 0
+                else float(len(selected_long_steps)) / len(selected_items)
+            ),
             'long_selected_step_mean': (
                 None if len(selected_long_steps) == 0
                 else float(np.mean(selected_long_steps))
@@ -2448,7 +2574,11 @@ class Rubiks_3_AI:
                 else int(np.max(selected_long_steps))
             ),
             'random_batches': random_batch_count,
+            'medium_min_steps': medium_min_steps,
+            'medium_max_steps': medium_max_steps,
+            'medium_eligible_items': medium_eligible_item_count,
             'long_min_steps': long_min_steps,
+            'long_max_ratio': long_max_ratio,
             'long_eligible_items': long_eligible_item_count,
             'original_items': original_item_count,
             'selected_items': len(selected_items),
@@ -3275,6 +3405,10 @@ class Rubiks_3_AI:
                 stage_index,
                 playout_limit,
             )
+            if stage_records:
+                stage_record['rootVisitShareGain'] = (
+                    stage_record['rootVisitShare'] - stage_records[-1]['rootVisitShare']
+                )
             stage_records.append(stage_record)
             if last_result.end_reason == 'solved':
                 stage_record['decision'] = 'solved'
@@ -3317,7 +3451,10 @@ class Rubiks_3_AI:
             # The middle tier is always reached after an inconclusive probe.
             # The final tier is reserved for a branch that is both deepening
             # and improving according to the current evaluator.
-            if stage_index == 1 or self._search3_promising_branch(last_result):
+            if stage_index == 1 or self._search3_promising_branch(
+                last_result,
+                previous_result = attempt_results[-2],
+            ):
                 stage_record['decision'] = 'escalate'
                 if progress_callback is not None:
                     progress_callback(last_result)
@@ -3374,13 +3511,21 @@ class Rubiks_3_AI:
             )
         )
 
-    def _search3_promising_branch(self, result):
+    def _search3_promising_branch(self, result, previous_result = None):
         diagnostics = getattr(result,'search_diagnostics',{}) or {}
         depth = float(diagnostics.get('playoutDepthMean',0.0) or 0.0)
+        visit_share_gain = self._search3_root_visit_share(result)
+        if previous_result is not None:
+            visit_share_gain -= self._search3_root_visit_share(previous_result)
         return (
             depth >= float(getattr(self,'search3_budget_min_playout_depth',3.0))
-            and self._search3_best_improvement(result) >= float(
-                getattr(self,'search3_budget_min_improvement',0.05)
+            and (
+                self._search3_best_improvement(result) >= float(
+                    getattr(self,'search3_budget_min_improvement',0.05)
+                )
+                or visit_share_gain >= float(
+                    getattr(self,'search3_budget_min_visit_share_gain',0.03)
+                )
             )
         )
 

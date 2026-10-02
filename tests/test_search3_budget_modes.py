@@ -90,3 +90,18 @@ class Search3BudgetModeTests(unittest.TestCase):
         self.assertEqual(summary['stageCount'], 3)
         self.assertEqual(summary['consumedPlayoutCount'], 1000)
         self.assertEqual(summary['stopReason'], 'budget_exhausted')
+
+    def test_progressive_mode_escalates_when_root_concentration_improves(self):
+        ai, requested = self._ai('progressive', [
+            _result(20, 100, best_value=0.22, depth=1.0),
+            _result(100, 300, best_value=0.22, depth=4.0),
+            _result(100, 600, best_value=0.22, depth=4.0),
+        ])
+        ai.search3_budget_min_visit_share_gain = 0.03
+
+        result = ai._search3_with_repeats()
+
+        self.assertEqual(requested, [100, 300, 600])
+        stages = result.search_diagnostics['budgetSummary']['stages']
+        self.assertGreater(stages[1]['rootVisitShareGain'], 0.03)
+        self.assertEqual(stages[1]['decision'], 'escalate')

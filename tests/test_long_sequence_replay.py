@@ -65,6 +65,38 @@ class LongSequenceReplayTests(unittest.TestCase):
         self.assertEqual(summary['long_batches'], 0)
         self.assertEqual(summary['random_batches'], 2)
 
+    def test_medium_reservation_and_long_cap_balance_the_effective_mix(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.train_max_batches = 10
+        ai.train_recent_ratio = 0.5
+        ai.train_medium_sequence_min_steps = 20
+        ai.train_medium_sequence_max_steps = 29
+        ai.train_medium_sequence_ratio = 0.2
+        ai.train_long_sequence_min_steps = 30
+        ai.train_long_sequence_ratio = 0.2
+        ai.train_long_sequence_max_ratio = 0.6
+        data = [
+            SimpleNamespace(moves = tuple(range(length)))
+            for length in ([8] * 10 + [24] * 10 + [40] * 10)
+        ]
+
+        random.seed(3)
+        batches, _ = ai._build_sampled_training_batches(
+            list(range(len(data))),
+            data,
+            batch_size = 1,
+            state_batch_size = 0,
+            state_count_fn = lambda item: len(item.moves) + 1,
+        )
+
+        selected = [index for batch in batches for index in batch]
+        summary = ai._last_training_sample_summary
+        self.assertEqual(len(selected), 10)
+        self.assertEqual(summary['medium_reserved_items'], 2)
+        self.assertGreaterEqual(summary['medium_selected_items'], 2)
+        self.assertLessEqual(summary['long_selected_items'], 6)
+        self.assertLessEqual(summary['long_selected_ratio'], 0.6)
+
     def test_replay_uses_remaining_solution_length_for_short_segments(self):
         item = SimpleNamespace(moves = (0, 1), steps_to_goal = 42)
 
