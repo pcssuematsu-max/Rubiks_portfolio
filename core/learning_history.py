@@ -216,7 +216,17 @@ _TRAINING_SAMPLE_INT_FIELDS = frozenset({
     "longSelectedItemCount", "longSelectedStepMax",
 })
 
-_TRAINING_SAMPLE_NUMBER_FIELDS = frozenset({"longReplayRatio"})
+# These fields were introduced after sampled replay was first persisted.
+# They must stay optional: users can keep opening existing local histories
+# whose records only contain the original long-replay counters.
+_TRAINING_SAMPLE_OPTIONAL_INT_FIELDS = frozenset({
+    "mediumBatchCount", "mediumSequenceMinSteps", "mediumSequenceMaxSteps",
+    "mediumEligibleItemCount", "mediumReservedItemCount", "mediumSelectedItemCount",
+})
+
+_TRAINING_SAMPLE_NUMBER_FIELDS = frozenset({
+    "longReplayRatio", "longReplayMaxRatio", "longSelectedRatio",
+})
 
 
 _GRADIENT_METRIC_NUMBER_FIELDS = frozenset({
@@ -264,13 +274,22 @@ def _training_sample(value: Any) -> dict[str, Any] | None:
             return None
         result[key] = number
     result["longSelectedStepMean"] = _finite_number(value.get("longSelectedStepMean"))
-    # The replay ratio was added after the first sampled-replay histories.
-    # Preserve those existing local records while including it going forward.
-    if "longReplayRatio" in value:
-        ratio = _finite_number(value.get("longReplayRatio"))
+    for key in _TRAINING_SAMPLE_OPTIONAL_INT_FIELDS:
+        if key not in value:
+            continue
+        number = _safe_optional_int(value.get(key))
+        if number is None or number < 0:
+            return None
+        result[key] = number
+    # Replay ratios were added after the first sampled-replay histories.
+    # Preserve those existing local records while including them going forward.
+    for key in _TRAINING_SAMPLE_NUMBER_FIELDS:
+        if key not in value:
+            continue
+        ratio = _finite_number(value.get(key))
         if ratio is None or not 0.0 <= ratio <= 1.0:
             return None
-        result["longReplayRatio"] = ratio
+        result[key] = ratio
     return result
 
 
@@ -278,7 +297,7 @@ def _validate_training_sample(value: Any) -> None:
     if value is None:
         return
     required = set(_TRAINING_SAMPLE_INT_FIELDS) | {"longSelectedStepMean"}
-    allowed = required | set(_TRAINING_SAMPLE_NUMBER_FIELDS)
+    allowed = required | set(_TRAINING_SAMPLE_OPTIONAL_INT_FIELDS) | set(_TRAINING_SAMPLE_NUMBER_FIELDS)
     if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
         raise ValueError("Invalid learning history trainingSample")
     if _training_sample(value) != value:

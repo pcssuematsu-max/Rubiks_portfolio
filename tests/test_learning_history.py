@@ -38,6 +38,7 @@ class _FakeAI:
             'originalBatchCount': 50,
             'selectedBatchCount': 10,
             'recentBatchCount': 5,
+            'mediumBatchCount': 2,
             'longBatchCount': 3,
             'randomBatchCount': 2,
             'originalItemCount': 100,
@@ -45,12 +46,19 @@ class _FakeAI:
             'selectedStateCount': 320,
             'remainderItemCount': 80,
             'longSequenceMinSteps': 20,
+            'mediumSequenceMinSteps': 12,
+            'mediumSequenceMaxSteps': 19,
+            'mediumEligibleItemCount': 24,
+            'mediumReservedItemCount': 4,
+            'mediumSelectedItemCount': 5,
             'longEligibleItemCount': 30,
             'longReservedItemCount': 6,
             'longSelectedItemCount': 7,
             'longSelectedStepMean': 29.5,
             'longSelectedStepMax': 48,
             'longReplayRatio': 0.25,
+            'longReplayMaxRatio': 0.6,
+            'longSelectedRatio': 0.35,
         },
     }
 
@@ -79,6 +87,9 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['trainingSample']['longReservedItemCount'], 6)
             self.assertEqual(saved['trainingSample']['longSelectedStepMean'], 29.5)
             self.assertEqual(saved['trainingSample']['longReplayRatio'], 0.25)
+            self.assertEqual(saved['trainingSample']['mediumSelectedItemCount'], 5)
+            self.assertEqual(saved['trainingSample']['longReplayMaxRatio'], 0.6)
+            self.assertEqual(saved['trainingSample']['longSelectedRatio'], 0.35)
             self.assertEqual(saved['search3RankLossMix'], 0.05)
 
     def test_writes_fixed_validation_metrics_when_available(self):
@@ -244,6 +255,28 @@ class LearningHistoryTests(unittest.TestCase):
 
             self.assertEqual(len(records), 1)
             self.assertNotIn('valueBcePerState', records[0])
+
+    def test_legacy_training_sample_without_medium_fields_remains_readable(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'learning.json'
+            legacy_record = completed_learning_record(3, _FakeAI(), 1.0)
+            for field in (
+                'mediumBatchCount', 'mediumSequenceMinSteps', 'mediumSequenceMaxSteps',
+                'mediumEligibleItemCount', 'mediumReservedItemCount', 'mediumSelectedItemCount',
+                'longReplayMaxRatio', 'longSelectedRatio',
+            ):
+                del legacy_record['trainingSample'][field]
+            path.write_text(json.dumps({
+                'schemaVersion': 1,
+                'updatedAt': legacy_record['timestamp'],
+                'records': [legacy_record],
+            }), encoding = 'utf-8')
+
+            saved = LearningHistoryStore(path).records()[0]['trainingSample']
+
+            self.assertEqual(saved['longReplayRatio'], 0.25)
+            self.assertNotIn('mediumSelectedItemCount', saved)
+            self.assertNotIn('longSelectedRatio', saved)
 
     def test_ai_training_metrics_marks_loss_as_unavailable_when_no_update_ran(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)

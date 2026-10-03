@@ -949,6 +949,7 @@ class LearningHistoryDialog(Tk.Toplevel):
         fixed_long_top1 = [self._fixed_validation_length_value(record, '60', 'policyTop1Accuracy', fixture_id) for record in visible]
         fixed_long_correlation = [self._fixed_validation_length_value(record, '60', 'valueRankCorrelation', fixture_id) for record in visible]
         long_replay_share = [self._long_replay_share(record) for record in visible]
+        medium_replay_share = [self._medium_replay_share(record) for record in visible]
         gradient_rms = [self._gradient_metric_value(record, 'globalRmsMean') for record in visible]
         gradient_policy_share = [self._gradient_metric_value(record, 'policyGradientShareMean') for record in visible]
         gradient_value_share = [self._gradient_metric_value(record, 'valueGradientShareMean') for record in visible]
@@ -1003,18 +1004,20 @@ class LearningHistoryDialog(Tk.Toplevel):
         else:
             self.chart.create_text(width // 2, 390, text = '勾配は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
         fixture_label = fixture_id or '未記録'
-        self.chart.create_text(8, 448, text = f'固定検証・長手数 replay（{fixture_label}）  全体P@1=orange  60手P@1=yellow  全体Value順位=green  60手順位=magenta  長手数採用比=cyan', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
-        if any(item is not None for item in fixed_top1 + fixed_long_top1 + fixed_correlation + fixed_long_correlation + long_replay_share):
+        self.chart.create_text(8, 448, text = f'固定検証・replay（{fixture_label}）  全体P@1=orange  60手P@1=yellow  全体Value順位=green  60手順位=magenta  中手数=white  長手数=cyan', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if any(item is not None for item in fixed_top1 + fixed_long_top1 + fixed_correlation + fixed_long_correlation + medium_replay_share + long_replay_share):
             self._draw_loss_series(fixed_top1, '#E68A00', 25, width - 12, 478, 528)
             self._draw_loss_series(fixed_long_top1, '#E6D200', 25, width - 12, 478, 528)
             self._draw_loss_series(fixed_correlation, '#78C850', 25, width - 12, 478, 528)
             self._draw_loss_series(fixed_long_correlation, '#DE5CE6', 25, width - 12, 478, 528)
+            self._draw_loss_series(medium_replay_share, '#E8E8E8', 25, width - 12, 478, 528)
             self._draw_loss_series(long_replay_share, '#49C7D4', 25, width - 12, 478, 528)
             self.chart.create_text(
                 8, 538,
                 text = (
                     f'全体P@1 {self._series_range(fixed_top1)}  60手P@1 {self._series_range(fixed_long_top1)}  '
                     f'全体順位 {self._series_range(fixed_correlation)}  60手順位 {self._series_range(fixed_long_correlation)}  '
+                    f'中手数採用比 {self._series_range(medium_replay_share)}  '
                     f'長手数採用比 {self._series_range(long_replay_share)}'
                 ),
                 fill = '#A0A0A0', anchor = 'sw', font = ('Menlo', 9), tags = 'trend',
@@ -1115,12 +1118,33 @@ class LearningHistoryDialog(Tk.Toplevel):
         minimum = sample.get('longSequenceMinSteps', 0)
         if not minimum:
             return prefix + '  長手数replay=off'
+        selected_items = sample.get('selectedItemCount')
+        medium_selected = sample.get('mediumSelectedItemCount')
+        medium_ratio = None
+        if isinstance(selected_items, (int, float)) and selected_items > 0 and isinstance(medium_selected, (int, float)):
+            medium_ratio = float(medium_selected) / float(selected_items)
+        medium_text = ''
+        if sample.get('mediumSequenceMinSteps', 0):
+            medium_text = (
+                f"  中手数{sample.get('mediumSequenceMinSteps', '--')}-"
+                f"{sample.get('mediumSequenceMaxSteps', '--')}:"
+                f" eligible={sample.get('mediumEligibleItemCount', '--')}"
+                f" reserved={sample.get('mediumReservedItemCount', '--')}"
+                f" selected={medium_selected if medium_selected is not None else '--'}"
+                f" actual={self._rate(medium_ratio)}"
+            )
+        long_actual = sample.get('longSelectedRatio')
+        if long_actual is None:
+            long_actual = self._long_replay_share(record)
         return (
             prefix
+            + medium_text
             + f"  長手数≥{minimum}: eligible={sample.get('longEligibleItemCount', '--')}"
             + f" reserved={sample.get('longReservedItemCount', '--')}"
             + f" selected={sample.get('longSelectedItemCount', '--')}"
-            + f" ratio={self._rate(sample.get('longReplayRatio'))}"
+            + f" reserved比={self._rate(sample.get('longReplayRatio'))}"
+            + f" actual={self._rate(long_actual)}"
+            + f" cap={self._rate(sample.get('longReplayMaxRatio'))}"
             + f" mean/max={self._number(sample.get('longSelectedStepMean'))}/"
             + f"{sample.get('longSelectedStepMax', '--')}"
         )
@@ -1133,6 +1157,15 @@ class LearningHistoryDialog(Tk.Toplevel):
         if not isinstance(selected, (int, float)) or not isinstance(long_selected, (int, float)) or selected <= 0:
             return None
         return float(long_selected) / float(selected)
+
+    @staticmethod
+    def _medium_replay_share(record):
+        sample = record.get('trainingSample') or {}
+        selected = sample.get('selectedItemCount')
+        medium_selected = sample.get('mediumSelectedItemCount')
+        if not isinstance(selected, (int, float)) or not isinstance(medium_selected, (int, float)) or selected <= 0:
+            return None
+        return float(medium_selected) / float(selected)
 
     def _gradient_metrics_text(self, record):
         metrics = record.get('gradientMetrics')
