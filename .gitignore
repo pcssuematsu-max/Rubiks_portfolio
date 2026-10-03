@@ -24,6 +24,7 @@ Datas.binaryfile
 
 # Generated analysis reports
 reports/*.csv
+cache/myperm_points/
 
 # Local, append-only solve experiment logs
 exports/ai-experiments.jsonl
@@ -32,3 +33,4 @@ exports/ai-experiment-summary.json
 exports/ai-experiment-summary.csv
 exports/ai-learning-history.json
 exports/ai-lifecycle-events.jsonl
+exports/ai-discoveries.pre-point-migration-*.json.gz

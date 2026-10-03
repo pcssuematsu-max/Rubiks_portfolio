@@ -16,9 +16,9 @@ from managers.solve_session import SolveSessionManager, SolveSessionState
 class MypermEffectAnalyzerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.cube = Rubiks_3(size = 3)
+        cls.cube = Rubiks_3(size = 3, PointReindex = False)
         cls.analyzer = MypermEffectAnalyzer(cls.cube)
-        cls.cube7 = Rubiks_3(size = 7)
+        cls.cube7 = Rubiks_3(size = 7, PointReindex = False)
         cls.analyzer7 = MypermEffectAnalyzer(cls.cube7)
 
     def test_corner_permutation_includes_count_direction_and_positions(self):
@@ -231,7 +231,7 @@ class MypermEffectAnalyzerTest(unittest.TestCase):
             make_myperm_key("W2-2s[RF@U<>UF@R]", 0),
         )
 
-        centers_cube = Rubiks_3(size = 4, Centers = True)
+        centers_cube = Rubiks_3(size = 4, Centers = True, PointReindex = False)
         self.assertEqual(
             resolve_myperm_key(centers_cube, 'CtrX8p[4x2]+W2-2s[FL@U<>UF@L]'),
             make_myperm_key("CtrX8p[4x2]+W2-2s[FL@U<>UF@L]", 0),

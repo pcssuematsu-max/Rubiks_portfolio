@@ -10,6 +10,7 @@ import numpy as np
 
 from core.scramble_selector import ScrambleSelector
 from core.myperm_effects import rename_myperms_by_effect
+from core.myperm_points import reindex_myperms_with_cache
 from core.myperm_keys import make_myperm_key, normalize_myperm_name, single_move_myperm_name
 
 
@@ -64,6 +65,7 @@ class PyraminxCube:
         self._init_groups()
         self.state_0 = np.array([self.index_to_face[i] for i in range(self.sticker_num)])
         self.state = self.state_0.copy()
+        reindex_myperms_with_cache(self)
         rename_myperms_by_effect(self)
         self._init_feature_layout()
         self.perfect_data = self.makedata()

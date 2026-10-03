@@ -26,7 +26,16 @@ python3 -m ruff check .
 
 ## AI discoveries のデータ形式
 
-AIが見つけた解法は `exports/ai-discoveries.json` に保存します。rootの `schemaVersion` は現在 `1` で、各成果について `puzzle`、`setup`、`moves`、`moveCount`、`foundAt`、`updatedAt` を検証します。効果解析できる成果には `effectName`、`effectClass`、`effectLabel`、`effectCount`、`orientationCount` も保存します。保存時には `myperms_point` が最大になる対称変換を選び、setupとmovesの両方を同じ向きへ正規化します。Web公開時は、検証済みのJSONだけを次のコマンドでWebプロジェクトへ同期します。
+AIが見つけた解法は `exports/ai-discoveries.json` に保存します。rootの `schemaVersion` は現在 `1` で、各成果について `puzzle`、`setup`、`moves`、`moveCount`、`foundAt`、`updatedAt` を検証します。効果解析できる成果には `effectName`、`effectClass`、`effectLabel`、`effectCount`、`orientationCount` も保存します。保存時には `myperms_point` が最大になる対称変換を選び、setupとmovesの両方を同じ向きへ正規化します。
+
+`Points.txt` を変更した後、保存済みの成果にも新しい代表形を反映するには、まず移行件数を確認し、次に書き込みます。同じ開始手順へ合流した成果は短い解法を残し、同じ解法へ合流した成果は短いsetupを残します。書き込み時には元ファイルの圧縮バックアップを `exports/` に作成します。
+
+```bash
+python3 tools/migrate_ai_discoveries_points.py
+python3 tools/migrate_ai_discoveries_points.py --write
+```
+
+Web公開時は、検証済みのJSONだけを次のコマンドでWebプロジェクトへ同期します。
 
 ```bash
 python3 tools/publish_ai_discoveries.py

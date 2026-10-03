@@ -13,7 +13,15 @@ from core.myperm_keys import (
     normalize_myperm_registry,
     single_move_myperm_name,
 )
-from core.myperm_points import load_myperm_points, reindex_myperms_by_points
+from core.myperm_points import (
+    load_myperm_points,
+    reindex_myperms_by_points,
+    reindex_myperms_with_cache,
+)
+
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_POINT_CACHE_DIRECTORY = _PROJECT_ROOT / "cache" / "myperm_points"
 
 
 def group_indices_by_size():
@@ -139,13 +147,10 @@ def expand_registered(cube, names = None):
 
 def reindex_by_points(cube, names = None):
     """Assign the highest-point symmetry transform to index zero."""
-    points_path = Path(__file__).resolve().parent.parent / "Points.txt"
-    if not points_path.exists():
-        cube.myperm_transform_key_aliases = {}
-        cube.myperm_transform_points = {}
-        return
-    point_table = load_myperm_points(points_path)
-    reindex_myperms_by_points(cube, point_table, names = names)
+    reindex_myperms_with_cache(
+        cube, points_path = _PROJECT_ROOT / "Points.txt",
+        cache_directory = _POINT_CACHE_DIRECTORY, names = names,
+    )
 
 
 def apply_point_reindex(cube, point_table = None):

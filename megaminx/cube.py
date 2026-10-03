@@ -1,14 +1,13 @@
 """Megaminx cube domain extracted from the legacy Megaminx GUI."""
 
 from functools import reduce
-from pathlib import Path
 
 import numpy as np
 
 from core.scramble_selector import ScrambleSelector
 from core.myperm_effects import rename_myperms_by_effect
 from core.myperm_keys import make_myperm_key, normalize_myperm_registry, single_move_myperm_name
-from core.myperm_points import load_myperm_points, reindex_myperms_by_points
+from core.myperm_points import reindex_myperms_with_cache
 
 
 PERFECT_VAL = 1.0e+8
@@ -655,13 +654,7 @@ class MegaminxCube:
 
     def _reindex_myperms_by_points(self):
         """point最大の対称変換を各myperm系列の#00へ割り当てる。"""
-        points_path = Path(__file__).resolve().parent.parent / "Points.txt"
-        if not points_path.exists():
-            self.myperm_transform_key_aliases = {}
-            self.myperm_transform_points = {}
-            return
-        point_table = load_myperm_points(points_path, puzzle = "megaminx")
-        reindex_myperms_by_points(self, point_table)
+        reindex_myperms_with_cache(self)
 
 
     def collect_single_moves_and_rotate(self):

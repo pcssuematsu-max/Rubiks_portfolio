@@ -51,7 +51,7 @@ RUBIKS_AXIS_FAMILY = {
 
 
 class Rubiks_3:
-    def __init__(self,S = '',size = 3,F2L = False,OLL = False,Centers = False,Edges = False,Cross = False,PointReindex = False,RegisterMyperms = True):        
+    def __init__(self,S = '',size = 3,F2L = False,OLL = False,Centers = False,Edges = False,Cross = False,PointReindex = None,RegisterMyperms = True):
         
         self.size = size
         self.F2L = F2L and (size == 3)
@@ -59,7 +59,7 @@ class Rubiks_3:
         self.Centers = Centers
         self.Edges = Edges
         self.Cross = Cross
-        self.PointReindex = PointReindex
+        self.PointReindex = RegisterMyperms if PointReindex is None else PointReindex
         self.RegisterMyperms = RegisterMyperms
         if self.PointReindex and not self.RegisterMyperms:
             raise ValueError("PointReindex requires RegisterMyperms = True")
@@ -1334,7 +1334,7 @@ class Rubiks_3:
         self._add_myperm2('C2s[DLF<>UFL]+EAll2s[LB<>RF]', (' D2', ' R2', " U'", ' L2', ' U ', " D'", ' B2', ' F2', " D'", ' F2', ' R2', " D'", ' R2', ' D ', ' R2', " D'", ' R2', ' D2', ' R2', ' F2'))
         self._add_myperm2('C2s[DLF<>UFL]+EAll2[BR>LF]', (" F'", " D'", ' R ', ' U2', ' L ', " F'", " L'", ' U2', ' D2', ' F ', ' D2', " F'", ' D2', ' R2', " B'", " R'", ' B ', ' R2', ' D ', ' F '))
         self._add_myperm2('C2[DRB>FLU]+EAll2s[FL<>RF]', (' F ', ' D ', " F'", " U'", ' F ', " D'", " F'", ' U ', " R'", " B'", ' R ', " F'", " R'", ' B ', ' R2', " F'", " R'", ' F ', " D'", " L'", " F'", ' L ', ' D ', ' R ', ' F ', " R'"))
-        self._add_myperm2('C2s[DBL<>UBR]+EAll2[FL>FR]', (' B2', ' D2', ' B2', ' U2', ' F2', ' U2', ' D2', ' R ', ' D2', ' B2', ' R2', ' B2', ' R ', ' D2', ' R2', ' B2', " R'", ' B2', ' D2', ' R2'))
+        self._add_myperm2('C2s[DBL<>UBR]+EAll2[FL>FR]', (' U ', ' R ', ' U2', ' B2', ' D ', ' L ', " D'", ' B2', ' U ', " R'", " L'", ' F ', ' L ', ' B2', " L'", " F'", ' L ', ' B2'))
         self._add_myperm2('C2[DBL>RUB]+EAll2[FL>FR]', (' B2', ' U2', ' D2', ' F2', ' U2', ' R ', " D'", ' F2', ' U ', " L'", " U'", ' F2', ' D2', " R'", ' D '))
         
         

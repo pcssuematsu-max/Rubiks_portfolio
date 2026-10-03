@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-from core.myperm_points import point_representative_transform
+from core.myperm_points import MypermPointCalculator, load_myperm_points
 
 
 DISCOVERIES_FILE_NAME = "ai-discoveries.json"
@@ -64,21 +64,40 @@ def _record_id(puzzle: str, setup: list[str], discovery_kind: str = "full-solve"
     return sha256("\0".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
-def point_canonical_discovery_sequences(cube, setup, moves) -> tuple[tuple, tuple]:
+def point_canonical_discovery_sequences(cube, setup, moves, *, point_calculator = None, strict = False) -> tuple[tuple, tuple]:
     """Return setup and solution in the same highest-point orientation.
 
-    ``point_representative_transform`` chooses the most readable orientation
-    from the solution.  Applying that same symmetry to the setup preserves the
-    relationship that the stored solution solves the stored setup.
+    Tied solution scores use setup and move text to select one stable orientation
+    across equivalent records.  Setup and solution always receive the same
+    symmetry transform, preserving their solve relationship.
     """
     source_setup = tuple(setup)
     source_moves = tuple(moves)
     try:
-        representative = point_representative_transform(cube, source_moves)
-        canonical_setup = tuple(cube.transform(source_setup, representative.transform_index))
+        calculator = point_calculator or MypermPointCalculator(
+            cube,
+            load_myperm_points(puzzle = getattr(cube, "myperm_point_puzzle", None)),
+        )
+        transform_count = len(getattr(cube, "transformation_keys", ()))
+        if not transform_count:
+            return source_setup, source_moves
+        best = None
+        for transform_index in range(transform_count):
+            transformed_moves = tuple(cube.transform(source_moves, transform_index))
+            transformed_setup = tuple(cube.transform(source_setup, transform_index))
+            point = calculator.point_for_moves(transformed_moves)
+            display_key = (
+                tuple(_clean_moves(transformed_moves)),
+                tuple(_clean_moves(transformed_setup)),
+                transform_index,
+            )
+            if best is None or point > best[0] or (point == best[0] and display_key < best[1]):
+                best = (point, display_key, transformed_setup, transformed_moves)
     except (OSError, AttributeError, KeyError, TypeError, ValueError):
+        if strict:
+            raise
         return source_setup, source_moves
-    return canonical_setup, tuple(representative.moves)
+    return best[2], best[3]
 
 
 def terminal_last_perm_sequences(setup, move_rows) -> tuple[tuple, tuple] | None:

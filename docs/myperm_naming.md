@@ -128,14 +128,14 @@ source keyは大きいキューブ側の情報量が多い表記を置き、各�
 `Points.txt` は、同じmyperm系列のどの対称変換を代表 `#00` とするかを決めるための位置スコア定義として扱う。
 point計算は、原則として移動したパーツのsource positionを加算する。
 Cornerは `UFR` と `URF` のような向き違いを同じ物理位置として扱う。
-MidEdgeは `UF@M` を `UF` に正規化し、Wingは `UF@2R` / `UF@3R` を `UF@R` に正規化する。
+MidEdgeは `UF@M` を `UF` に正規化する。Wingは層番号を維持して `Layer2` / `Layer3` の点数を選び、位置の照合では `UF@2R` / `UF@3R` を `UF@R` に正規化する。層指定のない従来の `#Wing` 点数は全層で共用する。
 辺位置のpoint lookupは物理辺として扱うため、`RF@U` は `FR@U`、`LB@D` は `BL@D` のように反転辺ラベルでも同じ点数を参照する。
 Centerはプログラム側の `CtrX` / `CtrPlus` / `CtrObl` と `Points.txt` の `XCenter` / `PlusCenter` / `ObliqueCenter` を対応させる。
 Center座標は実装側と `Points.txt` 側で軸順が逆になる場合があるため、`R@2U.2F` と `R@2F.2U` は同じpoint entryとして扱う。
 短縮名から除外している同一face内Center permutationは、既定ではpoint計算からも除外する。
-通常の `Rubiks_3` 初期化では起動コストを避けるためpoint reindexを自動実行しない。
-検証や段階的なsource移行では、`Rubiks_3(size = 7, PointReindex = ("source-name", ...))` のように対象myperm系列だけを指定して、point最大のtransformを `#00` に再割当する。
-全系列を対象にする場合は `PointReindex = True` を指定できるが、全transformのpoint計算が必要なため重い。
+通常の `Rubiks_3` 初期化では全myperm系列のpoint最大のtransformを `#00` に再割当し、登録元のmove列もその向きに揃える。
+再計算した点数順はパズル別に `cache/myperm_points/<puzzle>-N.json` に保存する。`Points.txt`、登録元のmove列、採点関連コードのいずれかが変わった場合だけ点数を再計算する。通常のpoint参照もファイルの更新時だけ `Points.txt` を読み直す。この仕組みは他の対応パズルのmypermsにも適用する。
+旧indexや旧名の確認が必要な場合は `PointReindex = False` を指定する。対象系列だけを再計算する場合は `Rubiks_3(size = 7, PointReindex = ("source-name", ...))` と指定できる。
 effect解析や局所レポート生成だけで固定myperms registryが不要な場合は、`Rubiks_3(size = 7, RegisterMyperms = False)` で SingleMove/Rotate 以外の myperms 登録と transform 展開をスキップできる。
 `tools/generate_myperm_point_report.py` はこの軽量初期化を使い、`--name-prefix` 指定時は対象系列だけを transform 展開する。
 

@@ -191,7 +191,7 @@ def build_parser():
 
 def build_report_cube(size, name_prefixes = (), full_init = False):
     if full_init or not name_prefixes:
-        return Rubiks_3(size = size)
+        return Rubiks_3(size = size, PointReindex = False)
 
     cube = Rubiks_3(size = size, RegisterMyperms = False)
     cube._register_myperms2()

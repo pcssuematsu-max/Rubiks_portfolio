@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
+from functools import lru_cache
+from hashlib import sha256
+import inspect
+import json
+import os
 from pathlib import Path
+import tempfile
 
 import numpy as np
 
@@ -49,8 +56,8 @@ class MypermPointTable:
             return self._outer_edge_point(canonical_position)
         if canonical_part == "ME":
             return self._mid_edge_point(canonical_position)
-        if canonical_part == "W":
-            return self._wing_point(canonical_position)
+        if str(canonical_part).startswith("W"):
+            return self._wing_point(canonical_position, canonical_part)
         if str(canonical_part).startswith("Ctr"):
             return self._center_point(canonical_part, canonical_position)
         return self._lookup(canonical_part, canonical_position)
@@ -73,8 +80,13 @@ class MypermPointTable:
             if faces not in {base_position, base_position[::-1]}:
                 continue
             wing_position = self._canonical_wing_position(f"{faces}@{axis}")
-            point += self._wing_point(wing_position)
+            point += self._wing_point(wing_position, self._wing_part_code(axis))
         return point
+
+    @staticmethod
+    def _wing_part_code(axis):
+        layer = "".join(character for character in str(axis) if character.isdigit())
+        return f"W{layer}" if layer else "W"
 
     def _lookup(self, part_code, position):
         section = self.points_by_part.get(part_code, {})
@@ -118,12 +130,14 @@ class MypermPointTable:
         position = self._strip_edge_axis(position)
         return self._lookup_first("ME", (position, position[::-1]))
 
-    def _wing_point(self, position):
+    def _wing_point(self, position, part_code = "W"):
         position = self._canonical_wing_position(position)
         if "@" not in position:
-            return self._lookup("W", position)
+            return self._lookup(part_code, position)
         edge, axis = position.split("@", 1)
-        return self._lookup_first("W", (position, f"{edge[::-1]}@{axis}"))
+        if part_code not in self.points_by_part and part_code not in self.default_by_part:
+            part_code = "W"
+        return self._lookup_first(part_code, (position, f"{edge[::-1]}@{axis}"))
 
     def _center_point(self, part_code, position):
         return self._lookup_first(part_code, self._center_position_aliases(position))
@@ -166,13 +180,13 @@ class MypermPointTable:
         if part_code == "EAll":
             return "EAll"
         if str(part_code).startswith("W"):
-            return "W"
+            return part_code if part_code in self.points_by_part or part_code in self.default_by_part else "W"
         return part_code
 
     def _canonical_position(self, part_code, position):
         if part_code in {"ME", "EAll"}:
             return self._strip_edge_axis(position)
-        if part_code == "W":
+        if str(part_code).startswith("W"):
             return self._canonical_wing_position(position)
         return position
 
@@ -342,15 +356,14 @@ def reindex_myperms_by_points(cube, point_table, names = None):
     """Reassign each registered myperm's transform #00 to its highest-point transform."""
     calculator = MypermPointCalculator(cube, point_table)
     names = tuple(names) if names is not None else tuple(getattr(cube, "myperms2", ()))
-    reindex_by_name = {}
     point_rows_by_name = {}
+    available_indices = defaultdict(list)
+    for key in cube.myperms:
+        if isinstance(key, tuple) and len(key) == 2:
+            available_indices[key[0]].append(key[1])
 
     for name in names:
-        transform_indices = sorted(
-            key[1]
-            for key in cube.myperms
-            if isinstance(key, tuple) and len(key) == 2 and key[0] == name
-        )
+        transform_indices = sorted(available_indices[name])
         if not transform_indices:
             continue
 
@@ -364,10 +377,6 @@ def reindex_myperms_by_points(cube, point_table, names = None):
                 }
             )
         ordered_rows = sorted(scored_rows, key = lambda row:(-row["point"], row["old_index"]))
-        reindex_by_name[name] = {
-            row["old_index"]:new_index
-            for new_index, row in enumerate(ordered_rows)
-        }
         point_rows_by_name[name] = tuple(
             {
                 "old_index":row["old_index"],
@@ -377,10 +386,35 @@ def reindex_myperms_by_points(cube, point_table, names = None):
             for new_index, row in enumerate(ordered_rows)
         )
 
+    return apply_myperm_point_rows(cube, point_rows_by_name)
+
+
+def apply_myperm_point_rows(cube, point_rows_by_name):
+    """Apply previously scored point order to the expanded myperm registry."""
+    reindex_by_name = {}
+    available_indices = defaultdict(list)
+    for key in cube.myperms:
+        if isinstance(key, tuple) and len(key) == 2:
+            available_indices[key[0]].append(key[1])
+    for name, rows in point_rows_by_name.items():
+        old_indices = sorted(available_indices[name])
+        if sorted(row["old_index"] for row in rows) != old_indices:
+            raise ValueError(f"stale point ordering for {name!r}")
+        if sorted(row["new_index"] for row in rows) != list(range(len(rows))):
+            raise ValueError(f"invalid point ordering for {name!r}")
+        reindex_by_name[name] = {
+            row["old_index"]:row["new_index"] for row in rows
+        }
+
     if not reindex_by_name:
         cube.myperm_transform_key_aliases = {}
         cube.myperm_transform_points = {}
         return {}
+
+    reindexed_sources = dict(cube.myperms2)
+    for name, rows in point_rows_by_name.items():
+        best_old_index = next(row["old_index"] for row in rows if row["new_index"] == 0)
+        reindexed_sources[name] = cube.myperms[make_myperm_key(name, best_old_index)]
 
     reindexed_myperms = {}
     transform_key_aliases = {}
@@ -396,6 +430,12 @@ def reindex_myperms_by_points(cube, point_table, names = None):
         reindexed_myperms[new_key] = moves
 
     cube.myperms = reindexed_myperms
+    cube.myperms2 = reindexed_sources
+    if hasattr(cube, "myperms_sequence_group"):
+        cube.myperms_sequence_group = {
+            name:{transform_key_aliases.get(key, key) for key in keys}
+            for name, keys in cube.myperms_sequence_group.items()
+        }
     cube.myperm_transform_key_aliases = transform_key_aliases
     cube.myperm_transform_points = point_rows_by_name
     return reindex_by_name
@@ -409,6 +449,7 @@ def parse_myperm_points_text(text, puzzle = None):
     current_puzzle = None
     target_puzzle = None if puzzle is None else str(puzzle).strip().lower()
 
+    wing_layer = None
     for line_number, raw_line in enumerate(text.splitlines(), start = 1):
         line = raw_line.strip()
         if not line:
@@ -416,6 +457,7 @@ def parse_myperm_points_text(text, puzzle = None):
         if line.startswith("###"):
             current_puzzle = line.lstrip("#").strip().lower()
             current_part = None
+            wing_layer = None
             continue
         if not _point_line_applies_to_puzzle(current_puzzle, target_puzzle):
             continue
@@ -423,9 +465,19 @@ def parse_myperm_points_text(text, puzzle = None):
             section_name = line[1:].strip().rstrip(":")
             current_part = SECTION_ALIASES.get(section_name, section_name)
             points_by_part.setdefault(current_part, {})
+            wing_layer = None
             continue
         if current_part is None:
             raise ValueError(f"point entry before section at line {line_number}")
+        if current_part == "W" and line.startswith("Layer"):
+            layer_name, separator, layer_value = line.partition(":")
+            if not separator or not layer_name[5:].isdigit():
+                raise ValueError(f"invalid wing layer at line {line_number}")
+            wing_layer = f"W{layer_name[5:]}"
+            points_by_part.setdefault(wing_layer, {})
+            if layer_value.strip():
+                default_by_part[wing_layer] = _parse_point_value(layer_value.strip(), line_number)
+            continue
         if ":" not in line:
             continue
 
@@ -434,14 +486,15 @@ def parse_myperm_points_text(text, puzzle = None):
                 raise ValueError(f"invalid point token {token!r} at line {line_number}")
             name, value_text = token.split(":", 1)
             value = _parse_point_value(value_text, line_number)
+            target_part = wing_layer or current_part
             if name == "Others":
-                default_by_part[current_part] = value
+                default_by_part[target_part] = value
             else:
-                if current_part in {"C", "E"}:
+                if target_part in {"C", "E"}:
                     normalized_name = MypermPointTable({}, {})._normalize_position(name)
                 else:
                     normalized_name = name
-                points_by_part.setdefault(current_part, {})[normalized_name] = value
+                points_by_part.setdefault(target_part, {})[normalized_name] = value
 
     return MypermPointTable(points_by_part = points_by_part, default_by_part = default_by_part)
 
@@ -450,7 +503,119 @@ def load_myperm_points(path = "Points.txt", puzzle = None):
     """Load a point table from Points.txt."""
     if puzzle is None:
         puzzle = "cube"
-    return parse_myperm_points_text(Path(path).read_text(encoding = "utf-8"), puzzle = puzzle)
+    resolved = Path(path).resolve()
+    stamp = resolved.stat()
+    return _cached_point_table(
+        str(resolved), stamp.st_mtime_ns, stamp.st_ctime_ns, stamp.st_size, puzzle,
+    )
+
+
+@lru_cache(maxsize = 32)
+def _cached_point_text(path, mtime_ns, ctime_ns, size):
+    return Path(path).read_text(encoding = "utf-8")
+
+
+@lru_cache(maxsize = 32)
+def _cached_point_table(path, mtime_ns, ctime_ns, size, puzzle):
+    return parse_myperm_points_text(
+        _cached_point_text(path, mtime_ns, ctime_ns, size), puzzle = puzzle,
+    )
+
+
+def point_file_text(path):
+    """Read the small point source only when its file timestamp or size changes."""
+    resolved = Path(path).resolve()
+    stamp = resolved.stat()
+    return _cached_point_text(
+        str(resolved), stamp.st_mtime_ns, stamp.st_ctime_ns, stamp.st_size,
+    )
+
+
+_POINT_CACHE_VERSION = 1
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_DEFAULT_POINT_CACHE_DIRECTORY = _PROJECT_ROOT / "cache" / "myperm_points"
+
+
+def reindex_myperms_with_cache(cube, points_path = None, cache_directory = None, names = None):
+    """Use saved point rankings until point values or source procedures change."""
+    points_path = Path(points_path) if points_path is not None else _PROJECT_ROOT / "Points.txt"
+    if not points_path.exists():
+        cube.myperm_transform_key_aliases = {}
+        cube.myperm_transform_points = {}
+        return
+    puzzle = getattr(cube, "myperm_point_puzzle", "cube")
+    if names is not None:
+        reindex_myperms_by_points(
+            cube, load_myperm_points(points_path, puzzle = puzzle), names = names,
+        )
+        return
+
+    fingerprint = _point_cache_fingerprint(cube, points_path, puzzle)
+    cache_directory = Path(cache_directory) if cache_directory is not None else _DEFAULT_POINT_CACHE_DIRECTORY
+    cache_path = cache_directory / f"{puzzle}-{cube.size}.json"
+    cached_rows = _read_point_cache(cache_path, fingerprint)
+    if cached_rows is not None and set(cached_rows) == set(cube.myperms2):
+        try:
+            apply_myperm_point_rows(cube, cached_rows)
+            return
+        except (KeyError, TypeError, ValueError):
+            pass
+
+    reindex_myperms_by_points(cube, load_myperm_points(points_path, puzzle = puzzle))
+    _write_point_cache(cache_path, fingerprint, cube.myperm_transform_points)
+
+
+def _point_cache_fingerprint(cube, points_path, puzzle):
+    digest = sha256()
+    digest.update(str(_POINT_CACHE_VERSION).encode("ascii"))
+    digest.update(str(puzzle).encode("utf-8"))
+    digest.update(str(cube.size).encode("ascii"))
+    digest.update(point_file_text(points_path).encode("utf-8"))
+    for name, moves in sorted(cube.myperms2.items()):
+        digest.update(json.dumps([name, list(moves)], ensure_ascii=False).encode("utf-8"))
+    source_paths = {
+        Path(__file__),
+        _PROJECT_ROOT / "core" / "myperm_effects.py",
+        _PROJECT_ROOT / "core" / "myperm_keys.py",
+    }
+    for cls in type(cube).__mro__:
+        if cls is not object:
+            source_paths.add(Path(inspect.getfile(cls)))
+    if puzzle == "cube":
+        source_paths.update((
+            _PROJECT_ROOT / "cube" / "myperm_registry.py",
+            _PROJECT_ROOT / "cube" / "move_sequence_ops.py",
+        ))
+    for source in sorted(source_paths):
+        digest.update(source.read_bytes())
+    return digest.hexdigest()
+
+
+def _read_point_cache(path, fingerprint):
+    try:
+        with path.open(encoding="utf-8") as stream:
+            payload = json.load(stream)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict) or payload.get("fingerprint") != fingerprint:
+        return None
+    rows = payload.get("rows")
+    return rows if isinstance(rows, dict) else None
+
+
+def _write_point_cache(path, fingerprint, rows):
+    try:
+        path.parent.mkdir(parents = True, exist_ok = True)
+        with tempfile.NamedTemporaryFile(
+            "w", encoding = "utf-8", dir = path.parent,
+            prefix = f".{path.name}.", delete = False,
+        ) as stream:
+            temporary_path = Path(stream.name)
+            json.dump({"fingerprint":fingerprint, "rows":rows}, stream, ensure_ascii = False)
+        os.replace(temporary_path, path)
+    except OSError:
+        if "temporary_path" in locals():
+            temporary_path.unlink(missing_ok = True)
 
 
 def _point_line_applies_to_puzzle(current_puzzle, target_puzzle):
