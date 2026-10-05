@@ -220,11 +220,14 @@ _TRAINING_SAMPLE_INT_FIELDS = frozenset({
 # They must stay optional: users can keep opening existing local histories
 # whose records only contain the original long-replay counters.
 _TRAINING_SAMPLE_OPTIONAL_INT_FIELDS = frozenset({
+    "shortSequenceMaxSteps", "shortEligibleItemCount", "shortSelectedItemCount",
     "mediumBatchCount", "mediumSequenceMinSteps", "mediumSequenceMaxSteps",
     "mediumEligibleItemCount", "mediumReservedItemCount", "mediumSelectedItemCount",
+    "directSearchSelectedItemCount", "fallbackSelectedItemCount",
 })
 
 _TRAINING_SAMPLE_NUMBER_FIELDS = frozenset({
+    "shortReplayMinRatio", "shortSelectedRatio",
     "longReplayRatio", "longReplayMaxRatio", "longSelectedRatio",
 })
 

@@ -72,6 +72,7 @@ class SearchDataManager:
             source_succeeded = True,
             solve_succeeded = True,
             steps_to_goal = len(segment_moves),
+            trajectory_source = 'bootstrap',
         )
 
     def _bootstrap_value_targets(self, segment_length):
@@ -163,6 +164,7 @@ class SearchDataManager:
             source_succeeded = getattr(search_result,'succeeded',False),
             solve_succeeded = False,
             steps_to_goal = remaining_steps,
+            trajectory_source = history_item.get('trajectory_source','direct-search'),
         )
 
     def build_segment_value_targets(self, history_index, segment_length, remaining_length = None):

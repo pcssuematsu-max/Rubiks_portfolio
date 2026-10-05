@@ -29,9 +29,10 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
     Policy labels are the next moves of one canonical inverse solution.  A
     Rubik's state can have multiple equally valid moves, so top-k is a stable
     proxy rather than a literal solve-rate.  Value quality is compared against
-    the known remaining distance.  Search2 values are ordinal within a path,
-    while Search3 values are sigmoid probabilities, hence their calibration
-    metrics are intentionally kept separate.
+    the known remaining distance.  Standard Search2 values are ordinal within
+    a path, while ``steps_to_goal`` is calibrated directly in move units and
+    Search3 values are sigmoid probabilities; their calibration metrics are
+    kept separate.
     """
     cube = ai.cube
     original_state = cube.state.copy()
@@ -100,6 +101,9 @@ def _quality_metrics(ai, policy_logits, raw_values, policy_targets, value_target
         predicted_probability = _sigmoid(raw_values)
         metrics["valueMae"] = float(np.mean(np.abs(predicted_probability - value_targets)))
         metrics["valueBce"] = _binary_cross_entropy(predicted_probability, value_targets)
+    elif getattr(ai, "search2_value_loss_type", "") == "steps_to_goal":
+        metrics["valueMae"] = float(np.mean(np.abs(raw_values - value_targets)))
+        metrics["valuePathCrossEntropy"] = None
     else:
         metrics["valuePathCrossEntropy"] = _search2_path_cross_entropy(
             raw_values,
@@ -118,6 +122,8 @@ def _fixture_tensors(ai):
     path_slices = []
     length_slices = {}
     gamma = float(getattr(ai, "value_target_gamma", (1 / 2) ** (1 / 20)))
+    steps_to_goal = getattr(ai, "search2_value_loss_type", "") == "steps_to_goal"
+    target_scale = float(getattr(ai, "search2_value_target_scale", 1.0))
 
     for length in FIXTURE_LENGTHS:
         length_start = len(policy_targets)
@@ -131,7 +137,10 @@ def _fixture_tensors(ai):
                 state_columns.append(cube.makedata())
                 policy_targets.append(cube.key_to_num[move])
                 remaining_steps = len(solution) - move_index
-                value_targets.append(gamma ** remaining_steps)
+                value_targets.append(
+                    -target_scale * remaining_steps
+                    if steps_to_goal else gamma ** remaining_steps
+                )
                 cube.make_move(move)
             path_slices.append(slice(start, len(policy_targets)))
         length_slices[length] = slice(length_start, len(policy_targets))

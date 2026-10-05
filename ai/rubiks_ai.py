@@ -18,14 +18,14 @@ from cube.search2_engine import Search2Engine
 from cube.search3_engine import Search3Engine
 from cube.rubiks_cube import Rubiks_3
 from ai.layers import Affine, Batch_Normalization, Hard_Sigmoid, ReLU, ResidualBlock, Sigmoid, SiLU, Transformer_SelfAttention, PieceTokenSelfAttention
-from ai.losses import BCEWithLogits, MyLoss2, MyLoss2Pairwise, Myloss, Soft_Target_Cross_Entropy, Softmax_Cross_Entropy
+from ai.losses import BCEWithLogits, Huber, MyLoss2, MyLoss2Pairwise, Myloss, Soft_Target_Cross_Entropy, Softmax_Cross_Entropy
 from ai.fixed_validation import evaluate_fixed_validation
 from ai.transformer_variance import transformer_parameter_target_variance
 
 
 
 class Rubiks_3_AI:
-    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
+    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_short_sequence_max_steps = None,train_short_sequence_min_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_value_target_scale = 1.0,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
         if cube == None:
             self.cube = Rubiks_3(size = cube_size)
         else:
@@ -50,6 +50,8 @@ class Rubiks_3_AI:
         # A reserved replay share prevents long successful lines from being
         # drowned out by the much more common short search segments.  Both
         # defaults disable the feature for existing profiles.
+        self.train_short_sequence_max_steps = max(0,int(train_short_sequence_max_steps or 0))
+        self.train_short_sequence_min_ratio = float(train_short_sequence_min_ratio or 0.0)
         self.train_medium_sequence_min_steps = max(0,int(train_medium_sequence_min_steps or 0))
         self.train_medium_sequence_max_steps = max(
             self.train_medium_sequence_min_steps,
@@ -75,6 +77,7 @@ class Rubiks_3_AI:
         self.search_mode = search_mode
         self.search2_value_loss_type = self._normalize_search2_value_loss_type(search2_value_loss_type)
         self.search2_value_loss_margin = float(search2_value_loss_margin)
+        self.search2_value_target_scale = max(0.0,float(search2_value_target_scale))
         self.search2_rank_loss_mix = float(search2_rank_loss_mix)
         self.search2_rank_loss_apply_type = self._normalize_search2_rank_loss_apply_type(search2_rank_loss_apply_type)
         self.search3_rank_loss_mix = float(search3_rank_loss_mix)
@@ -315,6 +318,9 @@ class Rubiks_3_AI:
         """Set the margin used by pairwise Search2 value training."""
         self.search2_value_loss_margin = float(margin)
         self.losslayer2 = self._create_search2_value_loss()
+
+    def set_search2_value_target_scale(self, scale):
+        self.search2_value_target_scale = max(0.0,float(scale))
 
     def set_search2_rank_loss_mix(self, mix):
         """Set the auxiliary Search2 rank-loss coefficient."""
@@ -705,6 +711,10 @@ class Rubiks_3_AI:
             'margin': 'myloss2_pairwise',
             'loss2pairwise': 'myloss2_pairwise',
             '2pairwise': 'myloss2_pairwise',
+            'stepstogoal': 'steps_to_goal',
+            'steps': 'steps_to_goal',
+            'distance_regression': 'steps_to_goal',
+            'regression': 'steps_to_goal',
         }
         if normalized not in aliases:
             raise ValueError(f'unknown Search2 value loss type: {loss_type}')
@@ -737,6 +747,8 @@ class Rubiks_3_AI:
             return Myloss()
         if self.search2_value_loss_type == 'myloss2_pairwise':
             return MyLoss2Pairwise(self.search2_value_loss_margin)
+        if self.search2_value_loss_type == 'steps_to_goal':
+            return Huber()
         return MyLoss2()
         
         
@@ -788,7 +800,7 @@ class Rubiks_3_AI:
             gc.collect()
 
     def _clear_layer_cache(self, layer):
-        for attr_name in ['x','out','y','t','x_bar','train_m','train_s','tokens','Q','K','V','M','s','attended','attended_sum']:
+        for attr_name in ['x','out','y','t','diff','x_bar','train_m','train_s','tokens','Q','K','V','M','s','attended','attended_sum']:
             if hasattr(layer,attr_name):
                 setattr(layer,attr_name,None)
 
@@ -1158,6 +1170,15 @@ class Rubiks_3_AI:
                 self.value_target_gamma,
             )
             base_name = 'myloss2_distance'
+        elif self.search2_value_loss_type == 'steps_to_goal':
+            value_targets = -self.search2_value_target_scale * np.asarray(
+                value_steps_to_goal,dtype = out.dtype,
+            ).reshape(1,-1)
+            base_loss = self.losslayer2.forward(
+                out[-1:,self._search2_value_columns],
+                value_targets,
+            )
+            base_name = 'steps_to_goal_huber'
         else:
             base_loss = self.losslayer2.forward(out[-1:,self._search2_value_columns],value_indices)
             base_name = self.search2_value_loss_type
@@ -1198,6 +1219,7 @@ class Rubiks_3_AI:
             'rank_apply_type': getattr(self,'search2_rank_loss_apply_type',''),
             'rank_applied': False,
             'margin': float(getattr(self,'search2_value_loss_margin',0.0)),
+            'target_scale': float(getattr(self,'search2_value_target_scale',1.0)),
         }
 
     def _record_search2_value_loss_components(self, base_name, base_loss, rank_loss, rank_scaled_loss, rank_applied):
@@ -1213,6 +1235,7 @@ class Rubiks_3_AI:
             'rank_apply_type': self.search2_rank_loss_apply_type,
             'rank_applied': bool(rank_applied),
             'margin': float(self.search2_value_loss_margin),
+            'target_scale': float(self.search2_value_target_scale),
         }
 
     def _build_loss_indices(self, d_Lis):
@@ -1262,6 +1285,8 @@ class Rubiks_3_AI:
         if self.search2_value_loss_type == 'myloss2':
             return True
         source_loss_type = getattr(data_item,'source_search2_value_loss_type',None)
+        if self.search2_value_loss_type == 'steps_to_goal':
+            return source_loss_type in (None, 'bootstrap', 'steps_to_goal_regression')
         if source_loss_type is None:
             return True
         try:
@@ -1438,12 +1463,16 @@ class Rubiks_3_AI:
         mode_counts = Counter(meta.get('search_mode','') for meta in metadata)
         end_reason_counts = Counter(meta.get('end_reason',None) for meta in metadata)
         source_successes = sum(1 for meta in metadata if meta.get('source_succeeded',False))
+        trajectory_sources = Counter(
+            meta.get('trajectory_source','direct-search') for meta in metadata
+        )
 
         lines = [
             (
                 'Search3 value debug: '
                 f'steps={targets.size} modes={dict(mode_counts)} end_reasons={dict(end_reason_counts)} '
                 f'source_succeeded={source_successes}/{len(metadata)} '
+                f'trajectory_sources={dict(trajectory_sources)} '
                 f'target={float(np.min(targets)):.4f}/{float(np.mean(targets)):.4f}/{float(np.max(targets)):.4f} '
                 f'pred={float(np.min(predictions)):.4f}/{float(np.mean(predictions)):.4f}/{float(np.max(predictions)):.4f} '
                 f'diff_mean={float(np.mean(diff)):.4f} mae={weighted_mae:.4f} mse={weighted_mse:.4f} '
@@ -1716,6 +1745,7 @@ class Rubiks_3_AI:
             'end_reason': getattr(data_item,'end_reason',None),
             'source_succeeded': getattr(data_item,'source_succeeded',getattr(data_item,'succeeded',False)),
             'solve_succeeded': getattr(data_item,'solve_succeeded',getattr(data_item,'succeeded',False)),
+            'trajectory_source': getattr(data_item,'trajectory_source','direct-search'),
         }
 
     def _transform_search3_item(self, data_item, transformation, flip_inside):
@@ -2045,6 +2075,9 @@ class Rubiks_3_AI:
             'originalBatchCount': 'original_batches',
             'selectedBatchCount': 'selected_batches',
             'recentBatchCount': 'recent_batches',
+            'shortSequenceMaxSteps': 'short_max_steps',
+            'shortEligibleItemCount': 'short_eligible_items',
+            'shortSelectedItemCount': 'short_selected_items',
             'mediumBatchCount': 'medium_batches',
             'longBatchCount': 'long_batches',
             'randomBatchCount': 'random_batches',
@@ -2062,6 +2095,8 @@ class Rubiks_3_AI:
             'longReservedItemCount': 'long_reserved_items',
             'longSelectedItemCount': 'long_selected_items',
             'longSelectedStepMax': 'long_selected_step_max',
+            'directSearchSelectedItemCount': 'direct_search_selected_items',
+            'fallbackSelectedItemCount': 'fallback_selected_items',
         }
         result = {
             field: max(0,int(summary.get(source,0) or 0))
@@ -2076,6 +2111,10 @@ class Rubiks_3_AI:
         result['longReplayMaxRatio'] = self._long_sequence_max_ratio()
         result['longSelectedRatio'] = min(
             1.0,max(0.0,float(summary.get('long_selected_ratio',0.0) or 0.0)),
+        )
+        result['shortReplayMinRatio'] = self._short_sequence_min_ratio()
+        result['shortSelectedRatio'] = min(
+            1.0,max(0.0,float(summary.get('short_selected_ratio',0.0) or 0.0)),
         )
         return result
 
@@ -2191,6 +2230,8 @@ class Rubiks_3_AI:
             f'data={summary["selected_items"]}/{summary["original_items"]} '
             f'states={summary["selected_states"]} '
             f'recent_batches={summary["recent_batches"]} '
+            f'short<={summary["short_max_steps"]}'
+            f'({summary["short_selected_items"]}/{summary["short_eligible_items"]}) '
             f'medium_batches={summary["medium_batches"]} '
             f'long_batches={summary["long_batches"]} '
             f'medium={summary["medium_min_steps"]}-{summary["medium_max_steps"]}'
@@ -2199,6 +2240,7 @@ class Rubiks_3_AI:
             f'long_selected={summary["long_selected_items"]} '
             f'long_ratio={summary["long_selected_ratio"]:.3f}/{summary["long_max_ratio"]:.3f} '
             f'long_steps={summary["long_selected_step_mean"]}/{summary["long_selected_step_max"]} '
+            f'direct/fallback={summary["direct_search_selected_items"]}/{summary["fallback_selected_items"]} '
             f'random_batches={summary["random_batches"]} '
             f'kept_for_later={summary["remainder_items"]} '
             f'index={summary["selected_index_min"]}-{summary["selected_index_max"]}'
@@ -2240,6 +2282,7 @@ class Rubiks_3_AI:
             f'Search2 value loss debug ({label}): '
             f'type={components.get("loss_type","")} '
             f'margin={float(components.get("margin",0.0)):.4f} '
+            f'target_scale={float(components.get("target_scale",1.0)):.4f} '
             f'rank_mix={float(components.get("rank_mix",0.0)):.4f} '
             f'rank_apply={components.get("rank_apply_type","")} '
             f'rank_applied={bool(components.get("rank_applied",False))}\n'
@@ -2271,6 +2314,7 @@ class Rubiks_3_AI:
                 'rank_apply_type': components.get('rank_apply_type',''),
                 'rank_applied': False,
                 'margin': float(components.get('margin',0.0)),
+                'target_scale': float(components.get('target_scale',1.0)),
                 'items': 0,
             }
         for key in ('base','rank_raw','rank_scaled','total'):
@@ -2282,6 +2326,7 @@ class Rubiks_3_AI:
         current['rank_apply_type'] = components.get('rank_apply_type',current.get('rank_apply_type',''))
         current['rank_applied'] = bool(current.get('rank_applied',False) or components.get('rank_applied',False))
         current['margin'] = float(components.get('margin',current.get('margin',0.0)))
+        current['target_scale'] = float(components.get('target_scale',current.get('target_scale',1.0)))
         return current
 
     def _build_training_batches(self, indices, data_source, batch_size, state_batch_size, state_count_fn):
@@ -2337,6 +2382,8 @@ class Rubiks_3_AI:
         max_batches = int(getattr(self,'train_max_batches',0))
         recent_ratio = min(max(float(getattr(self,'train_recent_ratio',0.0)),0.0),1.0)
         recent_count = min(max_batches,int(round(max_batches * recent_ratio)))
+        short_max_steps = max(0,int(getattr(self,'train_short_sequence_max_steps',0)))
+        short_min_ratio = self._short_sequence_min_ratio()
         medium_min_steps = max(0,int(getattr(self,'train_medium_sequence_min_steps',0)))
         medium_max_steps = max(medium_min_steps,int(getattr(self,'train_medium_sequence_max_steps',0)))
         medium_ratio = min(max(float(getattr(self,'train_medium_sequence_ratio',0.0)),0.0),1.0)
@@ -2433,6 +2480,13 @@ class Rubiks_3_AI:
             reserved_long_items = self._flatten_batches(long_batches),
             long_min_steps = long_min_steps,
         )
+        selected_batches = self._enforce_short_replay_minimum(
+            selected_batches,
+            all_indices,
+            data_source,
+            protected_items = self._flatten_batches(medium_batches) + self._flatten_batches(long_batches),
+            short_max_steps = short_max_steps,
+        )
         selected_items = set(self._flatten_batches(selected_batches))
         reserved_long_items = self._flatten_batches(long_batches)
         remainder_indices = [data_index for data_index in all_indices if data_index not in selected_items]
@@ -2446,10 +2500,16 @@ class Rubiks_3_AI:
             reserved_medium_items = self._flatten_batches(medium_batches),
             reserved_long_items = reserved_long_items,
             random_batch_count = len(random_batches),
+            short_max_steps = short_max_steps,
+            short_min_ratio = short_min_ratio,
             medium_min_steps = medium_min_steps,
             medium_max_steps = medium_max_steps,
             long_min_steps = long_min_steps,
             long_max_ratio = self._long_sequence_max_ratio(),
+            short_eligible_item_count = sum(
+                self._replay_is_short_sequence(data_source[data_index], short_max_steps)
+                for data_index in all_indices
+            ),
             medium_eligible_item_count = len(medium_order),
             long_eligible_item_count = len(long_order),
             remainder_indices = remainder_indices,
@@ -2457,6 +2517,13 @@ class Rubiks_3_AI:
             state_count_fn = state_count_fn,
         )
         return selected_batches,remainder_indices
+
+    @staticmethod
+    def _replay_is_short_sequence(data_item, maximum):
+        return maximum > 0 and Rubiks_3_AI._replay_sequence_steps(data_item) <= maximum
+
+    def _short_sequence_min_ratio(self):
+        return min(max(float(getattr(self,'train_short_sequence_min_ratio',0.0)),0.0),1.0)
 
     @staticmethod
     def _replay_is_medium_sequence(data_item, minimum, maximum):
@@ -2508,6 +2575,47 @@ class Rubiks_3_AI:
                 remaining_long -= 1
         return batches
 
+    def _enforce_short_replay_minimum(self, batches, all_indices, data_source, protected_items, short_max_steps):
+        """Keep basic short trajectories in an otherwise hard replay mix.
+
+        Recent data can consist almost entirely of fallback-recovered long
+        paths.  Preserve the explicitly reserved middle/long examples, then
+        replace only unreserved items until the configured short minimum is
+        reached whenever the replay buffer has short candidates available.
+        """
+        minimum_ratio = self._short_sequence_min_ratio()
+        if minimum_ratio <= 0.0 or short_max_steps <= 0:
+            return batches
+        selected_items = self._flatten_batches(batches)
+        required_short = int(len(selected_items) * minimum_ratio)
+        selected_short = sum(
+            self._replay_is_short_sequence(data_source[data_index], short_max_steps)
+            for data_index in selected_items
+        )
+        if selected_short >= required_short:
+            return batches
+        protected = set(protected_items)
+        selected_set = set(selected_items)
+        replacements = [
+            data_index for data_index in all_indices
+            if data_index not in selected_set
+            and self._replay_is_short_sequence(data_source[data_index], short_max_steps)
+        ]
+        random.shuffle(replacements)
+        replacement_index = 0
+        for batch in batches:
+            for item_index,data_index in enumerate(batch):
+                if selected_short >= required_short:
+                    return batches
+                if data_index in protected or self._replay_is_short_sequence(data_source[data_index], short_max_steps):
+                    continue
+                if replacement_index >= len(replacements):
+                    return batches
+                batch[item_index] = replacements[replacement_index]
+                replacement_index += 1
+                selected_short += 1
+        return batches
+
     @staticmethod
     def _replay_sequence_steps(data_item):
         """Return total remaining solution length when the sample records it."""
@@ -2527,7 +2635,7 @@ class Rubiks_3_AI:
             items += batch
         return items
 
-    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, medium_batch_count, long_batch_count, reserved_medium_items, reserved_long_items, random_batch_count, medium_min_steps, medium_max_steps, long_min_steps, long_max_ratio, medium_eligible_item_count, long_eligible_item_count, remainder_indices, data_source, state_count_fn):
+    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, medium_batch_count, long_batch_count, reserved_medium_items, reserved_long_items, random_batch_count, short_max_steps, short_min_ratio, medium_min_steps, medium_max_steps, long_min_steps, long_max_ratio, short_eligible_item_count, medium_eligible_item_count, long_eligible_item_count, remainder_indices, data_source, state_count_fn):
         selected_items = self._flatten_batches(selected_batches)
         selected_states = sum(int(state_count_fn(data_source[data_index])) for data_index in selected_items)
         if long_min_steps > 0:
@@ -2545,6 +2653,21 @@ class Rubiks_3_AI:
                 data_source[data_index], medium_min_steps, medium_max_steps,
             )
         ]
+        selected_short_steps = [
+            self._replay_sequence_steps(data_source[data_index])
+            for data_index in selected_items
+            if self._replay_is_short_sequence(data_source[data_index], short_max_steps)
+        ]
+        direct_search_selected_items = sum(
+            getattr(data_source[data_index], 'trajectory_source', 'direct-search')
+            == 'direct-search'
+            for data_index in selected_items
+        )
+        fallback_selected_items = sum(
+            getattr(data_source[data_index], 'trajectory_source', 'direct-search')
+            in ('search3-fallback-prefix', 'greedy-fallback')
+            for data_index in selected_items
+        )
         if selected_items:
             selected_index_min = min(selected_items)
             selected_index_max = max(selected_items)
@@ -2555,6 +2678,7 @@ class Rubiks_3_AI:
             'original_batches': original_batch_count,
             'selected_batches': len(selected_batches),
             'recent_batches': recent_batch_count,
+            'short_selected_items': len(selected_short_steps),
             'medium_batches': medium_batch_count,
             'long_batches': long_batch_count,
             'medium_reserved_items': len(reserved_medium_items),
@@ -2565,6 +2689,12 @@ class Rubiks_3_AI:
                 0.0 if len(selected_items) == 0
                 else float(len(selected_long_steps)) / len(selected_items)
             ),
+            'short_selected_ratio': (
+                0.0 if len(selected_items) == 0
+                else float(len(selected_short_steps)) / len(selected_items)
+            ),
+            'direct_search_selected_items': direct_search_selected_items,
+            'fallback_selected_items': fallback_selected_items,
             'long_selected_step_mean': (
                 None if len(selected_long_steps) == 0
                 else float(np.mean(selected_long_steps))
@@ -2574,6 +2704,9 @@ class Rubiks_3_AI:
                 else int(np.max(selected_long_steps))
             ),
             'random_batches': random_batch_count,
+            'short_max_steps': short_max_steps,
+            'short_min_ratio': short_min_ratio,
+            'short_eligible_items': short_eligible_item_count,
             'medium_min_steps': medium_min_steps,
             'medium_max_steps': medium_max_steps,
             'medium_eligible_items': medium_eligible_item_count,
@@ -2976,6 +3109,11 @@ class Rubiks_3_AI:
         if self.search2_value_loss_type == 'myloss2_pairwise':
             value_loss = self._torch_search2_value_loss_pairwise(values,indices)
             base_name = 'myloss2_pairwise'
+        elif self.search2_value_loss_type == 'steps_to_goal':
+            value_loss = self._torch_search2_value_loss_steps_to_goal(
+                values,value_steps_to_goal,
+            )
+            base_name = 'steps_to_goal_huber'
         else:
             value_loss = self._torch_search2_value_loss_distance(values,indices,value_steps_to_goal)
             base_name = 'myloss2_distance'
@@ -3052,6 +3190,15 @@ class Rubiks_3_AI:
         if not has_loss:
             return torch.zeros((), dtype = values.dtype, device = values.device)
         return total_loss
+
+    def _torch_search2_value_loss_steps_to_goal(self, values, value_steps_to_goal):
+        if value_steps_to_goal is None:
+            targets = torch.zeros_like(values)
+        else:
+            targets = -self.search2_value_target_scale * torch.as_tensor(
+                value_steps_to_goal,dtype = values.dtype,device = values.device,
+            )
+        return F_torch.smooth_l1_loss(values,targets,reduction = 'sum',beta = 1.0)
 
     def _torch_search3_losses_and_grads(self, search3_inputs):
         device = self._torch_training_device()

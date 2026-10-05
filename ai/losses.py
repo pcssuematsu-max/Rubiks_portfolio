@@ -292,3 +292,29 @@ class MyLoss2Pairwise:
             dO[:,start + 1:end] += d
             diff_index += count
         return dO
+
+
+class Huber:
+    """Smooth L1 regression for calibrated Search2 step-distance values."""
+
+    def __init__(self, delta = 1.0):
+        self.delta = max(1.0e-8,float(delta))
+        self.x = np.zeros(0,dtype = 'f')
+        self.t = np.zeros(0,dtype = 'f')
+        self.diff = np.zeros(0,dtype = 'f')
+
+    def forward(self,x,t):
+        self.x = x
+        self.t = np.asarray(t,dtype = x.dtype).reshape(x.shape)
+        self.diff = self.x - self.t
+        absolute = np.abs(self.diff)
+        quadratic = np.minimum(absolute,self.delta)
+        linear = absolute - quadratic
+        return np.sum(0.5 * quadratic ** 2 + self.delta * linear)
+
+    def backward(self):
+        return np.where(
+            np.abs(self.diff) <= self.delta,
+            self.diff,
+            self.delta * np.sign(self.diff),
+        )

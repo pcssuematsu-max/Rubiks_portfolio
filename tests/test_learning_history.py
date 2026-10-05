@@ -38,6 +38,9 @@ class _FakeAI:
             'originalBatchCount': 50,
             'selectedBatchCount': 10,
             'recentBatchCount': 5,
+            'shortSequenceMaxSteps': 11,
+            'shortEligibleItemCount': 31,
+            'shortSelectedItemCount': 4,
             'mediumBatchCount': 2,
             'longBatchCount': 3,
             'randomBatchCount': 2,
@@ -57,8 +60,12 @@ class _FakeAI:
             'longSelectedStepMean': 29.5,
             'longSelectedStepMax': 48,
             'longReplayRatio': 0.25,
+            'shortReplayMinRatio': 0.2,
+            'shortSelectedRatio': 0.2,
             'longReplayMaxRatio': 0.6,
             'longSelectedRatio': 0.35,
+            'directSearchSelectedItemCount': 9,
+            'fallbackSelectedItemCount': 11,
         },
     }
 
@@ -88,8 +95,12 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['trainingSample']['longSelectedStepMean'], 29.5)
             self.assertEqual(saved['trainingSample']['longReplayRatio'], 0.25)
             self.assertEqual(saved['trainingSample']['mediumSelectedItemCount'], 5)
+            self.assertEqual(saved['trainingSample']['shortSelectedItemCount'], 4)
+            self.assertEqual(saved['trainingSample']['shortReplayMinRatio'], 0.2)
             self.assertEqual(saved['trainingSample']['longReplayMaxRatio'], 0.6)
             self.assertEqual(saved['trainingSample']['longSelectedRatio'], 0.35)
+            self.assertEqual(saved['trainingSample']['directSearchSelectedItemCount'], 9)
+            self.assertEqual(saved['trainingSample']['fallbackSelectedItemCount'], 11)
             self.assertEqual(saved['search3RankLossMix'], 0.05)
 
     def test_writes_fixed_validation_metrics_when_available(self):
@@ -263,6 +274,8 @@ class LearningHistoryTests(unittest.TestCase):
             for field in (
                 'mediumBatchCount', 'mediumSequenceMinSteps', 'mediumSequenceMaxSteps',
                 'mediumEligibleItemCount', 'mediumReservedItemCount', 'mediumSelectedItemCount',
+                'shortSequenceMaxSteps', 'shortEligibleItemCount', 'shortSelectedItemCount',
+                'shortReplayMinRatio', 'shortSelectedRatio',
                 'longReplayMaxRatio', 'longSelectedRatio',
             ):
                 del legacy_record['trainingSample'][field]

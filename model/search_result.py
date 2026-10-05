@@ -55,6 +55,7 @@ class data_search3:
         source_succeeded=False,
         solve_succeeded=False,
         steps_to_goal=None,
+        trajectory_source='direct-search',
     ):
         self.scramble = scramble
         self.moves = moves
@@ -77,6 +78,9 @@ class data_search3:
         self.source_succeeded = bool(source_succeeded)
         self.solve_succeeded = bool(solve_succeeded)
         self.succeeded = self.source_succeeded
+        # A completed solution can contain a direct-search prefix followed
+        # by greedy recovery, so retain how each segment was obtained.
+        self.trajectory_source = str(trajectory_source or 'direct-search')
         # A search result can be one segment of a much longer completed
         # solution.  Keep the remaining total so replay selection can target
         # difficult starting positions rather than only long local segments.

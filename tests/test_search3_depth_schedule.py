@@ -128,10 +128,32 @@ class Search3DepthScheduleTests(unittest.TestCase):
         )
         self.assertEqual(config.search3_max_node_caches[3], 10000)
         self.assertEqual(config.search3_max_prediction_caches[3], 10000)
+        self.assertEqual(
+            [config.search3_budget_min_improvements[index] for index in (3, 5, 7)],
+            [0.02, 0.02, 0.02],
+        )
+        self.assertEqual(config.search3_budget_min_improvements[2], 0.05)
         self.assertEqual(config.original_train_medium_sequence_min_steps[10], 20)
         self.assertEqual(config.original_train_medium_sequence_max_steps[10], 29)
+        self.assertEqual(config.original_train_short_sequence_max_steps[10], 19)
+        self.assertEqual(config.original_train_short_sequence_min_ratios[10], 0.20)
         self.assertEqual(config.original_train_long_sequence_min_steps[10], 30)
         self.assertEqual(config.original_train_long_sequence_max_ratios[10], 0.60)
+        self.assertEqual(config.search3_rank_loss_mixes[10], 0.10)
+        self.assertEqual(config.search3_rank_loss_mixes[11], 0.10)
+        self.assertEqual(config.search3_rank_loss_mixes[18], 0.0)
+        self.assertEqual(config.search3_rank_loss_mixes[19], 0.0)
+        self.assertEqual(len(config.ai_search_modes), 25)
+        self.assertEqual(
+            [config.search2_value_loss_types[index] for index in range(20, 25)],
+            ['steps_to_goal'] * 5,
+        )
+        self.assertEqual(config.search2_rank_loss_mixes[20:25], [0.0] * 5)
+        self.assertEqual(config.search2_rank_loss_apply_types[20:25], ['none'] * 5)
+        self.assertEqual(config.search2_value_target_scales[20:25], [1.0] * 5)
+        self.assertEqual(config.original_transformer_attention[20:25], [False, False, True, True, True])
+        self.assertEqual(config.transform_idx[20:25], [0] * 5)
+        self.assertEqual(config.flip_inside_idx[20:25], [False] * 5)
         self.assertEqual(
             config.search3_progress,
             [mode == 'progressive' for mode in config.search3_budget_modes],

@@ -70,6 +70,7 @@ class FrameConfig:
     search2_torch_batch_sizes: Optional[Sequence[int]] = None
     search2_value_loss_types: Optional[Sequence[str]] = None
     search2_value_loss_margins: Optional[Sequence[float]] = None
+    search2_value_target_scales: Optional[Sequence[float]] = None
     search2_rank_loss_mixes: Optional[Sequence[float]] = None
     search2_rank_loss_apply_types: Optional[Sequence[str]] = None
     search3_rank_loss_mixes: Optional[Sequence[float]] = None
@@ -87,6 +88,8 @@ class FrameConfig:
     original_train_state_batch_sizes: Optional[Sequence[int]] = None
     original_train_max_batches: Optional[Sequence[int]] = None
     original_train_recent_ratios: Optional[Sequence[float]] = None
+    original_train_short_sequence_max_steps: Optional[Sequence[int]] = None
+    original_train_short_sequence_min_ratios: Optional[Sequence[float]] = None
     original_train_medium_sequence_min_steps: Optional[Sequence[int]] = None
     original_train_medium_sequence_max_steps: Optional[Sequence[int]] = None
     original_train_medium_sequence_ratios: Optional[Sequence[float]] = None
@@ -138,6 +141,7 @@ class FrameConfig:
         self._validate_ai_sequence_length('search2_torch_batch_sizes', self.search2_torch_batch_sizes, ai_count)
         self._validate_ai_sequence_length('search2_value_loss_types', self.search2_value_loss_types, ai_count)
         self._validate_ai_sequence_length('search2_value_loss_margins', self.search2_value_loss_margins, ai_count)
+        self._validate_ai_sequence_length('search2_value_target_scales', self.search2_value_target_scales, ai_count)
         self._validate_ai_sequence_length('search2_rank_loss_mixes', self.search2_rank_loss_mixes, ai_count)
         self._validate_ai_sequence_length('search2_rank_loss_apply_types', self.search2_rank_loss_apply_types, ai_count)
         self._validate_ai_sequence_length('search3_rank_loss_mixes', self.search3_rank_loss_mixes, ai_count)
@@ -155,6 +159,8 @@ class FrameConfig:
         self._validate_ai_sequence_length('original_train_state_batch_sizes', self.original_train_state_batch_sizes, ai_count)
         self._validate_ai_sequence_length('original_train_max_batches', self.original_train_max_batches, ai_count)
         self._validate_ai_sequence_length('original_train_recent_ratios', self.original_train_recent_ratios, ai_count)
+        self._validate_ai_sequence_length('original_train_short_sequence_max_steps', self.original_train_short_sequence_max_steps, ai_count)
+        self._validate_ai_sequence_length('original_train_short_sequence_min_ratios', self.original_train_short_sequence_min_ratios, ai_count)
         self._validate_ai_sequence_length('original_train_medium_sequence_min_steps', self.original_train_medium_sequence_min_steps, ai_count)
         self._validate_ai_sequence_length('original_train_medium_sequence_max_steps', self.original_train_medium_sequence_max_steps, ai_count)
         self._validate_ai_sequence_length('original_train_medium_sequence_ratios', self.original_train_medium_sequence_ratios, ai_count)

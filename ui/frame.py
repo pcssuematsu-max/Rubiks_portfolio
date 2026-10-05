@@ -164,6 +164,7 @@ class Frame(Tk.Frame):
             search2_torch_batch_sizes = config.search2_torch_batch_sizes,
             search2_value_loss_types = config.search2_value_loss_types,
             search2_value_loss_margins = config.search2_value_loss_margins,
+            search2_value_target_scales = config.search2_value_target_scales,
             search2_rank_loss_mixes = config.search2_rank_loss_mixes,
             search2_rank_loss_apply_types = config.search2_rank_loss_apply_types,
             search3_rank_loss_mixes = config.search3_rank_loss_mixes,
@@ -298,6 +299,8 @@ class Frame(Tk.Frame):
                 train_state_batch_size = self._ai_original_train_state_batch_size(ai_index),
                 train_max_batches = self._ai_original_train_max_batches(ai_index),
                 train_recent_ratio = self._ai_original_train_recent_ratio(ai_index),
+                train_short_sequence_max_steps = self._ai_original_train_short_sequence_max_steps(ai_index),
+                train_short_sequence_min_ratio = self._ai_original_train_short_sequence_min_ratio(ai_index),
                 train_medium_sequence_min_steps = self._ai_original_train_medium_sequence_min_steps(ai_index),
                 train_medium_sequence_max_steps = self._ai_original_train_medium_sequence_max_steps(ai_index),
                 train_medium_sequence_ratio = self._ai_original_train_medium_sequence_ratio(ai_index),
@@ -400,6 +403,18 @@ class Frame(Tk.Frame):
 
     def _ai_original_train_recent_ratio(self, ai_index):
         ratios = getattr(self.config, 'original_train_recent_ratios', None)
+        if ratios is None:
+            return None
+        return float(ratios[ai_index])
+
+    def _ai_original_train_short_sequence_max_steps(self, ai_index):
+        maximums = getattr(self.config, 'original_train_short_sequence_max_steps', None)
+        if maximums is None:
+            return None
+        return max(0,int(maximums[ai_index]))
+
+    def _ai_original_train_short_sequence_min_ratio(self, ai_index):
+        ratios = getattr(self.config, 'original_train_short_sequence_min_ratios', None)
         if ratios is None:
             return None
         return float(ratios[ai_index])
@@ -557,6 +572,7 @@ class Frame(Tk.Frame):
                                    search2_torch_batch_sizes = None,
                                    search2_value_loss_types = None,
                                    search2_value_loss_margins = None,
+                                   search2_value_target_scales = None,
                                    search2_rank_loss_mixes = None,
                                    search2_rank_loss_apply_types = None,
                                    search3_rank_loss_mixes = None,
@@ -641,6 +657,8 @@ class Frame(Tk.Frame):
                 self.AIs[i].set_search2_value_loss_type(search2_value_loss_types[i])
             if search2_value_loss_margins is not None:
                 self.AIs[i].set_search2_value_loss_margin(search2_value_loss_margins[i])
+            if search2_value_target_scales is not None:
+                self.AIs[i].set_search2_value_target_scale(search2_value_target_scales[i])
             if search2_rank_loss_mixes is not None:
                 self.AIs[i].set_search2_rank_loss_mix(search2_rank_loss_mixes[i])
             if search2_rank_loss_apply_types is not None:

@@ -342,7 +342,11 @@ class SolveSessionManager:
                 fallback_scramble = self._current_search_scramble()
                 fallback_result = self._advance_to_search3_fallback_state(AI, search_result)
                 if fallback_result is not None:
-                    self._record_search_history(fallback_result, scramble = fallback_scramble)
+                    self._record_search_history(
+                        fallback_result,
+                        scramble = fallback_scramble,
+                        trajectory_source = 'search3-fallback-prefix',
+                    )
                     self._commit_main_progress_to_scramble()
             state.search_TF = False
             self._set_status('フォールバック中', 'myval greedy')
@@ -674,7 +678,7 @@ class SolveSessionManager:
                 reduced_values.append(last_value)
         return reduced_values
 
-    def _record_search_history(self, search_result, scramble = None):
+    def _record_search_history(self, search_result, scramble = None, trajectory_source = 'direct-search'):
         """探索結果をSearch3学習データ化用の履歴へ保存する。"""
         if scramble is None:
             scramble = self._current_search_scramble()
@@ -683,6 +687,7 @@ class SolveSessionManager:
             'search_result': search_result,
             'top_group': self.frame.solve_state.last_top_group,
             'perfect_key': self.frame.solve_state.last_perfect_key,
+            'trajectory_source': trajectory_source,
         })
         self.frame.solve_state.last_search_result = search_result
 
@@ -710,6 +715,9 @@ class SolveSessionManager:
             'search_result': search_result,
             'top_group': self.frame.solve_state.last_top_group,
             'perfect_key': self.frame.solve_state.last_perfect_key,
+            'trajectory_source': (
+                'greedy-fallback' if state.fallback_used else 'greedy'
+            ),
         })
         self.frame.solve_state.last_search_result = search_result
 
@@ -1245,6 +1253,7 @@ class SolveSessionManager:
 
             combined_moves = ()
             if state.search_TF or self.frame.AIs[self.frame.AI_idx].search_mode == "search2":
+                self._store_connected_steps_to_goal_training_sample()
                 self._store_connected_myloss_training_sample()
                 for moves in state.move_lis:
                     combined_moves += moves
@@ -1473,6 +1482,9 @@ class SolveSessionManager:
                 'maxFrontier': getattr(ai, 'search2_max_frontier', None),
                 'batchSize': getattr(ai, 'search2_torch_batch_size', None),
                 'valueLossType': getattr(ai, 'search2_value_loss_type', None),
+                'valueTargetScale': getattr(ai, 'search2_value_target_scale', None),
+                'rankLossMix': getattr(ai, 'search2_rank_loss_mix', None),
+                'rankLossApplyType': getattr(ai, 'search2_rank_loss_apply_type', None),
             },
             'search3C': getattr(ai, 'search3_C', None),
             'search3DepthSchedule': {
@@ -1491,6 +1503,8 @@ class SolveSessionManager:
             },
             'search3Replay': {
                 'recentRatio': getattr(ai, 'train_recent_ratio', None),
+                'shortMaxSteps': getattr(ai, 'train_short_sequence_max_steps', None),
+                'shortMinRatio': getattr(ai, 'train_short_sequence_min_ratio', None),
                 'mediumMinSteps': getattr(ai, 'train_medium_sequence_min_steps', None),
                 'mediumMaxSteps': getattr(ai, 'train_medium_sequence_max_steps', None),
                 'mediumRatio': getattr(ai, 'train_medium_sequence_ratio', None),
@@ -1539,6 +1553,35 @@ class SolveSessionManager:
             target_ai_indices = target_ai_indices,
         )
 
+    def _store_connected_steps_to_goal_training_sample(self):
+        """Store one whole successful Search2 route for calibrated Value learning.
+
+        Search2 can apply several separately searched move segments before the
+        goal.  Regression targets must use the distance to that final goal,
+        not the length of each local segment, so join the route before
+        simplifying and calculating the descending step labels.
+        """
+        state = self.frame.solve_state
+        source_ai = self._current_source_ai()
+        if getattr(source_ai, 'search_mode', None) != 'search2':
+            return False
+        target_ai_indices = self._steps_to_goal_search2_ai_indices()
+        if not target_ai_indices:
+            return False
+        connected_moves = tuple(
+            move for moves in state.move_lis for move in moves
+        )
+        if len(connected_moves) == 0:
+            return False
+        return self._store_search2_training_sample(
+            state.s,
+            connected_moves,
+            source_ai = source_ai,
+            source_search_mode = 'search2',
+            source_value_loss_type = 'steps_to_goal_regression',
+            target_ai_indices = target_ai_indices,
+        )
+
     def _myloss_search2_ai_indices(self):
         indices = []
         for ai_index, ai in enumerate(self.frame.AIs):
@@ -1548,6 +1591,16 @@ class SolveSessionManager:
             ):
                 indices.append(ai_index)
         return indices
+
+    def _steps_to_goal_search2_ai_indices(self):
+        return [
+            ai_index
+            for ai_index, ai in enumerate(self.frame.AIs)
+            if (
+                getattr(ai, 'search_mode', None) == 'search2'
+                and getattr(ai, 'search2_value_loss_type', None) == 'steps_to_goal'
+            )
+        ]
 
     def _current_source_ai(self):
         if self.frame.AI_idx in range(self.frame.AInum):
@@ -1562,6 +1615,7 @@ class SolveSessionManager:
         source_search_mode = None,
         source_value_loss_type = None,
         target_ai_indices = None,
+        steps_to_goal = None,
     ):
         """保存前に手順列を簡約してから Search2 学習データへ追加する。"""
         simplified_moves = self.frame.cube.simplify(moves)
@@ -1591,6 +1645,10 @@ class SolveSessionManager:
             source_ai_index = self.frame.AI_idx,
             source_search_mode = source_search_mode,
             source_search2_value_loss_type = source_value_loss_type,
+            steps_to_goal = (
+                tuple(range(len(simplified_moves), -1, -1))
+                if steps_to_goal is None else steps_to_goal
+            ),
         )
         data_item.succeeded = True
         self.frame.AIs[self.frame.AI_idx].datas.append(data_item)
@@ -1604,6 +1662,8 @@ class SolveSessionManager:
 
     def _default_search2_target_ai_indices(self, source_value_loss_type):
         """通常Search2データを学習対象にするAI indexを返す。"""
+        if source_value_loss_type == 'steps_to_goal_regression':
+            return self._steps_to_goal_search2_ai_indices()
         if source_value_loss_type == 'myloss2_pairwise':
             return [
                 ai_index
@@ -1613,7 +1673,11 @@ class SolveSessionManager:
                     and getattr(ai,'search2_value_loss_type',None) == 'myloss'
                 )
             ]
-        return range(self.frame.AInum)
+        return [
+            ai_index
+            for ai_index, ai in enumerate(self.frame.AIs)
+            if getattr(ai, 'search2_value_loss_type', None) != 'steps_to_goal'
+        ]
 
 
 

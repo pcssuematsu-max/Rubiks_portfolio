@@ -169,15 +169,64 @@ def _default_initial_scramble_groups(size,puzzle_type):
     if size == 3:
         return (
             [
-                (" R "," U'"," F2"),
-                (" F "," U2"," R'"),
+                (" U "," B2"," L2"," F "," L2"," B2"," U'"),
+                (" R "," D'"," R'"," F "," R "," D "," R'"),
+                (" M "," F "," U "," F "," U'"," F'"," M'"),
+                (" R "," E "," F "," M "," F'"," E'"," R'"),
+                (" R'"," U "," F'"," U "," F "," U'"," R "),
+                (" R'"," U "," F'"," U'"," F "," U'"," R "),
+                (" R'"," U "," F'"," U2"," F "," U'"," R "),
+                (" E'", ' B2', " L'", ' S ', ' L ', ' B2', ' E '),
+
+                (" R "," U "," R'"," U'"," F'"," U "," F "),
+                (" F'"," R "," U "," R'"," U'"," F'"," U "," F2"),
+                (" L'"," R "," U "," R'"," U'"," F'"," U "," F "," L "),
+                (" B "," R "," U "," R'"," U'"," F'"," U "," F "," B'"),
+
+                (" U "," F'"," U'"," R'"," F'"," R "," F "),
+                (" F "," U "," F'"," U'"," R'"," F'"," R "),
+                (" F'"," U "," F'"," U'"," R'"," F'"," R "," F2"),
+                (" F2"," U "," F'"," U'"," R'"," F'"," R "," F'"),
+
+                (" M "," U "," M'"," U'"),
+                (" R "," M "," U "," M'"," U'"," R'"),
+                (" R'"," M "," U "," M'"," U'"," R "),
+                (" M2"," U "," M2"," U'"),
+                (" R "," M2"," U "," M2"," U'"," R'"),
+                (" R'"," M2"," U "," M2"," U'"," R "),
+
+                (" U2"," R'"," F "," R "," F'"," U2"),
+                (" U'"," R'"," F "," R "," F'"," U "),
+                (" U "," R'"," F "," R "," F'"," U'"),
+
+                (" F "," R "," U2"," R'"," U2"," F'"),
+                (" F'"," R "," U2"," R'"," U2"," F "),
+                (" F2"," R "," U2"," R'"," U2"," F2"),
+
+                (" F'", " U'", ' F ', " R'", ' F ', ' R ', " F'", ' U '),
+                (" U'"," F'", " U'", ' F ', " R'", ' F ', ' R ', " F'", ' U2'),
+
+                (" F "," R'"," F'"," D'"," F "," D "," F2"," U "," B2"," U'"," F2"," U "," B2"," U'"," R "),
+                (" E'", ' L2', ' E ', ' L2', " R'", ' D ', ' R ', ' D2', ' F ', ' D ', ' R ', ' F ', " R'", " D'", " F'", ' D '),
+
+
+                (' D ', " U'", ' R ', " U'", " R'", ' U2', " F'", " U'", " R'", " F'", ' R ', ' U ', ' F ', " D'"),
+                (' L2', ' B ', ' L ', " B'", " L'", " D'", ' B ', ' D ', ' L ', " U'", ' L ', ' U '),
+                (' R ', " U'", " R'", ' U2', " F'", " U'", " R'", " F'", ' R ', ' U ', ' F ', " U'"),
+                (" R'", ' F ', " D'", ' B2', " U'", ' L ', ' U ', ' B2', ' F2', " L'", ' F2', ' L ', ' F2', ' D2', ' R ', ' D ', " R'", ' D2', " F'", ' R '),
+                (' R ', ' F ', " D'", ' B2', " U'", ' L ', ' U ', ' B2', ' F2', " L'", ' F2', ' L ', ' F2', ' D2', ' R ', ' D ', " R'", ' D2', " F'", " R'"),
+                (" U'", " R'", " U'", ' R ', " U'", ' B2', ' D ', " L'", " D'", ' B2', " U'"),
+                (' L ', " D'", " L'", ' D ', " L'", ' F2', ' R ', " U'", " R'", ' F2', ' L '),
+                (" U'", ' R2', " F'", ' R ', ' F ', ' R ', " U'", ' R2', ' F ', ' R ', ' F ', " R'", " F'", ' R ', ' U ', ' R ', ' U '),
+                (' L ', ' D2', " B'", ' D ', ' B ', ' D ', " L'", ' D2', ' B ', ' D ', ' B ', " D'", " B'", ' D ', ' L ', ' D ', " L'"),
+
             ],
             [
-                (" E "," S "),
-                (" M "," E'"),
+                (' R2', ' B ', " L'", ' B2', ' U ', " F'", " U'", ' B ', ' U ', ' F ', " U'", ' R2', ' B ', ' L ', " B'"),
+                (" R "," F "," R'"," B2"," R "," F'"," R'"," B2"),
+                (" E "," F "," E "," F "," E "," F2"," E'"," F "," E'"," F "," E'"," F2"),
             ],
             [
-                (" F'", ' D ', " F'", ' U ', ' F ', " D'", " U'", ' F2', ' U ', ' F ', " U'", " F'"),
             ],
             [],
             [],
@@ -272,14 +321,17 @@ def build_experiment_frame_config():
         'search3'
         if ai_index in [2,3,4,5,6,7,10,11,18,19]
         else 'search2'
-        for ai_index in range(20)
+        for ai_index in range(25)
     ]
-    original_transformer_attention = [False] * 10 + [True] * 10
+    # AI20/21 compare the calibrated value target on Linear, while AI22-24
+    # use the same target with Transformer attention.
+    original_transformer_attention = [False] * 10 + [True] * 10 + [False,False,True,True,True]
     ai_count = len(ai_search_modes)
     is_search2_ai = [mode.startswith('search2') for mode in ai_search_modes]
     lrs = [
         2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,2.0e-6,
         5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,
+        2.0e-6,2.0e-6,5.0e-6,5.0e-6,5.0e-6,
     ]
     wdlrs = [
         1.0e-4 if original_transformer_attention[ai_index] else (1.0e-7 if is_search2_ai[ai_index] else 1.0e-5)
@@ -289,18 +341,17 @@ def build_experiment_frame_config():
     weight_decay = [True] * ai_count
     activations = ['SiLU'] * ai_count
     residuals = [True] * ai_count
-    #search2_value_loss_types = ['myloss','myloss','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss2_pairwise','myloss','myloss'] * 2
-    search2_value_loss_types = ['myloss','myloss','myloss','myloss','myloss','myloss','myloss','myloss','myloss','myloss'] * 2
+    search2_value_loss_types = ['myloss'] * 20 + ['steps_to_goal'] * 5
     search2_value_loss_margins = [0.0] * ai_count
-    search2_rank_loss_mixes = [
-        5.0 if search2_value_loss_types[ai_index] in ('myloss2','myloss2_pairwise') else 0.0
-        for ai_index in range(ai_count)
-    ]
-    search2_rank_loss_apply_types = ['all'] * ai_count
-    # A/B: Transformer Search3 の半数だけに、同一経路の残り手数を
-    # 順序付ける弱い補助損失を加える。AI 18/19 は基準群として維持する。
+    # The calibrated regression group uses only its direct Huber objective.
+    search2_value_target_scales = [1.0] * ai_count
+    search2_rank_loss_mixes = [0.0] * ai_count
+    search2_rank_loss_apply_types = ['all'] * 20 + ['none'] * 5
+    # Transformer Search3: fixed validation shows the rank-loss pair (10/11)
+    # orders value states more reliably than its no-rank baseline (18/19).
+    # Raise only that treatment to 0.10 while retaining the latter as control.
     search3_rank_loss_mixes = [
-        0.05 if ai_index in (10,11) else 0.0
+        0.10 if ai_index in (10,11) else 0.0
         for ai_index in range(ai_count)
     ]
     # Search3 budget allocation.  Linear Search3 also exercises the staged
@@ -312,7 +363,13 @@ def build_experiment_frame_config():
         search3_budget_modes[ai_index] = 'progressive'
     search3_budget_stage_playouts = [(1000,3000,6000)] * ai_count
     search3_budget_confidence_visit_shares = [0.70] * ai_count
-    search3_budget_min_improvements = [0.05] * ai_count
+    # The Linear progressive variants otherwise abandon 30+ move cases at
+    # tier 2 too often.  Let a smaller, still positive value improvement
+    # justify the final tier; fixed peers remain the comparison baseline.
+    search3_budget_min_improvements = [
+        0.02 if ai_index in (3,5,7) else 0.05
+        for ai_index in range(ai_count)
+    ]
     search3_budget_min_playout_depths = [3.0] * ai_count
     # A growing root preference after the middle tier is another sign that
     # additional Search3 budget can be useful, even before Value rises 0.05.
@@ -339,7 +396,7 @@ def build_experiment_frame_config():
 #        {'selector': {'correct': True, 'solve_group':'ObliqueCenter-B'}, 'basis': [9 + 11 * i for i in range(5)], 'scale': -0.05},
 #        {'selector': {'correct': True, 'solve_group':'CoreCenter'}, 'basis': [10 + 11 * i for i in range(5)], 'scale': -0.05},
         ],
-    ] * (20)
+    ] * ai_count
     # Example:
     # w1_initializers[10] = [
     #     {'selector': {'correct': True}, 'basis': 0, 'scale': 0.05},
@@ -353,10 +410,10 @@ def build_experiment_frame_config():
     cube_size = 3
     puzzle_type = 'cube'
     if cube_size >= 6:
-        transform_idx = [0,49,50,3,52,5,54,7,24,25] * 2
-        flip_inside_idx = [False,True] * 10
+        transform_idx = ([0,49,50,3,52,5,54,7,24,25] * 2) + [0] * 5
+        flip_inside_idx = ([False,True] * 10) + [False] * 5
     else:
-        transform_idx = [0,1,2,3,4,5,6,7,24,25] * 2
+        transform_idx = ([0,1,2,3,4,5,6,7,24,25] * 2) + [0] * 5
         flip_inside_idx = [False] * ai_count
 
 
@@ -406,7 +463,8 @@ def build_experiment_frame_config():
         priority_list = [
             ['CoreCenter','ObliqueCenter-A','PlusCenter-Layer2','XCenter-Layer2','ObliqueCenter-B','PlusCenter-Layer3','XCenter-Layer3','Wing-Layer2','Wing-Layer3','Corner','MidEdge'],
             ['Wing-Layer3','Wing-Layer2','MidEdge','Corner','XCenter-Layer2','PlusCenter-Layer2','ObliqueCenter-A','XCenter-Layer3','PlusCenter-Layer3','ObliqueCenter-B','CoreCenter'],
-        ] * 10
+        ] * 13
+        priority_list = priority_list[:ai_count]
         bootstrap_datas = build_default_bootstrap_datas(cube_size = cube_size)
         bootstrap_search3_datas = None
 
@@ -427,13 +485,13 @@ def build_experiment_frame_config():
         lr_vs = [0.99] * ai_count,
         lr_hs = [0.99] * ai_count,
         out_cs = [1.0] * ai_count,
-        search3_cs = [2.0] * ai_count,
-        # Transformer Search3 keeps C=2 near the root, then widens its local
-        # exploration linearly to C=4 by depth 8.  Recent diagnostics show
-        # most playouts remain shallower than 10, so a d20 ramp was rarely
-        # active.  Linear Search3 remains at the fixed C=2 baseline.
-        search3_c_depth_maxes = [2.0] * 10 + [4.0] * 10,
-        search3_c_depth_ramp_depths = [0] * 10 + [8] * 10,
+        search3_cs = [0,0,3,3,5,5,7,7,0,0] + [1.0] * 10 + [0.0] * 5,
+        # Transformer Search3 keeps C=1 near the root, then widens its local
+        # exploration linearly to C=2 by depth 8.  This limits the broad
+        # root allocation previously seen with the C=2→4 schedule.  Linear
+        # Search3 keeps its C=3/5/7 comparison groups.
+        search3_c_depth_maxes = [0,0,3,3,5,5,7,7,0,0] + [2.0] * 10 + [0.0] * 5,
+        search3_c_depth_ramp_depths = [0] * 10 + [8] * 10 + [0] * 5,
         search3_budget_modes = search3_budget_modes,
         search3_budget_stage_playouts = search3_budget_stage_playouts,
         search3_budget_confidence_visit_shares = search3_budget_confidence_visit_shares,
@@ -449,6 +507,7 @@ def build_experiment_frame_config():
         ],
         search2_value_loss_types = search2_value_loss_types,
         search2_value_loss_margins = search2_value_loss_margins,
+        search2_value_target_scales = search2_value_target_scales,
         search2_rank_loss_mixes = search2_rank_loss_mixes,
         search2_rank_loss_apply_types = search2_rank_loss_apply_types,
         search3_rank_loss_mixes = search3_rank_loss_mixes,
@@ -488,6 +547,17 @@ def build_experiment_frame_config():
         ],
         original_train_recent_ratios = [
             0.5 if original_transformer_attention[ai_index] else 0.0
+            for ai_index in range(ai_count)
+        ],
+        # Keep a small base of reliable local trajectories while replaying
+        # hard fallback paths.  Recent hard data otherwise drove short lines
+        # below 10% of each Transformer Search3 learning pass.
+        original_train_short_sequence_max_steps = [
+            19 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0
+            for ai_index in range(ai_count)
+        ],
+        original_train_short_sequence_min_ratios = [
+            0.20 if original_transformer_attention[ai_index] and not is_search2_ai[ai_index] else 0.0
             for ai_index in range(ai_count)
         ],
         # Keep an explicit middle-distance slice while replaying long lines.
