@@ -1,9 +1,11 @@
 """Tests for the persistent AI discovery feed."""
 
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from core.ai_discoveries import (
     AiDiscoveryStore,
@@ -170,3 +172,28 @@ class AiDiscoveryStoreTests(unittest.TestCase):
         for move in canonical_setup + canonical_moves:
             cube.make_move(move)
         self.assertTrue(cube.is_perfect())
+
+    def test_point_canonical_sequences_find_project_points_from_other_directory(self):
+        cube = Rubiks_3(size=3, RegisterMyperms=False)
+        setup = (" R ",)
+        moves = (" R'",)
+        original_directory = os.getcwd()
+        with TemporaryDirectory() as temporary_directory:
+            try:
+                os.chdir(temporary_directory)
+                canonical_setup, canonical_moves = point_canonical_discovery_sequences(cube, setup, moves)
+            finally:
+                os.chdir(original_directory)
+
+        self.assertEqual(len(canonical_setup), 1)
+        self.assertEqual(len(canonical_moves), 1)
+        self.assertEqual(
+            point_canonical_discovery_sequences(cube, setup, moves),
+            (canonical_setup, canonical_moves),
+        )
+
+    def test_point_canonical_sequences_report_point_loading_errors(self):
+        cube = Rubiks_3(size=3, RegisterMyperms=False)
+        with patch("core.ai_discoveries.load_myperm_points", side_effect=OSError("points unavailable")):
+            with self.assertRaisesRegex(OSError, "points unavailable"):
+                point_canonical_discovery_sequences(cube, (" R ",), (" R'",))

@@ -1,9 +1,14 @@
+import gzip
+import json
+import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 from core.ai_discoveries import _record_id, point_canonical_discovery_sequences
 from core.myperm_points import MypermPointCalculator, load_myperm_points
 from cube.rubiks_cube import Rubiks_3
-from tools.migrate_ai_discoveries_points import migrate_payload
+from tools.migrate_ai_discoveries_points import migrate_file, migrate_payload
 
 
 def record(cube, setup, moves, found_at):
@@ -21,6 +26,27 @@ def record(cube, setup, moves, found_at):
 
 
 class DiscoveryPointMigrationTests(unittest.TestCase):
+    def test_file_migration_keeps_a_backup_and_original_permissions(self):
+        cube = Rubiks_3(size=3, RegisterMyperms=False)
+        payload = {
+            "schemaVersion": 1,
+            "updatedAt": "2026-09-01T00:00:00+00:00",
+            "discoveries": [record(cube, (" R ",), (" R'",), "2026-09-01T00:00:00+00:00")],
+        }
+        with TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "ai-discoveries.json"
+            original = (json.dumps(payload) + "\n").encode("utf-8")
+            path.write_bytes(original)
+            os.chmod(str(path), 0o644)
+
+            stats, backup_path = migrate_file(path, write=True)
+
+            self.assertEqual(stats["source_count"], 1)
+            self.assertIsNotNone(backup_path)
+            self.assertEqual(gzip.decompress(backup_path.read_bytes()), original)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(len(json.loads(path.read_text(encoding="utf-8"))["discoveries"]), 1)
+
     def test_equivalent_orientations_share_one_canonical_record(self):
         cube = Rubiks_3(size=3, RegisterMyperms=False)
         setup = (" R ", " U ", " F ")

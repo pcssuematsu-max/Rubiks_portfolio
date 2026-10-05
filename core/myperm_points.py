@@ -499,11 +499,11 @@ def parse_myperm_points_text(text, puzzle = None):
     return MypermPointTable(points_by_part = points_by_part, default_by_part = default_by_part)
 
 
-def load_myperm_points(path = "Points.txt", puzzle = None):
-    """Load a point table from Points.txt."""
+def load_myperm_points(path = None, puzzle = None):
+    """Load the project's Points.txt unless an explicit path is supplied."""
     if puzzle is None:
         puzzle = "cube"
-    resolved = Path(path).resolve()
+    resolved = Path(path if path is not None else _PROJECT_ROOT / "Points.txt").resolve()
     stamp = resolved.stat()
     return _cached_point_table(
         str(resolved), stamp.st_mtime_ns, stamp.st_ctime_ns, stamp.st_size, puzzle,

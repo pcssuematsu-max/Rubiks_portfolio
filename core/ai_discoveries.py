@@ -64,7 +64,7 @@ def _record_id(puzzle: str, setup: list[str], discovery_kind: str = "full-solve"
     return sha256("\0".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
-def point_canonical_discovery_sequences(cube, setup, moves, *, point_calculator = None, strict = False) -> tuple[tuple, tuple]:
+def point_canonical_discovery_sequences(cube, setup, moves, *, point_calculator = None) -> tuple[tuple, tuple]:
     """Return setup and solution in the same highest-point orientation.
 
     Tied solution scores use setup and move text to select one stable orientation
@@ -73,30 +73,25 @@ def point_canonical_discovery_sequences(cube, setup, moves, *, point_calculator 
     """
     source_setup = tuple(setup)
     source_moves = tuple(moves)
-    try:
-        calculator = point_calculator or MypermPointCalculator(
-            cube,
-            load_myperm_points(puzzle = getattr(cube, "myperm_point_puzzle", None)),
-        )
-        transform_count = len(getattr(cube, "transformation_keys", ()))
-        if not transform_count:
-            return source_setup, source_moves
-        best = None
-        for transform_index in range(transform_count):
-            transformed_moves = tuple(cube.transform(source_moves, transform_index))
-            transformed_setup = tuple(cube.transform(source_setup, transform_index))
-            point = calculator.point_for_moves(transformed_moves)
-            display_key = (
-                tuple(_clean_moves(transformed_moves)),
-                tuple(_clean_moves(transformed_setup)),
-                transform_index,
-            )
-            if best is None or point > best[0] or (point == best[0] and display_key < best[1]):
-                best = (point, display_key, transformed_setup, transformed_moves)
-    except (OSError, AttributeError, KeyError, TypeError, ValueError):
-        if strict:
-            raise
+    calculator = point_calculator or MypermPointCalculator(
+        cube,
+        load_myperm_points(puzzle = getattr(cube, "myperm_point_puzzle", None)),
+    )
+    transform_count = len(getattr(cube, "transformation_keys", ()))
+    if not transform_count:
         return source_setup, source_moves
+    best = None
+    for transform_index in range(transform_count):
+        transformed_moves = tuple(cube.transform(source_moves, transform_index))
+        transformed_setup = tuple(cube.transform(source_setup, transform_index))
+        point = calculator.point_for_moves(transformed_moves)
+        display_key = (
+            tuple(_clean_moves(transformed_moves)),
+            tuple(_clean_moves(transformed_setup)),
+            transform_index,
+        )
+        if best is None or point > best[0] or (point == best[0] and display_key < best[1]):
+            best = (point, display_key, transformed_setup, transformed_moves)
     return best[2], best[3]
 
 

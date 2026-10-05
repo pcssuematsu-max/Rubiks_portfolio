@@ -1388,9 +1388,8 @@ class Frame(Tk.Frame):
         puzzle = web_puzzle_key(self.puzzle_type, self.cube_size)
         if puzzle is None:
             return
-        setup, moves = point_canonical_discovery_sequences(self.cube, setup, moves)
-
         try:
+            setup, moves = point_canonical_discovery_sequences(self.cube, setup, moves)
             if self.puzzle_adapter is None:
                 from core.myperm_effects import MypermEffectAnalyzer
                 effect = MypermEffectAnalyzer(self.cube).analyze(moves)
@@ -1404,7 +1403,7 @@ class Frame(Tk.Frame):
                 effect_metadata = effect_metadata,
                 discovery_kind = discovery_kind,
             )
-        except (OSError, ValueError) as error:
+        except (OSError, AttributeError, KeyError, TypeError, ValueError) as error:
             self.append_log(f'Web discoveries: 保存できませんでした ({error})')
             return
 

@@ -107,7 +107,7 @@ def migrate_payload(payload, *, migrated_at=None, progress=None):
             stats["invalid_source_replays"] += 1
 
         canonical_setup, canonical_moves = point_canonical_discovery_sequences(
-            cube, setup, moves, point_calculator=calculator, strict=True,
+            cube, setup, moves, point_calculator=calculator,
         )
         display_setup = _display_moves(canonical_setup)
         display_moves = _display_moves(canonical_moves)
@@ -190,6 +190,7 @@ def _backup_path(source):
 def migrate_file(path, *, write=False, progress=None):
     path = Path(path)
     original_bytes = path.read_bytes()
+    original_mode = path.stat().st_mode & 0o777
     original_digest = sha256(original_bytes).digest()
     payload = json.loads(original_bytes)
     migrated, stats = migrate_payload(payload, progress=progress)
@@ -206,12 +207,14 @@ def migrate_file(path, *, write=False, progress=None):
             temporary_path = Path(stream.name)
             json.dump(migrated, stream, ensure_ascii=False, indent=2)
             stream.write("\n")
+        os.chmod(temporary_path, original_mode)
         try:
             if sha256(path.read_bytes()).digest() != original_digest:
                 raise RuntimeError("discovery file changed before replacement; backup retained")
             os.replace(temporary_path, path)
         finally:
-            temporary_path.unlink(missing_ok=True)
+            if temporary_path.exists():
+                temporary_path.unlink()
         AiDiscoveryStore(path)._read()
     return stats, backup_path
 
