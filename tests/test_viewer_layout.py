@@ -17,6 +17,7 @@ from ui.viewers import (
     SUCCESS_FILTER_FAILED,
     SUCCESS_FILTER_FALLBACK,
     format_activity_status,
+    format_ai_success_level_rows,
     format_ai_success_levels,
     success_viewer_filter_matches,
 )
@@ -83,6 +84,13 @@ class SuccessViewerLevelTextTests(unittest.TestCase):
         text = format_ai_success_levels((3, 5, 0), (2, 4, 1))
 
         self.assertEqual(text, ['0:3/Lv2', '1:5/Lv4', '2:0/Lv1'])
+
+    def test_success_levels_use_three_balanced_rows_for_twenty_ais(self):
+        text = format_ai_success_level_rows(range(20), (1,) * 20)
+        rows = text.splitlines()
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual([len(row.split('  ')) for row in rows], [7, 7, 6])
 
     def test_success_history_grid_displays_all_two_hundred_results(self):
         self.assertEqual(SUCCESS_HISTORY_LIMIT, 200)

@@ -21,6 +21,7 @@ SUCCESS_HISTORY_GAP = 2
 SUCCESS_HISTORY_MARGIN = 4
 SUCCESS_HISTORY_CANVAS_WIDTH = 340
 SUCCESS_HISTORY_CANVAS_HEIGHT = 46
+SUCCESS_AI_STATUS_ROWS = 3
 
 
 def format_activity_status(message, width):
@@ -41,6 +42,18 @@ def format_ai_success_levels(success_counts, levels):
         f'{index}:{int(count)}/Lv{int(level_values[index])}'
         for index,count in enumerate(success_counts)
     ]
+
+
+def format_ai_success_level_rows(success_counts, levels, row_count = SUCCESS_AI_STATUS_ROWS):
+    """Split AI success/level labels into balanced rows without widening the UI."""
+    parts = format_ai_success_levels(success_counts, levels)
+    if not parts:
+        return ''
+    items_per_row = max(1, (len(parts) + row_count - 1) // row_count)
+    return '\n'.join(
+        '  '.join(parts[start:start + items_per_row])
+        for start in range(0, len(parts), items_per_row)
+    )
 
 
 class LogViewer(Tk.Frame):
@@ -127,7 +140,7 @@ class SuccessViewer(Tk.Frame):
         self.total_label.grid(row = 0,column = 2,sticky = 'w')
         self.history_button = Tk.Button(
             self,
-            text = '実験ログ',
+            text = '履歴',
             font = self.font,
             command = self._open_history,
         )
@@ -149,9 +162,9 @@ class SuccessViewer(Tk.Frame):
             command = self._set_result_filter,
         )
         self.filter_menu.configure(font = self.font)
-        self.filter_menu.grid(row = 1,column = 0,sticky = 'w')
+        self.filter_menu.grid(row = 0,column = 5,sticky = 'e')
         self.ai_label = Tk.Label(self,text = '',font = self.font,fg = '#F0F0F0',bg = '#303030',anchor = 'w',justify = Tk.LEFT)
-        self.ai_label.grid(row = 1,column = 1,columnspan = 5,sticky = 'ew')
+        self.ai_label.grid(row = 1,column = 0,columnspan = 6,sticky = 'ew')
         self.history_canvas = Tk.Canvas(
             self,
             width = SUCCESS_HISTORY_CANVAS_WIDTH,
@@ -187,9 +200,8 @@ class SuccessViewer(Tk.Frame):
     def _update_labels(self, success_counts, levels, solve_index, ai_index, succeeded, outcome = None):
         result_text = self._result_text(succeeded,outcome)
         self.current_label.configure(text = 'N: ' + str(solve_index) + '  AI: ' + str(ai_index) + result_text)
-        self.total_label.configure(text = '自力 total: ' + str(int(np.sum(success_counts))))
-        parts = format_ai_success_levels(success_counts,levels)
-        self.ai_label.configure(text = '  '.join(parts[:10]) + '\n' + '  '.join(parts[10:]))
+        self.total_label.configure(text = '自力: ' + str(int(np.sum(success_counts))))
+        self.ai_label.configure(text = format_ai_success_level_rows(success_counts, levels))
 
     @staticmethod
     def _result_text(succeeded, outcome):
