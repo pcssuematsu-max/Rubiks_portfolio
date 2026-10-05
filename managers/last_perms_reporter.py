@@ -37,15 +37,56 @@ class LastPermsReporter:
     def lp_key_infos(self):
         """lp_show用に、keyごとのmyperm手数と発見済み最短手数を返す。"""
         infos = []
-        for key in sorted(self.frame.last_perms.keys(), key = lambda value: str(value)):
-            infos.append({
+        for key in self.frame.last_perms.keys():
+            myperm_length = self._registered_myperm_length(key)
+            info = {
                 'key': key,
                 'display_name': self._display_group_name(key),
-                'myperm_length': self._registered_myperm_length(key),
+                'myperm_length': myperm_length,
                 'found_minimum_length': self._minimum_length(key),
                 'found_lengths': tuple(sorted({len(moves) for moves in self.frame.last_perms[key]})),
-            })
-        return infos
+                'effect_count': self._effect_count_for_key(key, myperm_length),
+            }
+            infos.append(info)
+        return sorted(infos, key = self._lp_key_sort_key)
+
+    def _effect_count_for_key(self, key, myperm_length):
+        """keyを代表する手順のEffect数を返し、解析不能時はNoneにする。"""
+        moves = self._registered_myperm_moves(key) if myperm_length is not None else None
+        if moves is None:
+            moves = min(self.frame.last_perms[key], key = len)
+        try:
+            adapter = getattr(self.frame,'puzzle_adapter',None)
+            if adapter is not None:
+                effect = adapter.analyze_effect(self.frame.cube, moves)
+            else:
+                from core.myperm_effects import MypermEffectAnalyzer
+                effect = MypermEffectAnalyzer(self.frame.cube).analyze(moves)
+            return int(effect.moved_count)
+        except (AttributeError, KeyError, TypeError, ValueError):
+            return None
+
+    def _registered_myperm_moves(self, base_key):
+        """登録mypermがあれば、その代表手順を返す。"""
+        myperms_key = resolve_myperm_key(self.frame.cube, base_key)
+        if myperms_key is None:
+            myperms_key = self._legacy_transform_zero_key(base_key)
+        if myperms_key is None:
+            return None
+        return self.frame.cube.myperms[myperms_key]
+
+    @staticmethod
+    def _lp_key_sort_key(info):
+        """myperm優先、Effect数、発見済み最短手数の順でkeyを並べる。"""
+        effect_count = info['effect_count']
+        if effect_count is None:
+            effect_count = float('inf')
+        return (
+            0 if info['myperm_length'] is not None else 1,
+            effect_count,
+            info['found_minimum_length'],
+            str(info['display_name']),
+        )
 
     def show_counter(self, N):
         """cube.counter[N]に記録された手順と回数を優先度順に表示する。"""
@@ -113,14 +154,8 @@ class LastPermsReporter:
 
     def _registered_myperm_length(self, base_key):
         """登録済み myperm の transform 0 長を puzzle ごとに解決する。"""
-        myperms_key = resolve_myperm_key(self.frame.cube, base_key)
-        if myperms_key is not None:
-            return len(self.frame.cube.myperms[myperms_key])
-
-        legacy_key = self._legacy_transform_zero_key(base_key)
-        if legacy_key is None:
-            return None
-        return len(self.frame.cube.myperms[legacy_key])
+        moves = self._registered_myperm_moves(base_key)
+        return None if moves is None else len(moves)
 
     def _legacy_transform_zero_key(self, base_key):
         """文字列 key の myperms から transform 0 を探す。"""

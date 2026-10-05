@@ -25,6 +25,15 @@ def format_activity_status(message, width):
     return text[:width - 1] + '…'
 
 
+def format_ai_success_levels(success_counts, levels):
+    """AIごとの直接成功数と現在levelを、Success Viewer用に整形する。"""
+    level_values = np.asarray(levels).reshape(-1)
+    return [
+        f'{index}:{int(count)}/Lv{int(level_values[index])}'
+        for index,count in enumerate(success_counts)
+    ]
+
+
 class LogViewer(Tk.Frame):
     """学習ログなどの短いテキストを GUI 上に蓄積表示する。"""
 
@@ -145,24 +154,24 @@ class SuccessViewer(Tk.Frame):
         if callable(self.on_open_summary):
             self.on_open_summary()
 
-    def put_summary(self, success_counts, solve_index, ai_index):
-        self._update_labels(success_counts,solve_index,ai_index,None)
+    def put_summary(self, success_counts, levels, solve_index, ai_index):
+        self._update_labels(success_counts,levels,solve_index,ai_index,None)
         self._draw_history()
 
-    def put_result(self, success_counts, solve_index, ai_index, succeeded, outcome = None):
+    def put_result(self, success_counts, levels, solve_index, ai_index, succeeded, outcome = None):
         if outcome is None:
             outcome = 'search_success' if succeeded else 'search_failed'
         self.history.append((solve_index,ai_index,str(outcome)))
         if len(self.history) > self.history_limit:
             self.history = self.history[-self.history_limit:]
-        self._update_labels(success_counts,solve_index,ai_index,succeeded,outcome)
+        self._update_labels(success_counts,levels,solve_index,ai_index,succeeded,outcome)
         self._draw_history()
 
-    def _update_labels(self, success_counts, solve_index, ai_index, succeeded, outcome = None):
+    def _update_labels(self, success_counts, levels, solve_index, ai_index, succeeded, outcome = None):
         result_text = self._result_text(succeeded,outcome)
         self.current_label.configure(text = 'N: ' + str(solve_index) + '  AI: ' + str(ai_index) + result_text)
         self.total_label.configure(text = '自力 total: ' + str(int(np.sum(success_counts))))
-        parts = [str(index) + ':' + str(int(count)) for index,count in enumerate(success_counts)]
+        parts = format_ai_success_levels(success_counts,levels)
         self.ai_label.configure(text = '  '.join(parts[:10]) + '\n' + '  '.join(parts[10:]))
 
     @staticmethod

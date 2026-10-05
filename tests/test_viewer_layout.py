@@ -10,6 +10,7 @@ from ui.viewers import (
     SUCCESS_FILTER_FAILED,
     SUCCESS_FILTER_FALLBACK,
     format_activity_status,
+    format_ai_success_levels,
     success_viewer_filter_matches,
 )
 
@@ -68,6 +69,13 @@ class ActivityStatusLayoutTests(unittest.TestCase):
 
     def test_short_status_is_not_truncated(self):
         self.assertEqual(format_activity_status('待機中', 24), '状況: 待機中')
+
+
+class SuccessViewerLevelTextTests(unittest.TestCase):
+    def test_success_text_includes_current_level_for_each_ai(self):
+        text = format_ai_success_levels((3, 5, 0), (2, 4, 1))
+
+        self.assertEqual(text, ['0:3/Lv2', '1:5/Lv4', '2:0/Lv1'])
 
 
 class SuccessViewerFilterTests(unittest.TestCase):

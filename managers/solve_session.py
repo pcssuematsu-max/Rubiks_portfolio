@@ -1315,6 +1315,7 @@ class SolveSessionManager:
             )
             self.frame.success_viewer.put_result(
                 self.frame.success,
+                self.frame.level[:,self.frame.stage],
                 self.frame.N,
                 self.frame.AI_idx,
                 result_recorded,
@@ -1343,6 +1344,12 @@ class SolveSessionManager:
                 self.frame.stage = 0
                 self.frame.my_scramble = []
                 self.frame.learn()
+            self.frame.success_viewer.put_summary(
+                self.frame.success,
+                self.frame.level[:,self.frame.stage],
+                self.frame.N,
+                self.frame.AI_idx,
+            )
 
         state.phase = -1
         if result_recorded:

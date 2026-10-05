@@ -887,7 +887,7 @@ class Frame(Tk.Frame):
             on_open_summary = self.show_experiment_summary,
         )
         self.success_viewer.grid(row = 1,column = 0,sticky = 'ew')
-        self.success_viewer.put_summary(self.success,self.N,self.AI_idx)
+        self.success_viewer.put_summary(self.success,self.level[:,self.stage],self.N,self.AI_idx)
         # Keep the log in the right column: it shares the lower row with the
         # analysis and summary panels instead of requiring another full row.
         self.log_viewer = LogViewer(self,width = 48,height = 12)

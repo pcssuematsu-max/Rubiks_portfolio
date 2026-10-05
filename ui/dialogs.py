@@ -111,7 +111,10 @@ class LpShowDialog(Tk.Toplevel):
     def _key_label(self, info):
         display_name = str(info['display_name'])
         key = str(info['key'])
-        return display_name if display_name == key else f'{display_name} ({key})'
+        effect_count = info['effect_count']
+        effect_text = '?' if effect_count is None else str(effect_count)
+        name = display_name if display_name == key else f'{display_name} ({key})'
+        return f'{name}  [Effect {effect_text} / 最短 {info["found_minimum_length"]}手]'
 
     def _select_key(self):
         info = self._infos_by_label.get(self.key_var.get())
@@ -120,10 +123,11 @@ class LpShowDialog(Tk.Toplevel):
             return
         myperm_length = info['myperm_length']
         myperm_text = '該当なし' if myperm_length is None else f'{myperm_length}手'
+        effect_count = '?' if info['effect_count'] is None else str(info['effect_count'])
         found_length = info['found_minimum_length']
         found_lengths = ', '.join(str(length) for length in info['found_lengths'])
         self.summary_var.set(
-            f"登録myperm: {myperm_text}\n"
+            f"登録myperm: {myperm_text}  / Effect数: {effect_count}\n"
             f"発見済み最短: {found_length}手  / 記録済み手数: {found_lengths}"
         )
         self.length_var.set(str(found_length))
