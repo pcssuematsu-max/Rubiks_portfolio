@@ -25,7 +25,7 @@ class ControlPanel(Tk.Frame):
     def __init__(self,master,frame,initial_mode = 'advanced'):
         Tk.Frame.__init__(self,master,relief = Tk.RIDGE,bd = 4)
         self.frame = frame
-        self.font = ('Century Gothic',12,'bold')
+        self.font = ('Century Gothic',13,'bold')
         self.panel_mode = initial_mode
         self._build_buttons()
         self._configure_columns()
@@ -156,7 +156,7 @@ class ControlPanel(Tk.Frame):
 
     def _create_button(self, master, text, command, row, column, columnspan = 1):
         """共通スタイルの Button を作って grid 配置する。"""
-        button = Tk.Button(master,text = text,font = self.font,padx = 1,pady = 1,command = command)
+        button = Tk.Button(master,text = text,font = self.font,padx = 4,pady = 2,command = command)
         button.grid(row = row,column = column,columnspan = columnspan,sticky = 'ew')
         return button
 

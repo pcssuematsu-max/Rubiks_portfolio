@@ -5,6 +5,13 @@ import numpy as np
 from managers.debug_analysis import DebugAnalysisManager, VIEWER_RANGE_TEXT_WIDTH
 from ui.viewers import (
     MoveViewer,
+    SUCCESS_HISTORY_BLOCK,
+    SUCCESS_HISTORY_CANVAS_HEIGHT,
+    SUCCESS_HISTORY_COLUMNS,
+    SUCCESS_HISTORY_GAP,
+    SUCCESS_HISTORY_LIMIT,
+    SUCCESS_HISTORY_MARGIN,
+    SUCCESS_HISTORY_ROWS,
     SUCCESS_FILTER_ALL,
     SUCCESS_FILTER_DIRECT,
     SUCCESS_FILTER_FAILED,
@@ -76,6 +83,16 @@ class SuccessViewerLevelTextTests(unittest.TestCase):
         text = format_ai_success_levels((3, 5, 0), (2, 4, 1))
 
         self.assertEqual(text, ['0:3/Lv2', '1:5/Lv4', '2:0/Lv1'])
+
+    def test_success_history_grid_displays_all_two_hundred_results(self):
+        self.assertEqual(SUCCESS_HISTORY_LIMIT, 200)
+        self.assertEqual(SUCCESS_HISTORY_COLUMNS * SUCCESS_HISTORY_ROWS, 200)
+        required_height = (
+            SUCCESS_HISTORY_MARGIN * 2
+            + SUCCESS_HISTORY_ROWS * SUCCESS_HISTORY_BLOCK
+            + (SUCCESS_HISTORY_ROWS - 1) * SUCCESS_HISTORY_GAP
+        )
+        self.assertLessEqual(required_height, SUCCESS_HISTORY_CANVAS_HEIGHT)
 
 
 class SuccessViewerFilterTests(unittest.TestCase):

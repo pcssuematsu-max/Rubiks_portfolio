@@ -13,6 +13,15 @@ SUCCESS_FILTER_ALL = 'すべて'
 SUCCESS_FILTER_FALLBACK = 'Fallbackのみ'
 SUCCESS_FILTER_FAILED = '失敗のみ'
 
+SUCCESS_HISTORY_LIMIT = 200
+SUCCESS_HISTORY_COLUMNS = 25
+SUCCESS_HISTORY_ROWS = 8
+SUCCESS_HISTORY_BLOCK = 10
+SUCCESS_HISTORY_GAP = 3
+SUCCESS_HISTORY_MARGIN = 5
+SUCCESS_HISTORY_CANVAS_WIDTH = 340
+SUCCESS_HISTORY_CANVAS_HEIGHT = 112
+
 
 def format_activity_status(message, width):
     """Return a one-line activity status that never exceeds the viewer width."""
@@ -48,7 +57,7 @@ class LogViewer(Tk.Frame):
             textvariable = self.status_var,
             width = self.status_width,
             height = 1,
-            font = ('Menlo', 10, 'bold'),
+            font = ('Menlo', 11, 'bold'),
             fg = '#F0F0F0',
             bg = '#303030',
             anchor = 'w',
@@ -63,7 +72,7 @@ class LogViewer(Tk.Frame):
             fg = '#E8E8E8',
             insertbackground = '#E8E8E8',
             relief = Tk.FLAT,
-            font = ('Menlo', 10),
+            font = ('Menlo', 11),
         )
         self.text.pack(fill = 'both', expand = True)
         self.text.configure(state = Tk.DISABLED)
@@ -100,10 +109,12 @@ class SuccessViewer(Tk.Frame):
         self.on_open_history = on_open_history
         self.on_open_summary = on_open_summary
         self.history = []
-        self.history_limit = 200
-        self.history_columns = 40
-        self.history_block = 4
-        self.font = ('Futura',9,'bold')
+        self.history_limit = SUCCESS_HISTORY_LIMIT
+        self.history_columns = SUCCESS_HISTORY_COLUMNS
+        self.history_block = SUCCESS_HISTORY_BLOCK
+        self.history_gap = SUCCESS_HISTORY_GAP
+        self.history_margin = SUCCESS_HISTORY_MARGIN
+        self.font = ('Futura',11,'bold')
         self.result_filter = Tk.StringVar(value = SUCCESS_FILTER_DIRECT)
         self._build_widgets()
 
@@ -141,7 +152,13 @@ class SuccessViewer(Tk.Frame):
         self.filter_menu.grid(row = 1,column = 0,sticky = 'w')
         self.ai_label = Tk.Label(self,text = '',font = self.font,fg = '#F0F0F0',bg = '#303030',anchor = 'w',justify = Tk.LEFT)
         self.ai_label.grid(row = 1,column = 1,columnspan = 5,sticky = 'ew')
-        self.history_canvas = Tk.Canvas(self,width = 300,height = 28,bg = '#202020',highlightthickness = 0)
+        self.history_canvas = Tk.Canvas(
+            self,
+            width = SUCCESS_HISTORY_CANVAS_WIDTH,
+            height = SUCCESS_HISTORY_CANVAS_HEIGHT,
+            bg = '#202020',
+            highlightthickness = 0,
+        )
         self.history_canvas.grid(row = 2,column = 0,columnspan = 6,sticky = 'ew')
         for column_index in range(6):
             self.grid_columnconfigure(column_index, weight = 1)
@@ -189,7 +206,6 @@ class SuccessViewer(Tk.Frame):
 
     def _draw_history(self):
         self.history_canvas.delete('history')
-        margin = 4
         visible_history = [
             result for result in self.history
             if success_viewer_filter_matches(result[2], self.result_filter.get())
@@ -197,8 +213,8 @@ class SuccessViewer(Tk.Frame):
         for index,result in enumerate(visible_history[-self.history_limit:]):
             column_index = index % self.history_columns
             row_index = index // self.history_columns
-            x0 = margin + column_index * (self.history_block + 2)
-            y0 = margin + row_index * (self.history_block + 2)
+            x0 = self.history_margin + column_index * (self.history_block + self.history_gap)
+            y0 = self.history_margin + row_index * (self.history_block + self.history_gap)
             x1 = x0 + self.history_block
             y1 = y0 + self.history_block
             color = success_viewer_outcome_color(result[2])
@@ -356,7 +372,7 @@ class MoveViewer(Tk.Canvas):
         self.text_color = '#FFFFFF'
         self.move_color = '#000000'
         self.font = 'Futura'
-        self.font_size = 10
+        self.font_size = 11
         self.words_in_a_row = 20
         self.c_start = 150
         self.r_start = 100
@@ -510,9 +526,9 @@ class ProbViewer(Tk.Canvas):
     def __init__(self,master,move_keys):
         self.r_size = 120
         self.c_size = 350
-        self.font = ('Futura',8,'bold')
+        self.font = ('Futura',10,'bold')
         self.column_width = 55
-        self.row_height = 9
+        self.row_height = 11
         self.columns = 6
 
         Tk.Canvas.__init__(self,master,relief = Tk.RAISED, bd = 0,width = self.c_size,height = self.r_size,bg = '#000000')
