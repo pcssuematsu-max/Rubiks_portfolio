@@ -456,6 +456,9 @@ class Frame(Tk.Frame):
         """AI 配列数に依存する基本状態と myval AI を初期化する。"""
         self.AInum = len(self.AIs)
         self.level = 1 * np.ones((self.AInum,self.stage_num),dtype = 'i')
+        # 200 trialごとのlevel判定は、AI・stageごとに全play成功かを確認する。
+        self.level_play_counts = np.zeros((self.AInum,self.stage_num),dtype = 'i')
+        self.level_success_counts = np.zeros((self.AInum,self.stage_num),dtype = 'i')
         self.success = np.zeros((self.AInum,),dtype = 'i')
         self.move_keys = self.cube.move_keys
         self.my_scramble = []

@@ -1320,6 +1320,7 @@ class SolveSessionManager:
                 result_recorded,
                 outcome = experiment.outcome,
             )
+            self._record_level_trial(result_recorded)
 
         self.frame.N += 1
         self.frame.AI_idx += 1
@@ -1332,17 +1333,15 @@ class SolveSessionManager:
             self.frame.data_search3_len = self.frame.current_search3_data_len()
 
         if self.frame.N == 200:
+            completed_stage = self.frame.stage
+            promoted = self._promote_perfect_ai_levels(completed_stage)
+            self._log_level_promotion(completed_stage,promoted)
+            self.frame.perf_num[completed_stage] = 0
             self.frame.N = 0
             self.frame.stage += 1
             if self.frame.stage == self.frame.stage_num:
                 self.frame.stage = 0
-
-                if np.sum(self.frame.perf_num) >= 180:
-                    self.frame.level[:] += 1
-
-                print(self.frame.level[:])
                 self.frame.my_scramble = []
-                self.frame.perf_num[:] = 0
                 self.frame.learn()
 
         state.phase = -1
@@ -1355,6 +1354,51 @@ class SolveSessionManager:
         else:
             detail = '未解決'
         self._set_status('完了', detail)
+
+    def _record_level_trial(self, direct_search_succeeded):
+        """200試行単位のlevel判定に使う、AI別のplay/成功数を記録する。"""
+        ai_index = self.frame.AI_idx
+        stage = self.frame.stage
+        play_counts = getattr(self.frame,'level_play_counts',None)
+        success_counts = getattr(self.frame,'level_success_counts',None)
+        if (
+            play_counts is None
+            or success_counts is None
+            or not 0 <= ai_index < self.frame.AInum
+            or not 0 <= stage < self.frame.stage_num
+        ):
+            return
+        play_counts[ai_index,stage] += 1
+        if direct_search_succeeded:
+            success_counts[ai_index,stage] += 1
+
+    def _promote_perfect_ai_levels(self, stage):
+        """全playで直接探索に成功したAIだけ、完了stageのlevelを1上げる。"""
+        play_counts = getattr(self.frame,'level_play_counts',None)
+        success_counts = getattr(self.frame,'level_success_counts',None)
+        if play_counts is None or success_counts is None:
+            return []
+
+        promoted = []
+        for ai_index in range(self.frame.AInum):
+            plays = int(play_counts[ai_index,stage])
+            successes = int(success_counts[ai_index,stage])
+            if plays > 0 and successes == plays:
+                self.frame.level[ai_index,stage] += 1
+                promoted.append((ai_index,plays))
+        play_counts[:,stage] = 0
+        success_counts[:,stage] = 0
+        return promoted
+
+    def _log_level_promotion(self, stage, promoted):
+        """level判定の結果を短くログへ残す。"""
+        if not hasattr(self.frame,'append_log'):
+            return
+        if promoted:
+            details = ', '.join(f'AI {ai_index} ({plays}/{plays})' for ai_index,plays in promoted)
+            self.frame.append_log(f'level up stage={stage}: {details}')
+            return
+        self.frame.append_log(f'level unchanged stage={stage}: 全AIに失敗あり')
 
     def _record_experiment_log(
         self,
