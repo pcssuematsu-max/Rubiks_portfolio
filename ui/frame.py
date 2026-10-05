@@ -35,7 +35,7 @@ from managers.search_data import SearchDataManager
 from managers.solve_session import SolveSessionManager, SolveSessionState
 from model.search_result import data
 from ui.control_panel import ControlPanel
-from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, ExperimentSummaryDialog, LearningHistoryDialog, LpShowKeyButton, ParamEditorDialog, RecentSolveHistoryDialog, ToolsDialog, W1EmbeddingDialog
+from ui.dialogs import AnalysisScoresDialog, DatasetInspectorDialog, ExperimentSummaryDialog, LearningHistoryDialog, LpShowDialog, ParamEditorDialog, RecentSolveHistoryDialog, ToolsDialog, W1EmbeddingDialog
 from ui.frame_config import FrameConfig
 from ui.move_controls import MoveControlProxy, square1_manual_move, update_square1_manual_status
 from ui.group_puzzle.state_viewer import GroupStateViewer
@@ -1439,14 +1439,7 @@ class Frame(Tk.Frame):
         self.myperm_manager.open_apply_dialog()
     
     def lp_show_by_button(self):
-        Frame = Tk.Toplevel(self)
-        Frame.title('show lp')
-        E_key = Tk.Entry(master = Frame,width = 20)
-        E_key.grid(row = 0,column = 0)
-        E_length = Tk.Entry(master = Frame,width = 20)
-        E_length.grid(row = 1,column = 0)
-        B = LpShowKeyButton(Frame,self,E_key,E_length)
-        B.grid(row = 2,column = 0)
+        LpShowDialog(self)
 
     def open_param_editor(self):
         ParamEditorDialog(self)

@@ -20,6 +20,9 @@ class LastPermsReporter:
 
     def lp_show(self, key, N = None):
         """指定keyのlast_permsから、指定手数または最短手数の手順を表示する。"""
+        if key not in self.frame.last_perms:
+            self.frame.append_log(f'lp_show: key not found={key}')
+            return 0
         if N == None:
             N = self._minimum_length(key)
         hit_count = 0
@@ -29,6 +32,20 @@ class LastPermsReporter:
                 print(display_moves)
                 hit_count += 1
         self.frame.append_log(f'lp_show: key={self._display_group_name(key)} len={N} hits={hit_count}')
+        return hit_count
+
+    def lp_key_infos(self):
+        """lp_show用に、keyごとのmyperm手数と発見済み最短手数を返す。"""
+        infos = []
+        for key in sorted(self.frame.last_perms.keys(), key = lambda value: str(value)):
+            infos.append({
+                'key': key,
+                'display_name': self._display_group_name(key),
+                'myperm_length': self._registered_myperm_length(key),
+                'found_minimum_length': self._minimum_length(key),
+                'found_lengths': tuple(sorted({len(moves) for moves in self.frame.last_perms[key]})),
+            })
+        return infos
 
     def show_counter(self, N):
         """cube.counter[N]に記録された手順と回数を優先度順に表示する。"""

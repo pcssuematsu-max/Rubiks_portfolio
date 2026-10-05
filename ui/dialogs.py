@@ -48,6 +48,101 @@ make_myperm_OK = MakeMypermOkButton
 lp_show_key = LpShowKeyButton
 
 
+class LpShowDialog(Tk.Toplevel):
+    """last_permsのkeyを選び、登録mypermと発見済み手順を比較して表示する。"""
+
+    def __init__(self, frame):
+        Tk.Toplevel.__init__(self, frame)
+        self.frame = frame
+        self.reporter = frame.last_perms_reporter
+        self.font = ('Century Gothic', 12, 'bold')
+        self.title('lp show')
+        self.key_var = Tk.StringVar(value = '')
+        self.length_var = Tk.StringVar(value = '')
+        self.summary_var = Tk.StringVar(value = '')
+        self.result_var = Tk.StringVar(value = '')
+        self._infos_by_label = {}
+        self._selected_info = None
+        self._build_widgets()
+        self.refresh_keys()
+
+    def _build_widgets(self):
+        Tk.Label(self, text = 'last perm key', font = self.font).grid(row = 0,column = 0,sticky = 'e',padx = 6,pady = 4)
+        self.key_menu = Tk.OptionMenu(self, self.key_var, '')
+        self.key_menu.configure(font = self.font)
+        self.key_menu.grid(row = 0,column = 1,sticky = 'ew',padx = 6,pady = 4)
+        Tk.Button(self, text = '更新', font = self.font, command = self.refresh_keys).grid(row = 0,column = 2,sticky = 'ew',padx = 6,pady = 4)
+
+        Tk.Label(self, textvariable = self.summary_var, font = ('Menlo', 11), justify = Tk.LEFT, anchor = 'w').grid(
+            row = 1,column = 0,columnspan = 3,sticky = 'ew',padx = 6,pady = (2,6),
+        )
+
+        Tk.Label(self, text = '表示する手数', font = self.font).grid(row = 2,column = 0,sticky = 'e',padx = 6,pady = 4)
+        Tk.Entry(self, textvariable = self.length_var, font = self.font, width = 12).grid(row = 2,column = 1,sticky = 'ew',padx = 6,pady = 4)
+        Tk.Button(self, text = '手順を表示', font = self.font, command = self.show_selected).grid(row = 2,column = 2,sticky = 'ew',padx = 6,pady = 4)
+
+        Tk.Label(self, textvariable = self.result_var, font = ('Menlo', 11), justify = Tk.LEFT, anchor = 'w').grid(
+            row = 3,column = 0,columnspan = 3,sticky = 'ew',padx = 6,pady = (2,6),
+        )
+        self.grid_columnconfigure(1, weight = 1)
+        self.key_var.trace_add('write', lambda *_: self._select_key())
+
+    def refresh_keys(self):
+        infos = self.reporter.lp_key_infos()
+        self._infos_by_label = {}
+        menu = self.key_menu['menu']
+        menu.delete(0, 'end')
+        for info in infos:
+            label = self._key_label(info)
+            self._infos_by_label[label] = info
+            menu.add_command(label = label, command = lambda value = label: self.key_var.set(value))
+        current = self.key_var.get()
+        if current in self._infos_by_label:
+            self._select_key()
+        elif infos:
+            self.key_var.set(self._key_label(infos[0]))
+        else:
+            self.key_var.set('')
+            self._selected_info = None
+            self.length_var.set('')
+            self.summary_var.set('last_perms はまだありません。')
+            self.result_var.set('')
+
+    def _key_label(self, info):
+        display_name = str(info['display_name'])
+        key = str(info['key'])
+        return display_name if display_name == key else f'{display_name} ({key})'
+
+    def _select_key(self):
+        info = self._infos_by_label.get(self.key_var.get())
+        self._selected_info = info
+        if info is None:
+            return
+        myperm_length = info['myperm_length']
+        myperm_text = '該当なし' if myperm_length is None else f'{myperm_length}手'
+        found_length = info['found_minimum_length']
+        found_lengths = ', '.join(str(length) for length in info['found_lengths'])
+        self.summary_var.set(
+            f"登録myperm: {myperm_text}\n"
+            f"発見済み最短: {found_length}手  / 記録済み手数: {found_lengths}"
+        )
+        self.length_var.set(str(found_length))
+        self.result_var.set('')
+
+    def show_selected(self):
+        info = self._selected_info
+        if info is None:
+            self.result_var.set('keyを選択してください。')
+            return
+        try:
+            length = int(self.length_var.get().strip())
+        except ValueError:
+            self.result_var.set('表示する手数は整数で指定してください。')
+            return
+        hit_count = self.reporter.lp_show(info['key'], length)
+        self.result_var.set(f'{length}手の手順を {hit_count} 件コンソールへ表示しました。')
+
+
 class ParamEditorDialog(Tk.Toplevel):
     """AI parameter viewer/editor dialog."""
 
