@@ -14,13 +14,13 @@ SUCCESS_FILTER_FALLBACK = 'Fallbackのみ'
 SUCCESS_FILTER_FAILED = '失敗のみ'
 
 SUCCESS_HISTORY_LIMIT = 200
-SUCCESS_HISTORY_COLUMNS = 25
-SUCCESS_HISTORY_ROWS = 8
-SUCCESS_HISTORY_BLOCK = 10
-SUCCESS_HISTORY_GAP = 3
-SUCCESS_HISTORY_MARGIN = 5
+SUCCESS_HISTORY_COLUMNS = 40
+SUCCESS_HISTORY_ROWS = 5
+SUCCESS_HISTORY_BLOCK = 6
+SUCCESS_HISTORY_GAP = 2
+SUCCESS_HISTORY_MARGIN = 4
 SUCCESS_HISTORY_CANVAS_WIDTH = 340
-SUCCESS_HISTORY_CANVAS_HEIGHT = 112
+SUCCESS_HISTORY_CANVAS_HEIGHT = 46
 
 
 def format_activity_status(message, width):
@@ -57,7 +57,7 @@ class LogViewer(Tk.Frame):
             textvariable = self.status_var,
             width = self.status_width,
             height = 1,
-            font = ('Menlo', 11, 'bold'),
+            font = ('Menlo', 10, 'bold'),
             fg = '#F0F0F0',
             bg = '#303030',
             anchor = 'w',
@@ -72,7 +72,7 @@ class LogViewer(Tk.Frame):
             fg = '#E8E8E8',
             insertbackground = '#E8E8E8',
             relief = Tk.FLAT,
-            font = ('Menlo', 11),
+            font = ('Menlo', 10),
         )
         self.text.pack(fill = 'both', expand = True)
         self.text.configure(state = Tk.DISABLED)
@@ -114,7 +114,7 @@ class SuccessViewer(Tk.Frame):
         self.history_block = SUCCESS_HISTORY_BLOCK
         self.history_gap = SUCCESS_HISTORY_GAP
         self.history_margin = SUCCESS_HISTORY_MARGIN
-        self.font = ('Futura',11,'bold')
+        self.font = ('Futura',10,'bold')
         self.result_filter = Tk.StringVar(value = SUCCESS_FILTER_DIRECT)
         self._build_widgets()
 
