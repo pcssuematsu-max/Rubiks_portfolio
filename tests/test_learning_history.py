@@ -103,6 +103,24 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['trainingSample']['fallbackSelectedItemCount'], 11)
             self.assertEqual(saved['search3RankLossMix'], 0.05)
 
+    def test_writes_steps_to_goal_regression_calibration_when_available(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'learning.json'
+            ai = _FakeAI()
+            ai.last_training_metrics = dict(ai.last_training_metrics)
+            ai.last_training_metrics['stepsToGoalRegression'] = {
+                'stateCount': 12, 'trajectoryCount': 2,
+                'targetMin': -8.0, 'targetMean': -4.0, 'targetMax': 0.0,
+                'predictionMin': -3.0, 'predictionMean': -1.0, 'predictionMax': 1.0,
+                'signedErrorMean': 3.0, 'maePerState': 3.2, 'huberPerState': 2.7,
+            }
+            LearningHistoryStore(path).append(completed_learning_record(20, ai, 1.0))
+
+            saved = LearningHistoryStore(path).records()[0]['stepsToGoalRegression']
+            self.assertEqual(saved['stateCount'], 12)
+            self.assertEqual(saved['trajectoryCount'], 2)
+            self.assertEqual(saved['signedErrorMean'], 3.0)
+
     def test_writes_fixed_validation_metrics_when_available(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / 'learning.json'

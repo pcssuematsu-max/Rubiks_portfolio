@@ -81,6 +81,7 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "fixedValidation": _fixed_validation(metrics.get("fixedValidation")),
         "trainingSample": _training_sample(metrics.get("trainingSample")),
         "gradientMetrics": _gradient_metrics(metrics.get("gradientMetrics")),
+        "stepsToGoalRegression": _steps_to_goal_regression(metrics.get("stepsToGoalRegression")),
         "updatesDuringSolve": int(metrics.get("updatesDuringSolve", 0) or 0),
         "trainingDataCount": int(metrics.get("trainingDataCount", 0) or 0),
         "retainedDataCount": int(metrics.get("retainedDataCount", 0) or 0),
@@ -134,7 +135,7 @@ def _validate_record(record: Any) -> None:
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
-        "valueSequenceCount", "fixedValidation", "trainingSample", "gradientMetrics", "search3RankLossMix",
+        "valueSequenceCount", "fixedValidation", "trainingSample", "gradientMetrics", "stepsToGoalRegression", "search3RankLossMix",
     }
     if not isinstance(record, dict) or not required.issubset(record) or set(record) - required - optional:
         raise ValueError("Invalid learning history record")
@@ -163,6 +164,7 @@ def _validate_record(record: Any) -> None:
     _validate_fixed_validation(record.get("fixedValidation"))
     _validate_training_sample(record.get("trainingSample"))
     _validate_gradient_metrics(record.get("gradientMetrics"))
+    _validate_steps_to_goal_regression(record.get("stepsToGoalRegression"))
     _validate_optional_number(record.get("search3RankLossMix"))
     _validate_optional_number(record["learningSeconds"])
     _validate_number_mapping(record["learningRate"], {"base", "lrC", "momentumV", "momentumH"})
@@ -237,6 +239,37 @@ _GRADIENT_METRIC_NUMBER_FIELDS = frozenset({
     "policyHeadL2Mean", "valueHeadL2Mean", "trunkL2Mean",
     "policyGradientShareMean", "valueGradientShareMean",
 })
+
+
+_STEPS_TO_GOAL_REGRESSION_NUMBER_FIELDS = frozenset({
+    "targetMin", "targetMean", "targetMax",
+    "predictionMin", "predictionMean", "predictionMax",
+    "signedErrorMean", "maePerState", "huberPerState",
+})
+
+
+def _steps_to_goal_regression(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    state_count = _safe_optional_int(value.get("stateCount"))
+    trajectory_count = _safe_optional_int(value.get("trajectoryCount"))
+    if state_count is None or trajectory_count is None:
+        return None
+    result = {"stateCount": state_count, "trajectoryCount": trajectory_count}
+    for key in _STEPS_TO_GOAL_REGRESSION_NUMBER_FIELDS:
+        number = _finite_number(value.get(key))
+        if number is None:
+            return None
+        result[key] = number
+    return result
+
+
+def _validate_steps_to_goal_regression(value: Any) -> None:
+    if value is None:
+        return
+    expected = {"stateCount", "trajectoryCount", *_STEPS_TO_GOAL_REGRESSION_NUMBER_FIELDS}
+    if not isinstance(value, dict) or set(value) != expected or _steps_to_goal_regression(value) != value:
+        raise ValueError("Invalid learning history stepsToGoalRegression")
 
 
 def _gradient_metrics(value: Any) -> dict[str, Any] | None:

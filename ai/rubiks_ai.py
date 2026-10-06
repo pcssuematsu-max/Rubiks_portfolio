@@ -748,7 +748,10 @@ class Rubiks_3_AI:
         if self.search2_value_loss_type == 'myloss2_pairwise':
             return MyLoss2Pairwise(self.search2_value_loss_margin)
         if self.search2_value_loss_type == 'steps_to_goal':
-            return Huber()
+            # A connected successful route can contain far more states than a
+            # normal Search2 sample.  Average by states so route length does
+            # not itself multiply one optimizer update.
+            return Huber(reduction = 'mean')
         return MyLoss2()
         
         
@@ -1149,6 +1152,7 @@ class Rubiks_3_AI:
 
     def _compute_search2_losses(self, out, args, indices, value_columns = None, value_indices = None, value_steps_to_goal = None):
         """Search2 用の policy loss と value loss を計算する。"""
+        self._last_steps_to_goal_regression_stats = None
         policy_loss = self.losslayer.forward(out[:-1],args,np.zeros(0),indices)
         self._search2_value_output_size = out.shape[1]
         if value_columns is None:
@@ -1174,6 +1178,11 @@ class Rubiks_3_AI:
             value_targets = -self.search2_value_target_scale * np.asarray(
                 value_steps_to_goal,dtype = out.dtype,
             ).reshape(1,-1)
+            self._last_steps_to_goal_regression_stats = self._steps_to_goal_regression_stats(
+                out[-1:,self._search2_value_columns],
+                value_targets,
+                len(value_indices) - 1,
+            )
             base_loss = self.losslayer2.forward(
                 out[-1:,self._search2_value_columns],
                 value_targets,
@@ -1222,6 +1231,33 @@ class Rubiks_3_AI:
             'target_scale': float(getattr(self,'search2_value_target_scale',1.0)),
         }
 
+    @staticmethod
+    def _steps_to_goal_regression_stats(predictions, targets, trajectory_count):
+        """Return compact calibration sums for a selected regression batch."""
+        prediction_values = np.asarray(predictions,dtype = 'f').reshape(-1)
+        target_values = np.asarray(targets,dtype = 'f').reshape(-1)
+        count = min(prediction_values.size,target_values.size)
+        if count <= 0:
+            return None
+        prediction_values = prediction_values[:count]
+        target_values = target_values[:count]
+        error = prediction_values - target_values
+        absolute = np.abs(error)
+        huber = np.where(absolute <= 1.0,0.5 * absolute ** 2,absolute - 0.5)
+        return {
+            'state_count': int(count),
+            'trajectory_count': max(0,int(trajectory_count)),
+            'target_sum': float(np.sum(target_values)),
+            'prediction_sum': float(np.sum(prediction_values)),
+            'signed_error_sum': float(np.sum(error)),
+            'absolute_error_sum': float(np.sum(absolute)),
+            'huber_sum': float(np.sum(huber)),
+            'target_min': float(np.min(target_values)),
+            'target_max': float(np.max(target_values)),
+            'prediction_min': float(np.min(prediction_values)),
+            'prediction_max': float(np.max(prediction_values)),
+        }
+
     def _record_search2_value_loss_components(self, base_name, base_loss, rank_loss, rank_scaled_loss, rank_applied):
         total = float(base_loss) + float(rank_scaled_loss)
         self._last_search2_value_loss_components = {
@@ -1236,6 +1272,7 @@ class Rubiks_3_AI:
             'rank_applied': bool(rank_applied),
             'margin': float(self.search2_value_loss_margin),
             'target_scale': float(self.search2_value_target_scale),
+            'steps_to_goal_stats': getattr(self,'_last_steps_to_goal_regression_stats',None),
         }
 
     def _build_loss_indices(self, d_Lis):
@@ -2041,6 +2078,29 @@ class Rubiks_3_AI:
             'retainedDataCount': max(0,int(retained_len)),
             'trainingSample': self._training_sample_history_metrics(),
             'gradientMetrics': self._gradient_history_metrics(),
+            'stepsToGoalRegression': self._steps_to_goal_history_metrics(),
+        }
+
+    def _steps_to_goal_history_metrics(self):
+        """Expose regression ranges without retaining state-level data."""
+        components = getattr(self,'_last_search2_value_loss_components',None)
+        if not isinstance(components,dict) or components.get('loss_type') != 'steps_to_goal':
+            return None
+        summary = components.get('steps_to_goal_stats')
+        if not isinstance(summary,dict):
+            return None
+        count = max(0,int(summary.get('state_count',0) or 0))
+        if count <= 0:
+            return None
+        average = lambda key: float(summary.get(key,0.0)) / count
+        return {
+            'stateCount': count,
+            'trajectoryCount': max(0,int(summary.get('trajectory_count',0) or 0)),
+            'targetMin': summary.get('target_min'), 'targetMean': average('target_sum'), 'targetMax': summary.get('target_max'),
+            'predictionMin': summary.get('prediction_min'), 'predictionMean': average('prediction_sum'), 'predictionMax': summary.get('prediction_max'),
+            'signedErrorMean': average('signed_error_sum'),
+            'maePerState': average('absolute_error_sum'),
+            'huberPerState': average('huber_sum'),
         }
 
     def _gradient_history_metrics(self):
@@ -2179,6 +2239,7 @@ class Rubiks_3_AI:
         epoch_state['new_indices'] += remainder_indices
         self._last_training_search3_quality_metrics = epoch_state.get('search3_quality_metrics')
         self._last_training_gradient_metrics = epoch_state.get('gradient_metrics')
+        self._last_search2_value_loss_components = epoch_state.get('search2_value_loss_components')
         self._report_final_search2_value_debug(epoch_state)
         return (
             epoch_state['err'],
@@ -2316,6 +2377,7 @@ class Rubiks_3_AI:
                 'margin': float(components.get('margin',0.0)),
                 'target_scale': float(components.get('target_scale',1.0)),
                 'items': 0,
+                'steps_to_goal_stats': None,
             }
         for key in ('base','rank_raw','rank_scaled','total'):
             current[key] = float(current.get(key,0.0)) + float(components.get(key,0.0))
@@ -2327,6 +2389,36 @@ class Rubiks_3_AI:
         current['rank_applied'] = bool(current.get('rank_applied',False) or components.get('rank_applied',False))
         current['margin'] = float(components.get('margin',current.get('margin',0.0)))
         current['target_scale'] = float(components.get('target_scale',current.get('target_scale',1.0)))
+        current['steps_to_goal_stats'] = self._merge_steps_to_goal_regression_stats(
+            current.get('steps_to_goal_stats'),
+            components.get('steps_to_goal_stats'),
+        )
+        return current
+
+    @staticmethod
+    def _merge_steps_to_goal_regression_stats(current, incoming):
+        if incoming is None:
+            return current
+        if current is None:
+            current = {
+                'state_count': 0, 'trajectory_count': 0,
+                'target_sum': 0.0, 'prediction_sum': 0.0,
+                'signed_error_sum': 0.0, 'absolute_error_sum': 0.0,
+                'huber_sum': 0.0,
+                'target_min': None, 'target_max': None,
+                'prediction_min': None, 'prediction_max': None,
+            }
+        for key in ('state_count','trajectory_count'):
+            current[key] += int(incoming.get(key,0) or 0)
+        for key in ('target_sum','prediction_sum','signed_error_sum','absolute_error_sum','huber_sum'):
+            current[key] += float(incoming.get(key,0.0) or 0.0)
+        for key,compare in (
+            ('target_min',min),('target_max',max),
+            ('prediction_min',min),('prediction_max',max),
+        ):
+            value = incoming.get(key)
+            if value is not None:
+                current[key] = float(value) if current[key] is None else compare(current[key],float(value))
         return current
 
     def _build_training_batches(self, indices, data_source, batch_size, state_batch_size, state_count_fn):
@@ -3090,6 +3182,7 @@ class Rubiks_3_AI:
         return total_loss
 
     def _torch_search2_value_loss(self, values, indices, value_columns = None, value_steps_to_goal = None):
+        self._last_steps_to_goal_regression_stats = None
         if value_columns is not None:
             if len(value_columns) == 0:
                 self._record_search2_value_loss_components('none',0.0,0.0,0.0,False)
@@ -3111,7 +3204,7 @@ class Rubiks_3_AI:
             base_name = 'myloss2_pairwise'
         elif self.search2_value_loss_type == 'steps_to_goal':
             value_loss = self._torch_search2_value_loss_steps_to_goal(
-                values,value_steps_to_goal,
+                values,value_steps_to_goal,len(indices) - 1,
             )
             base_name = 'steps_to_goal_huber'
         else:
@@ -3191,14 +3284,17 @@ class Rubiks_3_AI:
             return torch.zeros((), dtype = values.dtype, device = values.device)
         return total_loss
 
-    def _torch_search2_value_loss_steps_to_goal(self, values, value_steps_to_goal):
+    def _torch_search2_value_loss_steps_to_goal(self, values, value_steps_to_goal, trajectory_count):
         if value_steps_to_goal is None:
             targets = torch.zeros_like(values)
         else:
             targets = -self.search2_value_target_scale * torch.as_tensor(
                 value_steps_to_goal,dtype = values.dtype,device = values.device,
             )
-        return F_torch.smooth_l1_loss(values,targets,reduction = 'sum',beta = 1.0)
+        self._last_steps_to_goal_regression_stats = self._steps_to_goal_regression_stats(
+            values.detach().cpu().numpy(), targets.detach().cpu().numpy(), trajectory_count,
+        )
+        return F_torch.smooth_l1_loss(values,targets,reduction = 'mean',beta = 1.0)
 
     def _torch_search3_losses_and_grads(self, search3_inputs):
         device = self._torch_training_device()

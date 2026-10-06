@@ -951,6 +951,7 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"updates={latest['updatesDuringSolve']}  data={latest['trainingDataCount']}→{latest['retainedDataCount']}\n"
                 f"Search3 quality: {self._search3_quality_text(latest)}\n"
                 f"学習抽出: {self._training_sample_text(latest)}\n"
+                f"steps_to_goal: {self._steps_to_goal_regression_text(latest)}\n"
                 f"勾配: {self._gradient_metrics_text(latest)}\n"
                 f"固定検証: {self._fixed_validation_text(latest)}\n"
                 f"Search3 深さ別: {self._search3_depth_summary_text(depth_bands)}\n"
@@ -973,6 +974,8 @@ class LearningHistoryDialog(Tk.Toplevel):
                 lines.append(f"  Search3 quality: {self._search3_quality_text(record)}")
             if record.get('trainingSample') is not None:
                 lines.append(f"  学習抽出: {self._training_sample_text(record)}")
+            if record.get('stepsToGoalRegression') is not None:
+                lines.append(f"  steps_to_goal: {self._steps_to_goal_regression_text(record)}")
             if record.get('gradientMetrics') is not None:
                 lines.append(f"  勾配: {self._gradient_metrics_text(record)}")
             if record.get('fixedValidation') is not None:
@@ -1315,6 +1318,23 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"{self._number(metrics.get('trunkL2Mean'))}  "
             f"P比={self._rate(metrics.get('policyGradientShareMean'))}  "
             f"V比={self._rate(metrics.get('valueGradientShareMean'))}"
+        )
+
+    def _steps_to_goal_regression_text(self, record):
+        metrics = record.get('stepsToGoalRegression')
+        if not metrics:
+            return '（対象外／未記録）'
+        return (
+            f"state/route={metrics.get('stateCount', '--')}/{metrics.get('trajectoryCount', '--')}  "
+            f"target={self._number(metrics.get('targetMin'))}/"
+            f"{self._number(metrics.get('targetMean'))}/"
+            f"{self._number(metrics.get('targetMax'))}  "
+            f"pred={self._number(metrics.get('predictionMin'))}/"
+            f"{self._number(metrics.get('predictionMean'))}/"
+            f"{self._number(metrics.get('predictionMax'))}  "
+            f"bias={self._number(metrics.get('signedErrorMean'))}  "
+            f"MAE/state={self._number(metrics.get('maePerState'))}  "
+            f"Huber/state={self._number(metrics.get('huberPerState'))}"
         )
 
     def _fixed_validation_text(self, record):

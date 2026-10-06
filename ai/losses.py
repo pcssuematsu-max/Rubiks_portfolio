@@ -297,8 +297,11 @@ class MyLoss2Pairwise:
 class Huber:
     """Smooth L1 regression for calibrated Search2 step-distance values."""
 
-    def __init__(self, delta = 1.0):
+    def __init__(self, delta = 1.0, reduction = 'sum'):
         self.delta = max(1.0e-8,float(delta))
+        if reduction not in ('sum','mean'):
+            raise ValueError(f'unknown Huber reduction: {reduction}')
+        self.reduction = reduction
         self.x = np.zeros(0,dtype = 'f')
         self.t = np.zeros(0,dtype = 'f')
         self.diff = np.zeros(0,dtype = 'f')
@@ -310,11 +313,17 @@ class Huber:
         absolute = np.abs(self.diff)
         quadratic = np.minimum(absolute,self.delta)
         linear = absolute - quadratic
-        return np.sum(0.5 * quadratic ** 2 + self.delta * linear)
+        total = np.sum(0.5 * quadratic ** 2 + self.delta * linear)
+        if self.reduction == 'mean' and self.diff.size:
+            return total / self.diff.size
+        return total
 
     def backward(self):
-        return np.where(
+        gradient = np.where(
             np.abs(self.diff) <= self.delta,
             self.diff,
             self.delta * np.sign(self.diff),
         )
+        if self.reduction == 'mean' and self.diff.size:
+            gradient = gradient / self.diff.size
+        return gradient

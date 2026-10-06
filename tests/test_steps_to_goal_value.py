@@ -16,6 +16,14 @@ class StepsToGoalValueTests(unittest.TestCase):
         self.assertAlmostEqual(loss.forward(prediction, target), 2.5)
         np.testing.assert_allclose(loss.backward(), [[0.0, 1.0]])
 
+    def test_huber_mean_reduction_keeps_longer_routes_from_scaling_one_update(self):
+        loss = Huber(reduction = 'mean')
+        prediction = np.asarray([[-3.0, 2.0]], dtype = 'f')
+        target = np.asarray([[-3.0, -1.0]], dtype = 'f')
+
+        self.assertAlmostEqual(loss.forward(prediction, target), 1.25)
+        np.testing.assert_allclose(loss.backward(), [[0.0, 0.5]])
+
     def test_connected_search2_route_has_distances_to_the_final_goal(self):
         shared_data = []
         source_ai = SimpleNamespace(
