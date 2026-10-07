@@ -1483,6 +1483,8 @@ class SolveSessionManager:
                 'batchSize': getattr(ai, 'search2_torch_batch_size', None),
                 'valueLossType': getattr(ai, 'search2_value_loss_type', None),
                 'valueTargetScale': getattr(ai, 'search2_value_target_scale', None),
+                'stepsToGoalValueLossWeight': getattr(ai, 'steps_to_goal_value_loss_weight', None),
+                'stepsToGoalStatesPerBand': getattr(ai, 'steps_to_goal_states_per_band', None),
                 'rankLossMix': getattr(ai, 'search2_rank_loss_mix', None),
                 'rankLossApplyType': getattr(ai, 'search2_rank_loss_apply_type', None),
             },
@@ -1645,6 +1647,7 @@ class SolveSessionManager:
             source_ai_index = self.frame.AI_idx,
             source_search_mode = source_search_mode,
             source_search2_value_loss_type = source_value_loss_type,
+            trajectory_origin = ('fallback' if getattr(state,'fallback_used',False) else 'direct_search'),
             steps_to_goal = (
                 tuple(range(len(simplified_moves), -1, -1))
                 if steps_to_goal is None else steps_to_goal

@@ -15,6 +15,7 @@ class data:
         source_search_mode = 'search2',
         source_search2_value_loss_type = None,
         steps_to_goal = None,
+        trajectory_origin = 'legacy',
     ):
         self.scramble = scramble
         self.moves = moves
@@ -24,6 +25,7 @@ class data:
         self.source_ai_index = source_ai_index
         self.source_search_mode = source_search_mode
         self.source_search2_value_loss_type = source_search2_value_loss_type
+        self.trajectory_origin = str(trajectory_origin or 'legacy')
         if steps_to_goal is None:
             steps_to_goal = tuple(range(len(moves),-1,-1))
         self.steps_to_goal = tuple(steps_to_goal)

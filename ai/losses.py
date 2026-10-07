@@ -299,21 +299,35 @@ class Huber:
 
     def __init__(self, delta = 1.0, reduction = 'sum'):
         self.delta = max(1.0e-8,float(delta))
-        if reduction not in ('sum','mean'):
+        if reduction not in ('sum','mean','trajectory_sum'):
             raise ValueError(f'unknown Huber reduction: {reduction}')
         self.reduction = reduction
         self.x = np.zeros(0,dtype = 'f')
         self.t = np.zeros(0,dtype = 'f')
         self.diff = np.zeros(0,dtype = 'f')
+        self.trajectory_scales = np.zeros(0,dtype = 'f')
 
-    def forward(self,x,t):
+    def forward(self,x,t,indices = None):
         self.x = x
         self.t = np.asarray(t,dtype = x.dtype).reshape(x.shape)
         self.diff = self.x - self.t
         absolute = np.abs(self.diff)
         quadratic = np.minimum(absolute,self.delta)
         linear = absolute - quadratic
-        total = np.sum(0.5 * quadratic ** 2 + self.delta * linear)
+        element_loss = 0.5 * quadratic ** 2 + self.delta * linear
+        self.trajectory_scales = np.ones_like(self.diff,dtype = self.diff.dtype)
+        if self.reduction == 'trajectory_sum':
+            total = 0.0
+            if indices is None:
+                indices = (0,self.diff.shape[1])
+            for index in range(len(indices) - 1):
+                start,end = indices[index],indices[index + 1]
+                count = max(0,end - start)
+                if count:
+                    total += np.sum(element_loss[:,start:end]) / count
+                    self.trajectory_scales[:,start:end] = 1.0 / count
+            return total
+        total = np.sum(element_loss)
         if self.reduction == 'mean' and self.diff.size:
             return total / self.diff.size
         return total
@@ -326,4 +340,6 @@ class Huber:
         )
         if self.reduction == 'mean' and self.diff.size:
             gradient = gradient / self.diff.size
+        elif self.reduction == 'trajectory_sum':
+            gradient = gradient * self.trajectory_scales
         return gradient

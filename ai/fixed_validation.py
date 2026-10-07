@@ -37,7 +37,7 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
     cube = ai.cube
     original_state = cube.state.copy()
     try:
-        states, policy_targets, value_targets, path_slices, length_slices = _fixture_tensors(ai)
+        states, policy_targets, value_targets, remaining_steps, path_slices, length_slices = _fixture_tensors(ai)
         outputs = ai.predict(states, policy = True, value = True, loss = False, retain_cache = False)
     finally:
         cube.state[:] = original_state
@@ -74,7 +74,32 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
         }
         for length, length_slice in length_slices.items()
     }
+    if getattr(ai, "search2_value_loss_type", "") == "steps_to_goal":
+        metrics["stepsToGoalByRemainingSteps"] = _steps_to_goal_remaining_step_metrics(
+            ai, policy_logits, raw_values, policy_targets, value_targets, remaining_steps,
+        )
     return metrics
+
+
+def _steps_to_goal_remaining_step_metrics(ai, policy_logits, raw_values, policy_targets, value_targets, remaining_steps):
+    """Expose calibration separately near, mid, and far from the goal."""
+    bands = (("0-10",0,10),("11-30",11,30),("31+",31,None))
+    result = {}
+    for label,minimum,maximum in bands:
+        mask = remaining_steps >= minimum
+        if maximum is not None:
+            mask &= remaining_steps <= maximum
+        count = int(np.sum(mask))
+        if count == 0:
+            continue
+        result[label] = {
+            "stateCount": count,
+            **_quality_metrics(
+                ai,policy_logits[:,mask],raw_values[mask],policy_targets[mask],
+                value_targets[mask],(),
+            ),
+        }
+    return result
 
 
 def _quality_metrics(ai, policy_logits, raw_values, policy_targets, value_targets, path_slices):
@@ -119,6 +144,7 @@ def _fixture_tensors(ai):
     state_columns = []
     policy_targets = []
     value_targets = []
+    remaining_steps_list = []
     path_slices = []
     length_slices = {}
     gamma = float(getattr(ai, "value_target_gamma", (1 / 2) ** (1 / 20)))
@@ -137,6 +163,7 @@ def _fixture_tensors(ai):
                 state_columns.append(cube.makedata())
                 policy_targets.append(cube.key_to_num[move])
                 remaining_steps = len(solution) - move_index
+                remaining_steps_list.append(remaining_steps)
                 value_targets.append(
                     -target_scale * remaining_steps
                     if steps_to_goal else gamma ** remaining_steps
@@ -149,6 +176,7 @@ def _fixture_tensors(ai):
         np.asarray(state_columns, dtype = "f").T,
         np.asarray(policy_targets, dtype = int),
         np.asarray(value_targets, dtype = "f"),
+        np.asarray(remaining_steps_list, dtype = int),
         tuple(path_slices),
         length_slices,
     )

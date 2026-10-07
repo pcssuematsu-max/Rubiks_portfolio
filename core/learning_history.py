@@ -199,6 +199,9 @@ def _fixed_validation(value: Any) -> dict[str, Any] | None:
     by_length = _fixed_validation_by_length(value.get("byLength"))
     if by_length is not None:
         result["byLength"] = by_length
+    remaining_steps = _fixed_validation_remaining_steps(value.get("stepsToGoalByRemainingSteps"))
+    if remaining_steps is not None:
+        result["stepsToGoalByRemainingSteps"] = remaining_steps
     return result
 
 
@@ -261,14 +264,42 @@ def _steps_to_goal_regression(value: Any) -> dict[str, Any] | None:
         if number is None:
             return None
         result[key] = number
+    if "lossWeight" in value:
+        weight = _finite_number(value.get("lossWeight"))
+        if weight is None or weight < 0.0:
+            return None
+        result["lossWeight"] = weight
+    if "origins" in value:
+        source_rows = value.get("origins")
+        if not isinstance(source_rows, dict):
+            return None
+        origins = {}
+        for origin, metrics in source_rows.items():
+            if not isinstance(origin, str) or not origin:
+                return None
+            copied = _steps_to_goal_regression(metrics)
+            if copied is None or "lossWeight" in copied or "origins" in copied or "remainingStepBands" in copied:
+                return None
+            origins[origin] = copied
+        result["origins"] = origins
+    if "remainingStepBands" in value:
+        bands = value.get("remainingStepBands")
+        expected_bands = {"0-10", "11-30", "31+"}
+        if not isinstance(bands, dict) or set(bands) != expected_bands:
+            return None
+        copied_bands = {label: _safe_optional_int(bands.get(label)) for label in expected_bands}
+        if any(count is None for count in copied_bands.values()):
+            return None
+        result["remainingStepBands"] = copied_bands
     return result
 
 
 def _validate_steps_to_goal_regression(value: Any) -> None:
     if value is None:
         return
-    expected = {"stateCount", "trajectoryCount", *_STEPS_TO_GOAL_REGRESSION_NUMBER_FIELDS}
-    if not isinstance(value, dict) or set(value) != expected or _steps_to_goal_regression(value) != value:
+    required = {"stateCount", "trajectoryCount", *_STEPS_TO_GOAL_REGRESSION_NUMBER_FIELDS}
+    allowed = required | {"lossWeight", "origins", "remainingStepBands"}
+    if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed or _steps_to_goal_regression(value) != value:
         raise ValueError("Invalid learning history stepsToGoalRegression")
 
 
@@ -361,6 +392,24 @@ def _fixed_validation_by_length(value: Any) -> dict[str, dict[str, Any]] | None:
     return result
 
 
+def _fixed_validation_remaining_steps(value: Any) -> dict[str, dict[str, Any]] | None:
+    """Copy optional calibrated-regression metrics by remaining-step band."""
+    if not isinstance(value, dict) or len(value) == 0:
+        return None
+    result = {}
+    for label,metrics in value.items():
+        if label not in {"0-10", "11-30", "31+"} or not isinstance(metrics, dict):
+            return None
+        state_count = _safe_optional_int(metrics.get("stateCount"))
+        if state_count is None:
+            return None
+        copied = {"stateCount": state_count}
+        for key in _FIXED_VALIDATION_NUMBERS:
+            copied[key] = _finite_number(metrics.get(key))
+        result[label] = copied
+    return result
+
+
 def _validate_fixed_validation(value: Any) -> None:
     if value is None:
         return
@@ -368,7 +417,7 @@ def _validate_fixed_validation(value: Any) -> None:
         "fixtureId", "fixtureLengths", "fixtureCount", "stateCount",
         *_FIXED_VALIDATION_NUMBERS,
     }
-    if not isinstance(value, dict) or set(value) - expected - {"byLength"}:
+    if not isinstance(value, dict) or set(value) - expected - {"byLength", "stepsToGoalByRemainingSteps"}:
         raise ValueError("Invalid learning history fixedValidation")
     if not isinstance(value["fixtureId"], str) or not value["fixtureId"]:
         raise ValueError("Invalid learning history fixedValidation fixture")
@@ -384,6 +433,10 @@ def _validate_fixed_validation(value: Any) -> None:
         _validate_optional_number(value[key])
     if "byLength" in value:
         _validate_fixed_validation_by_length(value["byLength"])
+    if "stepsToGoalByRemainingSteps" in value:
+        normalized = _fixed_validation_remaining_steps(value["stepsToGoalByRemainingSteps"])
+        if normalized is None or normalized != value["stepsToGoalByRemainingSteps"]:
+            raise ValueError("Invalid learning history fixedValidation remaining-step bands")
 
 
 def _validate_fixed_validation_by_length(value: Any) -> None:

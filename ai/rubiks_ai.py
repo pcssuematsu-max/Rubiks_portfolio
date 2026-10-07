@@ -25,7 +25,7 @@ from ai.transformer_variance import transformer_parameter_target_variance
 
 
 class Rubiks_3_AI:
-    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_short_sequence_max_steps = None,train_short_sequence_min_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_value_target_scale = 1.0,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
+    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_short_sequence_max_steps = None,train_short_sequence_min_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_value_target_scale = 1.0,steps_to_goal_value_loss_weight = 1.0,steps_to_goal_states_per_band = 0,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
         if cube == None:
             self.cube = Rubiks_3(size = cube_size)
         else:
@@ -78,6 +78,8 @@ class Rubiks_3_AI:
         self.search2_value_loss_type = self._normalize_search2_value_loss_type(search2_value_loss_type)
         self.search2_value_loss_margin = float(search2_value_loss_margin)
         self.search2_value_target_scale = max(0.0,float(search2_value_target_scale))
+        self.steps_to_goal_value_loss_weight = max(0.0,float(steps_to_goal_value_loss_weight))
+        self.steps_to_goal_states_per_band = max(0,int(steps_to_goal_states_per_band))
         self.search2_rank_loss_mix = float(search2_rank_loss_mix)
         self.search2_rank_loss_apply_type = self._normalize_search2_rank_loss_apply_type(search2_rank_loss_apply_type)
         self.search3_rank_loss_mix = float(search3_rank_loss_mix)
@@ -321,6 +323,14 @@ class Rubiks_3_AI:
 
     def set_search2_value_target_scale(self, scale):
         self.search2_value_target_scale = max(0.0,float(scale))
+
+    def set_steps_to_goal_value_loss_weight(self, weight):
+        """Set the loss-only coefficient without changing calibrated targets."""
+        self.steps_to_goal_value_loss_weight = max(0.0,float(weight))
+
+    def set_steps_to_goal_states_per_band(self, cap):
+        """Cap sampled states in each remaining-step band of one route."""
+        self.steps_to_goal_states_per_band = max(0,int(cap))
 
     def set_search2_rank_loss_mix(self, mix):
         """Set the auxiliary Search2 rank-loss coefficient."""
@@ -748,10 +758,10 @@ class Rubiks_3_AI:
         if self.search2_value_loss_type == 'myloss2_pairwise':
             return MyLoss2Pairwise(self.search2_value_loss_margin)
         if self.search2_value_loss_type == 'steps_to_goal':
-            # A connected successful route can contain far more states than a
-            # normal Search2 sample.  Average by states so route length does
-            # not itself multiply one optimizer update.
-            return Huber(reduction = 'mean')
+            # Normalize inside each route but retain one contribution per
+            # route.  A global state mean made Value gradients disappear when
+            # a batch contained many long solved routes.
+            return Huber(reduction = 'trajectory_sum')
         return MyLoss2()
         
         
@@ -1127,6 +1137,7 @@ class Rubiks_3_AI:
             loss_inputs['value_columns'],
             loss_inputs['value_indices'],
             loss_inputs['value_steps_to_goal'],
+            loss_inputs['value_trajectory_origins'],
         )
 
     def _build_loss_inputs(self, d_lis, transformation = 0, flip_inside = False):
@@ -1135,7 +1146,7 @@ class Rubiks_3_AI:
         args = np.zeros(total_steps - len(d_lis),dtype = 'i')
         x = np.zeros((self.ips,total_steps))
         self._fill_loss_tensors(d_lis, transformation, flip_inside, args, x)
-        value_columns,value_indices = self._build_search2_value_loss_selection(d_lis,indices)
+        value_columns,value_indices,value_trajectory_origins = self._build_search2_value_loss_selection(d_lis,indices)
         value_steps_to_goal = self._build_search2_value_steps_to_goal(d_lis,indices,value_columns)
         return {
             'indices': indices,
@@ -1144,13 +1155,14 @@ class Rubiks_3_AI:
             'value_columns': value_columns,
             'value_indices': value_indices,
             'value_steps_to_goal': value_steps_to_goal,
+            'value_trajectory_origins': value_trajectory_origins,
         }
 
     def _predict_loss_outputs(self, x):
         """loss 計算用に policy/value 出力をまとめて推論する。"""
         return self.predict(x,policy = True,value = True,loss = True,retain_cache = True)
 
-    def _compute_search2_losses(self, out, args, indices, value_columns = None, value_indices = None, value_steps_to_goal = None):
+    def _compute_search2_losses(self, out, args, indices, value_columns = None, value_indices = None, value_steps_to_goal = None, value_trajectory_origins = None):
         """Search2 用の policy loss と value loss を計算する。"""
         self._last_steps_to_goal_regression_stats = None
         policy_loss = self.losslayer.forward(out[:-1],args,np.zeros(0),indices)
@@ -1182,11 +1194,16 @@ class Rubiks_3_AI:
                 out[-1:,self._search2_value_columns],
                 value_targets,
                 len(value_indices) - 1,
+                value_indices,
+                value_trajectory_origins,
+                value_steps_to_goal,
             )
             base_loss = self.losslayer2.forward(
                 out[-1:,self._search2_value_columns],
                 value_targets,
+                value_indices,
             )
+            base_loss *= self.steps_to_goal_value_loss_weight
             base_name = 'steps_to_goal_huber'
         else:
             base_loss = self.losslayer2.forward(out[-1:,self._search2_value_columns],value_indices)
@@ -1229,10 +1246,11 @@ class Rubiks_3_AI:
             'rank_applied': False,
             'margin': float(getattr(self,'search2_value_loss_margin',0.0)),
             'target_scale': float(getattr(self,'search2_value_target_scale',1.0)),
+            'steps_to_goal_value_loss_weight': float(getattr(self,'steps_to_goal_value_loss_weight',1.0)),
         }
 
     @staticmethod
-    def _steps_to_goal_regression_stats(predictions, targets, trajectory_count):
+    def _steps_to_goal_regression_stats(predictions, targets, trajectory_count, indices = None, trajectory_origins = None, remaining_steps = None):
         """Return compact calibration sums for a selected regression batch."""
         prediction_values = np.asarray(predictions,dtype = 'f').reshape(-1)
         target_values = np.asarray(targets,dtype = 'f').reshape(-1)
@@ -1244,7 +1262,7 @@ class Rubiks_3_AI:
         error = prediction_values - target_values
         absolute = np.abs(error)
         huber = np.where(absolute <= 1.0,0.5 * absolute ** 2,absolute - 0.5)
-        return {
+        result = {
             'state_count': int(count),
             'trajectory_count': max(0,int(trajectory_count)),
             'target_sum': float(np.sum(target_values)),
@@ -1257,6 +1275,28 @@ class Rubiks_3_AI:
             'prediction_min': float(np.min(prediction_values)),
             'prediction_max': float(np.max(prediction_values)),
         }
+        if remaining_steps is not None:
+            steps = np.asarray(remaining_steps,dtype = 'f').reshape(-1)[:count]
+            result['remaining_step_bands'] = {
+                '0-10': int(np.sum((steps >= 0) & (steps <= 10))),
+                '11-30': int(np.sum((steps >= 11) & (steps <= 30))),
+                '31+': int(np.sum(steps >= 31)),
+            }
+        if indices is not None and trajectory_origins is not None:
+            result['origins'] = {}
+            for index,origin in enumerate(trajectory_origins):
+                start = max(0,int(indices[index]))
+                end = min(count,int(indices[index + 1]))
+                if end <= start:
+                    continue
+                origin_stats = Rubiks_3_AI._steps_to_goal_regression_stats(
+                    prediction_values[start:end],target_values[start:end],1,
+                    remaining_steps = None if remaining_steps is None else np.asarray(remaining_steps)[start:end],
+                )
+                result['origins'][origin] = Rubiks_3_AI._merge_steps_to_goal_regression_stats(
+                    result['origins'].get(origin),origin_stats,
+                )
+        return result
 
     def _record_search2_value_loss_components(self, base_name, base_loss, rank_loss, rank_scaled_loss, rank_applied):
         total = float(base_loss) + float(rank_scaled_loss)
@@ -1272,6 +1312,7 @@ class Rubiks_3_AI:
             'rank_applied': bool(rank_applied),
             'margin': float(self.search2_value_loss_margin),
             'target_scale': float(self.search2_value_target_scale),
+            'steps_to_goal_value_loss_weight': float(self.steps_to_goal_value_loss_weight),
             'steps_to_goal_stats': getattr(self,'_last_steps_to_goal_regression_stats',None),
         }
 
@@ -1288,16 +1329,50 @@ class Rubiks_3_AI:
         """Return output columns/index boundaries used by the Search2 value loss."""
         columns = []
         value_indices = [0]
+        trajectory_origins = []
         total = 0
         for data_index,data_item in enumerate(d_lis):
             start = indices[data_index]
             end = indices[data_index + 1]
             if not self._uses_search2_value_loss_for_sample(data_item):
                 continue
-            columns.extend(range(start,end))
-            total += end - start
+            route_columns = self._steps_to_goal_value_columns_for_route(data_item,start,end)
+            if not route_columns:
+                continue
+            columns.extend(route_columns)
+            total += len(route_columns)
             value_indices.append(total)
-        return np.asarray(columns,dtype = 'i'), value_indices
+            trajectory_origins.append(self._steps_to_goal_trajectory_origin(data_item))
+        return np.asarray(columns,dtype = 'i'), value_indices, trajectory_origins
+
+    def _steps_to_goal_value_columns_for_route(self, data_item, start, end):
+        """Balance near/mid/far Value supervision within a long route."""
+        count = end - start
+        if self.search2_value_loss_type != 'steps_to_goal':
+            return list(range(start,end))
+        cap = max(0,int(getattr(self,'steps_to_goal_states_per_band',0)))
+        if cap == 0:
+            return list(range(start,end))
+        steps = self._steps_to_goal_for_search2_data(data_item,count)
+        selected = []
+        for minimum,maximum in ((0,10),(11,30),(31,None)):
+            positions = [
+                index for index,step in enumerate(steps)
+                if step >= minimum and (maximum is None or step <= maximum)
+            ]
+            if len(positions) > cap:
+                positions = random.sample(positions,cap)
+            selected.extend(positions)
+        return [start + index for index in sorted(selected)]
+
+    @staticmethod
+    def _steps_to_goal_trajectory_origin(data_item):
+        origin = str(getattr(data_item,'trajectory_origin','legacy') or 'legacy').lower()
+        if origin in ('direct','direct_search','direct-search'):
+            return 'direct_search'
+        if origin in ('fallback','greedy_fallback','greedy-fallback'):
+            return 'fallback'
+        return 'legacy'
 
     def _build_search2_value_steps_to_goal(self, d_lis, indices, value_columns):
         if len(value_columns) == 0:
@@ -2089,6 +2164,24 @@ class Rubiks_3_AI:
         summary = components.get('steps_to_goal_stats')
         if not isinstance(summary,dict):
             return None
+        result = self._steps_to_goal_history_metrics_for_summary(summary)
+        if result is None:
+            return None
+        result['lossWeight'] = float(components.get('steps_to_goal_value_loss_weight',1.0))
+        result['remainingStepBands'] = {
+            label: int(count)
+            for label,count in (summary.get('remaining_step_bands') or {}).items()
+        }
+        origins = {}
+        for origin,origin_summary in (summary.get('origins') or {}).items():
+            origin_metrics = self._steps_to_goal_history_metrics_for_summary(origin_summary)
+            if origin_metrics is not None:
+                origins[str(origin)] = origin_metrics
+        result['origins'] = origins
+        return result
+
+    @staticmethod
+    def _steps_to_goal_history_metrics_for_summary(summary):
         count = max(0,int(summary.get('state_count',0) or 0))
         if count <= 0:
             return None
@@ -2344,6 +2437,7 @@ class Rubiks_3_AI:
             f'type={components.get("loss_type","")} '
             f'margin={float(components.get("margin",0.0)):.4f} '
             f'target_scale={float(components.get("target_scale",1.0)):.4f} '
+            f'value_weight={float(components.get("steps_to_goal_value_loss_weight",1.0)):.4f} '
             f'rank_mix={float(components.get("rank_mix",0.0)):.4f} '
             f'rank_apply={components.get("rank_apply_type","")} '
             f'rank_applied={bool(components.get("rank_applied",False))}\n'
@@ -2376,6 +2470,7 @@ class Rubiks_3_AI:
                 'rank_applied': False,
                 'margin': float(components.get('margin',0.0)),
                 'target_scale': float(components.get('target_scale',1.0)),
+                'steps_to_goal_value_loss_weight': float(components.get('steps_to_goal_value_loss_weight',1.0)),
                 'items': 0,
                 'steps_to_goal_stats': None,
             }
@@ -2389,6 +2484,9 @@ class Rubiks_3_AI:
         current['rank_applied'] = bool(current.get('rank_applied',False) or components.get('rank_applied',False))
         current['margin'] = float(components.get('margin',current.get('margin',0.0)))
         current['target_scale'] = float(components.get('target_scale',current.get('target_scale',1.0)))
+        current['steps_to_goal_value_loss_weight'] = float(components.get(
+            'steps_to_goal_value_loss_weight',current.get('steps_to_goal_value_loss_weight',1.0),
+        ))
         current['steps_to_goal_stats'] = self._merge_steps_to_goal_regression_stats(
             current.get('steps_to_goal_stats'),
             components.get('steps_to_goal_stats'),
@@ -2407,6 +2505,8 @@ class Rubiks_3_AI:
                 'huber_sum': 0.0,
                 'target_min': None, 'target_max': None,
                 'prediction_min': None, 'prediction_max': None,
+                'origins': {},
+                'remaining_step_bands': {'0-10': 0, '11-30': 0, '31+': 0},
             }
         for key in ('state_count','trajectory_count'):
             current[key] += int(incoming.get(key,0) or 0)
@@ -2419,6 +2519,12 @@ class Rubiks_3_AI:
             value = incoming.get(key)
             if value is not None:
                 current[key] = float(value) if current[key] is None else compare(current[key],float(value))
+        for origin,stats in (incoming.get('origins') or {}).items():
+            current['origins'][origin] = Rubiks_3_AI._merge_steps_to_goal_regression_stats(
+                current['origins'].get(origin),stats,
+            )
+        for label,count in (incoming.get('remaining_step_bands') or {}).items():
+            current['remaining_step_bands'][label] = current['remaining_step_bands'].get(label,0) + int(count or 0)
         return current
 
     def _build_training_batches(self, indices, data_source, batch_size, state_batch_size, state_count_fn):
@@ -3149,6 +3255,7 @@ class Rubiks_3_AI:
             loss_inputs['value_indices'],
             loss_inputs['value_columns'],
             loss_inputs['value_steps_to_goal'],
+            loss_inputs['value_trajectory_origins'],
         )
         total_loss = policy_loss + value_loss
         total_loss.backward()
@@ -3181,7 +3288,7 @@ class Rubiks_3_AI:
             return torch.zeros((), dtype = torch.float32, device = device)
         return total_loss
 
-    def _torch_search2_value_loss(self, values, indices, value_columns = None, value_steps_to_goal = None):
+    def _torch_search2_value_loss(self, values, indices, value_columns = None, value_steps_to_goal = None, value_trajectory_origins = None):
         self._last_steps_to_goal_regression_stats = None
         if value_columns is not None:
             if len(value_columns) == 0:
@@ -3204,8 +3311,9 @@ class Rubiks_3_AI:
             base_name = 'myloss2_pairwise'
         elif self.search2_value_loss_type == 'steps_to_goal':
             value_loss = self._torch_search2_value_loss_steps_to_goal(
-                values,value_steps_to_goal,len(indices) - 1,
+                values,value_steps_to_goal,indices,value_trajectory_origins,
             )
+            value_loss = value_loss * self.steps_to_goal_value_loss_weight
             base_name = 'steps_to_goal_huber'
         else:
             value_loss = self._torch_search2_value_loss_distance(values,indices,value_steps_to_goal)
@@ -3284,7 +3392,7 @@ class Rubiks_3_AI:
             return torch.zeros((), dtype = values.dtype, device = values.device)
         return total_loss
 
-    def _torch_search2_value_loss_steps_to_goal(self, values, value_steps_to_goal, trajectory_count):
+    def _torch_search2_value_loss_steps_to_goal(self, values, value_steps_to_goal, indices, trajectory_origins):
         if value_steps_to_goal is None:
             targets = torch.zeros_like(values)
         else:
@@ -3292,9 +3400,17 @@ class Rubiks_3_AI:
                 value_steps_to_goal,dtype = values.dtype,device = values.device,
             )
         self._last_steps_to_goal_regression_stats = self._steps_to_goal_regression_stats(
-            values.detach().cpu().numpy(), targets.detach().cpu().numpy(), trajectory_count,
+            values.detach().cpu().numpy(), targets.detach().cpu().numpy(),
+            len(indices) - 1,indices,trajectory_origins,value_steps_to_goal,
         )
-        return F_torch.smooth_l1_loss(values,targets,reduction = 'mean',beta = 1.0)
+        total_loss = torch.zeros((), dtype = values.dtype, device = values.device)
+        for index in range(len(indices) - 1):
+            start,end = indices[index],indices[index + 1]
+            if end > start:
+                total_loss = total_loss + F_torch.smooth_l1_loss(
+                    values[start:end],targets[start:end],reduction = 'mean',beta = 1.0,
+                )
+        return total_loss
 
     def _torch_search3_losses_and_grads(self, search3_inputs):
         device = self._torch_training_device()
@@ -3401,6 +3517,8 @@ class Rubiks_3_AI:
             and self._search2_value_has_rank_loss
         ):
             d_selected = d_selected + self.search2_rank_loss_mix * self.search2_rank_loss.backward()
+        if self.search2_value_loss_type == 'steps_to_goal':
+            d_selected = d_selected * self.steps_to_goal_value_loss_weight
         d_full = np.zeros((1,output_size),dtype = d_selected.dtype if d_selected.size > 0 else 'f')
         if len(columns) > 0:
             d_full[:,columns] = d_selected

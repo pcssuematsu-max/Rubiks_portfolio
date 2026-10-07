@@ -1326,6 +1326,8 @@ class LearningHistoryDialog(Tk.Toplevel):
             return '（対象外／未記録）'
         return (
             f"state/route={metrics.get('stateCount', '--')}/{metrics.get('trajectoryCount', '--')}  "
+            f"w={self._number(metrics.get('lossWeight'))}  "
+            f"bands={self._steps_to_goal_band_text(metrics.get('remainingStepBands'))}  "
             f"target={self._number(metrics.get('targetMin'))}/"
             f"{self._number(metrics.get('targetMean'))}/"
             f"{self._number(metrics.get('targetMax'))}  "
@@ -1335,7 +1337,28 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"bias={self._number(metrics.get('signedErrorMean'))}  "
             f"MAE/state={self._number(metrics.get('maePerState'))}  "
             f"Huber/state={self._number(metrics.get('huberPerState'))}"
+            f"{self._steps_to_goal_origin_text(metrics.get('origins'))}"
         )
+
+    def _steps_to_goal_origin_text(self, origins):
+        if not isinstance(origins, dict) or not origins:
+            return ''
+        parts = []
+        for origin in ('direct_search','fallback','legacy'):
+            metrics = origins.get(origin)
+            if not metrics:
+                continue
+            parts.append(
+                f"{origin}={metrics.get('trajectoryCount', '--')}route/"
+                f"{metrics.get('stateCount', '--')}state MAE={self._number(metrics.get('maePerState'))}"
+            )
+        return '' if not parts else '  source[' + ' | '.join(parts) + ']'
+
+    @staticmethod
+    def _steps_to_goal_band_text(bands):
+        if not isinstance(bands, dict):
+            return '--'
+        return '/'.join(str(bands.get(label, '--')) for label in ('0-10','11-30','31+'))
 
     def _fixed_validation_text(self, record):
         validation = record.get('fixedValidation')
@@ -1350,6 +1373,15 @@ class LearningHistoryDialog(Tk.Toplevel):
             value_parts.append(f"Value MAE={self._number(validation.get('valueMae'))}")
         if validation.get('valuePathCrossEntropy') is not None:
             value_parts.append(f"Value path CE={self._number(validation.get('valuePathCrossEntropy'))}")
+        steps_bands = validation.get('stepsToGoalByRemainingSteps') or {}
+        if steps_bands:
+            value_parts.append(
+                'steps MAE=' + ', '.join(
+                    f'{label}:{self._number((steps_bands.get(label) or {}).get("valueMae"))}'
+                    for label in ('0-10','11-30','31+')
+                    if label in steps_bands
+                )
+            )
         return (
             '  '.join(value_parts)
             + f"  states={validation.get('stateCount', '--')}"

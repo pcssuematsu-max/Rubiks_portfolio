@@ -113,6 +113,15 @@ class LearningHistoryTests(unittest.TestCase):
                 'targetMin': -8.0, 'targetMean': -4.0, 'targetMax': 0.0,
                 'predictionMin': -3.0, 'predictionMean': -1.0, 'predictionMax': 1.0,
                 'signedErrorMean': 3.0, 'maePerState': 3.2, 'huberPerState': 2.7,
+                'lossWeight': 1.0,
+                'origins': {
+                    'direct_search': {
+                        'stateCount': 12, 'trajectoryCount': 2,
+                        'targetMin': -8.0, 'targetMean': -4.0, 'targetMax': 0.0,
+                        'predictionMin': -3.0, 'predictionMean': -1.0, 'predictionMax': 1.0,
+                        'signedErrorMean': 3.0, 'maePerState': 3.2, 'huberPerState': 2.7,
+                    },
+                },
             }
             LearningHistoryStore(path).append(completed_learning_record(20, ai, 1.0))
 
@@ -120,6 +129,8 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['stateCount'], 12)
             self.assertEqual(saved['trajectoryCount'], 2)
             self.assertEqual(saved['signedErrorMean'], 3.0)
+            self.assertEqual(saved['lossWeight'], 1.0)
+            self.assertEqual(saved['origins']['direct_search']['stateCount'], 12)
 
     def test_writes_fixed_validation_metrics_when_available(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -164,6 +175,11 @@ class LearningHistoryTests(unittest.TestCase):
                     },
                 },
             }
+            remaining_step_metrics = dict(ai.last_training_metrics['fixedValidation']['byLength']['60'])
+            ai.last_training_metrics['fixedValidation']['stepsToGoalByRemainingSteps'] = {
+                label: {**remaining_step_metrics, 'stateCount': state_count}
+                for label,state_count in (('0-10',36),('11-30',84),('31+',96))
+            }
             record = completed_learning_record(3, ai, 1.0)
             LearningHistoryStore(path).append(record)
 
@@ -173,6 +189,7 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['fixedValidation']['stateCount'], 216)
             self.assertAlmostEqual(saved['fixedValidation']['valueRankCorrelation'], 0.4)
             self.assertEqual(saved['fixedValidation']['byLength']['60']['stateCount'], 180)
+            self.assertEqual(saved['fixedValidation']['stepsToGoalByRemainingSteps']['31+']['stateCount'], 96)
 
     def test_ai_training_metrics_uses_processed_batch_count_as_update_count(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)

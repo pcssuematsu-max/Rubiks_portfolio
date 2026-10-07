@@ -345,6 +345,12 @@ def build_experiment_frame_config():
     search2_value_loss_margins = [0.0] * ai_count
     # The calibrated regression group uses only its direct Huber objective.
     search2_value_target_scales = [1.0] * ai_count
+    # Keep the target at -n.  This coefficient only balances the regression
+    # loss after route-wise normalization.
+    steps_to_goal_value_loss_weights = [0.0] * 20 + [5.0,5.0,2.0,2.0,2.0]
+    # Keep at most twelve Value states from each near/mid/far remaining-step
+    # band in one route.  Policy training still sees the complete route.
+    steps_to_goal_states_per_bands = [0] * 20 + [12] * 5
     search2_rank_loss_mixes = [0.0] * ai_count
     search2_rank_loss_apply_types = ['all'] * 20 + ['none'] * 5
     # Transformer Search3: fixed validation shows the rank-loss pair (10/11)
@@ -508,6 +514,8 @@ def build_experiment_frame_config():
         search2_value_loss_types = search2_value_loss_types,
         search2_value_loss_margins = search2_value_loss_margins,
         search2_value_target_scales = search2_value_target_scales,
+        steps_to_goal_value_loss_weights = steps_to_goal_value_loss_weights,
+        steps_to_goal_states_per_bands = steps_to_goal_states_per_bands,
         search2_rank_loss_mixes = search2_rank_loss_mixes,
         search2_rank_loss_apply_types = search2_rank_loss_apply_types,
         search3_rank_loss_mixes = search3_rank_loss_mixes,

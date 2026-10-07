@@ -26,6 +26,8 @@ class MainProfileTests(unittest.TestCase):
         self.assertEqual(config.cube_size, 3)
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(config.control_panel_mode, "advanced")
+        self.assertEqual(config.steps_to_goal_value_loss_weights[20:], [5.0, 5.0, 2.0, 2.0, 2.0])
+        self.assertEqual(config.steps_to_goal_states_per_bands[20:], [12, 12, 12, 12, 12])
 
     def test_test_profile_is_an_alias_for_experiment(self):
         config = build_frame_config("test")

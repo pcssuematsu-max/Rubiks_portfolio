@@ -71,6 +71,8 @@ class FrameConfig:
     search2_value_loss_types: Optional[Sequence[str]] = None
     search2_value_loss_margins: Optional[Sequence[float]] = None
     search2_value_target_scales: Optional[Sequence[float]] = None
+    steps_to_goal_value_loss_weights: Optional[Sequence[float]] = None
+    steps_to_goal_states_per_bands: Optional[Sequence[int]] = None
     search2_rank_loss_mixes: Optional[Sequence[float]] = None
     search2_rank_loss_apply_types: Optional[Sequence[str]] = None
     search3_rank_loss_mixes: Optional[Sequence[float]] = None
@@ -142,6 +144,8 @@ class FrameConfig:
         self._validate_ai_sequence_length('search2_value_loss_types', self.search2_value_loss_types, ai_count)
         self._validate_ai_sequence_length('search2_value_loss_margins', self.search2_value_loss_margins, ai_count)
         self._validate_ai_sequence_length('search2_value_target_scales', self.search2_value_target_scales, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_value_loss_weights', self.steps_to_goal_value_loss_weights, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_states_per_bands', self.steps_to_goal_states_per_bands, ai_count)
         self._validate_ai_sequence_length('search2_rank_loss_mixes', self.search2_rank_loss_mixes, ai_count)
         self._validate_ai_sequence_length('search2_rank_loss_apply_types', self.search2_rank_loss_apply_types, ai_count)
         self._validate_ai_sequence_length('search3_rank_loss_mixes', self.search3_rank_loss_mixes, ai_count)

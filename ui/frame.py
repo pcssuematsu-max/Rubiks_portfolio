@@ -165,6 +165,8 @@ class Frame(Tk.Frame):
             search2_value_loss_types = config.search2_value_loss_types,
             search2_value_loss_margins = config.search2_value_loss_margins,
             search2_value_target_scales = config.search2_value_target_scales,
+            steps_to_goal_value_loss_weights = config.steps_to_goal_value_loss_weights,
+            steps_to_goal_states_per_bands = config.steps_to_goal_states_per_bands,
             search2_rank_loss_mixes = config.search2_rank_loss_mixes,
             search2_rank_loss_apply_types = config.search2_rank_loss_apply_types,
             search3_rank_loss_mixes = config.search3_rank_loss_mixes,
@@ -573,6 +575,8 @@ class Frame(Tk.Frame):
                                    search2_value_loss_types = None,
                                    search2_value_loss_margins = None,
                                    search2_value_target_scales = None,
+                                   steps_to_goal_value_loss_weights = None,
+                                   steps_to_goal_states_per_bands = None,
                                    search2_rank_loss_mixes = None,
                                    search2_rank_loss_apply_types = None,
                                    search3_rank_loss_mixes = None,
@@ -659,6 +663,10 @@ class Frame(Tk.Frame):
                 self.AIs[i].set_search2_value_loss_margin(search2_value_loss_margins[i])
             if search2_value_target_scales is not None:
                 self.AIs[i].set_search2_value_target_scale(search2_value_target_scales[i])
+            if steps_to_goal_value_loss_weights is not None:
+                self.AIs[i].set_steps_to_goal_value_loss_weight(steps_to_goal_value_loss_weights[i])
+            if steps_to_goal_states_per_bands is not None:
+                self.AIs[i].set_steps_to_goal_states_per_band(steps_to_goal_states_per_bands[i])
             if search2_rank_loss_mixes is not None:
                 self.AIs[i].set_search2_rank_loss_mix(search2_rank_loss_mixes[i])
             if search2_rank_loss_apply_types is not None:
