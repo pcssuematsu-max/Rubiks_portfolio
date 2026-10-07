@@ -5,6 +5,7 @@ import numpy as np
 
 from ai.losses import Huber
 from ai.rubiks_ai import Rubiks_3_AI
+from managers.search_data import SearchDataManager
 from managers.solve_session import SolveSessionManager
 
 
@@ -98,6 +99,87 @@ class StepsToGoalValueTests(unittest.TestCase):
         self.assertEqual(source_ai.indices, [])
         self.assertEqual(regression_one.indices, [0])
         self.assertEqual(regression_two.indices, [0])
+
+    def test_direct_steps_to_goal_route_creates_one_connected_sample_per_target_kind(self):
+        source = SimpleNamespace(search_mode = 'search2', search2_value_loss_type = 'steps_to_goal')
+        original = SimpleNamespace(search_mode = 'search2', search2_value_loss_type = 'myloss')
+        search3 = SimpleNamespace(search_mode = 'search3', search2_value_loss_type = 'myloss')
+        state = SimpleNamespace(search_TF = True, fallback_used = False, move_lis = [('A',), ('B',)])
+        calls = []
+        frame = SimpleNamespace(
+            solve_state = state,
+            AIs = [source, original, search3],
+            AI_idx = 0,
+            AInum = 3,
+            search_data_manager = SimpleNamespace(
+                store_connected_search3_data = lambda ai: calls.append(('search3_connected', ai)),
+            ),
+        )
+        manager = SolveSessionManager(frame)
+        manager._store_connected_steps_to_goal_training_sample = lambda: calls.append('steps_connected') or True
+        manager._store_connected_original_search2_training_sample = lambda ai: calls.append(('original_connected', ai)) or True
+        manager._store_search2_segment_training_samples = lambda: calls.append('segments') or True
+
+        self.assertTrue(manager._store_completed_training_samples())
+        self.assertEqual(
+            calls,
+            ['steps_connected', ('original_connected', source), ('search3_connected', source)],
+        )
+
+    def test_fallback_steps_to_goal_route_stays_in_steps_to_goal_only(self):
+        source = SimpleNamespace(search_mode = 'search2', search2_value_loss_type = 'steps_to_goal')
+        state = SimpleNamespace(search_TF = False, fallback_used = True, move_lis = [('A',)])
+        calls = []
+        frame = SimpleNamespace(
+            solve_state = state,
+            AIs = [source],
+            AI_idx = 0,
+            AInum = 1,
+            search_data_manager = SimpleNamespace(
+                store_connected_search3_data = lambda ai: calls.append(('search3_connected', ai)),
+            ),
+        )
+        manager = SolveSessionManager(frame)
+        manager._store_connected_steps_to_goal_training_sample = lambda: calls.append('steps_connected') or True
+        manager._store_connected_original_search2_training_sample = lambda ai: calls.append(('original_connected', ai)) or True
+
+        self.assertFalse(manager._store_completed_training_samples())
+        self.assertEqual(calls, ['steps_connected'])
+
+    def test_direct_search3_route_also_creates_a_connected_steps_to_goal_sample(self):
+        source = SimpleNamespace(search_mode = 'search3', search2_value_loss_type = 'myloss')
+        state = SimpleNamespace(search_TF = True, fallback_used = False, move_lis = [('A',), ('B',)])
+        calls = []
+        frame = SimpleNamespace(solve_state = state, AIs = [source], AI_idx = 0, AInum = 1)
+        manager = SolveSessionManager(frame)
+        manager._store_connected_steps_to_goal_training_sample = lambda: calls.append('steps_connected') or True
+        manager._store_connected_myloss_training_sample = lambda: calls.append('pairwise_connected') or True
+        manager._store_search2_segment_training_samples = lambda: calls.append('original_segments') or True
+
+        self.assertFalse(manager._store_completed_training_samples())
+        self.assertEqual(calls, ['steps_connected', 'pairwise_connected', 'original_segments'])
+
+    def test_connected_steps_route_adds_one_search3_sample_per_search3_ai(self):
+        source = SimpleNamespace(search_mode = 'search2')
+        original = SimpleNamespace(search_mode = 'search2', datas_search3 = [], indices_search3 = [])
+        search3_one = SimpleNamespace(search_mode = 'search3', datas_search3 = [], indices_search3 = [])
+        search3_two = SimpleNamespace(search_mode = 'transformer', datas_search3 = [], indices_search3 = [])
+        frame = SimpleNamespace(
+            solve_state = SimpleNamespace(s = ('scramble',), move_lis = [('A',), ('B',)]),
+            cube = SimpleNamespace(simplify = lambda moves: tuple(moves)),
+            AIs = [original, search3_one, search3_two],
+        )
+        manager = SearchDataManager(frame)
+        built = []
+        manager.build_connected_search3_training_sample = lambda scramble, moves, ai: built.append(
+            (scramble, moves, ai)
+        ) or SimpleNamespace()
+
+        self.assertEqual(manager.store_connected_search3_data(source), 2)
+        self.assertEqual(built, [(('scramble',), ('A', 'B'), source)] * 2)
+        self.assertEqual(original.datas_search3, [])
+        self.assertEqual(search3_one.indices_search3, [0])
+        self.assertEqual(search3_two.indices_search3, [0])
 
 
 if __name__ == '__main__':

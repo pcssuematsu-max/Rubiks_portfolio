@@ -1251,15 +1251,7 @@ class SolveSessionManager:
                 self.frame.success[self.frame.AI_idx] += 1
                 result_recorded = True
 
-            combined_moves = ()
-            if state.search_TF or self.frame.AIs[self.frame.AI_idx].search_mode == "search2":
-                self._store_connected_steps_to_goal_training_sample()
-                self._store_connected_myloss_training_sample()
-                for moves in state.move_lis:
-                    combined_moves += moves
-                    if self._store_search2_training_sample(state.s, combined_moves):
-                        state.s += combined_moves
-                        combined_moves = ()
+            steps_to_goal_direct_route = self._store_completed_training_samples()
 
             if state.search_TF and len(state.move_lis) >= 2:
                 simplified_moves = tuple(state.last_simplified_lis)
@@ -1297,7 +1289,13 @@ class SolveSessionManager:
                     level = max(0,int(- state.val_lis2[move_index][0] / 5))
                     self.frame.cube.register_scramble_sequence(level, inverted_moves)
 
-            if state.search_TF or self.frame.AIs[self.frame.AI_idx].search_mode in ('search3', 'transformer'):
+            if (
+                not steps_to_goal_direct_route
+                and (
+                    state.search_TF
+                    or self.frame.AIs[self.frame.AI_idx].search_mode in ('search3', 'transformer')
+                )
+            ):
                 for ai_index in range(self.frame.AInum):
                     self.frame.search_data_manager.store_search3_data(ai_index)
 
@@ -1370,6 +1368,109 @@ class SolveSessionManager:
         else:
             detail = '未解決'
         self._set_status('完了', detail)
+
+    def _store_completed_training_samples(self):
+        """Route one completed solve to the loss-specific replay datasets.
+
+        A direct solve may teach other objectives, but a greedy fallback is
+        retained only by the objective that produced it.  In particular,
+        direct ``steps_to_goal`` solves become one connected route for each
+        target representation rather than several local Search2 segments.
+        """
+        state = self.frame.solve_state
+        source_ai = self._current_source_ai()
+        source_mode = getattr(source_ai, 'search_mode', 'search2')
+        source_loss_type = getattr(source_ai, 'search2_value_loss_type', None)
+        direct_success = bool(state.search_TF and not state.fallback_used)
+        steps_to_goal_source = (
+            source_mode == 'search2'
+            and source_loss_type == 'steps_to_goal'
+        )
+
+        if steps_to_goal_source:
+            self._store_connected_steps_to_goal_training_sample()
+            if direct_success:
+                self._store_connected_original_search2_training_sample(source_ai)
+                self.frame.search_data_manager.store_connected_search3_data(source_ai)
+            return direct_success
+
+        if direct_success:
+            # Normal successes may cross-teach: Search2 keeps its local
+            # policy/value segments, while calibrated Value receives one
+            # route to the final goal.
+            self._store_connected_steps_to_goal_training_sample()
+            self._store_connected_myloss_training_sample()
+            self._store_search2_segment_training_samples()
+            return False
+
+        if source_mode == 'search2':
+            # Greedy recovery must not leak into a different loss objective.
+            self._store_search2_fallback_training_samples(source_loss_type)
+        return False
+
+    def _store_connected_original_search2_training_sample(self, source_ai):
+        """Convert a direct calibrated route to one full Original Search2 sample."""
+        state = self.frame.solve_state
+        connected_moves = tuple(
+            move for moves in state.move_lis for move in moves
+        )
+        target_ai_indices = self._non_steps_to_goal_search2_ai_indices()
+        if len(connected_moves) == 0 or not target_ai_indices:
+            return False
+        return self._store_search2_training_sample(
+            state.s,
+            connected_moves,
+            source_ai = source_ai,
+            source_search_mode = getattr(source_ai, 'search_mode', 'search2'),
+            source_value_loss_type = 'steps_to_goal_connected',
+            target_ai_indices = target_ai_indices,
+        )
+
+    def _store_search2_segment_training_samples(self, target_ai_indices = None):
+        """Store the existing per-search segments for Original Search2."""
+        state = self.frame.solve_state
+        combined_moves = ()
+        stored = False
+        for moves in state.move_lis:
+            combined_moves += moves
+            if self._store_search2_training_sample(
+                state.s,
+                combined_moves,
+                target_ai_indices = target_ai_indices,
+            ):
+                state.s += combined_moves
+                combined_moves = ()
+                stored = True
+        return stored
+
+    def _store_search2_fallback_training_samples(self, source_loss_type):
+        """Keep a Search2 fallback only for Search2 AIs with the same loss."""
+        if source_loss_type == 'steps_to_goal':
+            return self._store_connected_steps_to_goal_training_sample()
+        target_ai_indices = self._search2_ai_indices_with_value_loss(source_loss_type)
+        if not target_ai_indices:
+            return False
+        return self._store_search2_segment_training_samples(target_ai_indices)
+
+    def _non_steps_to_goal_search2_ai_indices(self):
+        return [
+            ai_index
+            for ai_index, ai in enumerate(self.frame.AIs)
+            if (
+                getattr(ai, 'search_mode', None) == 'search2'
+                and getattr(ai, 'search2_value_loss_type', None) != 'steps_to_goal'
+            )
+        ]
+
+    def _search2_ai_indices_with_value_loss(self, loss_type):
+        return [
+            ai_index
+            for ai_index, ai in enumerate(self.frame.AIs)
+            if (
+                getattr(ai, 'search_mode', None) == 'search2'
+                and getattr(ai, 'search2_value_loss_type', None) == loss_type
+            )
+        ]
 
     def _record_level_trial(self, direct_search_succeeded):
         """200試行単位のlevel判定に使う、AI別のplay/成功数を記録する。"""
@@ -1565,7 +1666,7 @@ class SolveSessionManager:
         """
         state = self.frame.solve_state
         source_ai = self._current_source_ai()
-        if getattr(source_ai, 'search_mode', None) != 'search2':
+        if getattr(source_ai, 'search_mode', None) not in ('search2', 'search3', 'transformer'):
             return False
         target_ai_indices = self._steps_to_goal_search2_ai_indices()
         if not target_ai_indices:
@@ -1579,7 +1680,7 @@ class SolveSessionManager:
             state.s,
             connected_moves,
             source_ai = source_ai,
-            source_search_mode = 'search2',
+            source_search_mode = getattr(source_ai, 'search_mode', 'search2'),
             source_value_loss_type = 'steps_to_goal_regression',
             target_ai_indices = target_ai_indices,
         )

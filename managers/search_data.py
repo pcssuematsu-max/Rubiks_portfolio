@@ -112,6 +112,76 @@ class SearchDataManager:
             ai.indices_search3.append(next_index)
             next_index += 1
 
+    def store_connected_search3_data(self, source_ai):
+        """Store one completed direct route as one Search3 training sample.
+
+        This is used when a calibrated ``steps_to_goal`` Search2 solver
+        reaches the goal directly.  Its local Search2 segments are useful to
+        neither Search3 nor a calibrated trajectory target, so retain the
+        completed route as one sequence instead.
+        """
+        state = self.frame.solve_state
+        connected_moves = tuple(
+            move for moves in state.move_lis for move in moves
+        )
+        connected_moves = self.frame.cube.simplify(connected_moves)
+        if len(connected_moves) == 0:
+            return 0
+        scramble = tuple(state.s)
+        stored = 0
+        for ai in self.frame.AIs:
+            if ai.search_mode not in ('search3', 'transformer'):
+                continue
+            search_data = self.build_connected_search3_training_sample(
+                scramble,
+                connected_moves,
+                source_ai,
+            )
+            if search_data is None:
+                continue
+            next_index = len(ai.datas_search3)
+            ai.datas_search3.append(search_data)
+            ai.indices_search3.append(next_index)
+            stored += 1
+        return stored
+
+    def build_connected_search3_training_sample(self, scramble, moves, source_ai):
+        """Build a direct, full-route Search3 sample from a completed solve."""
+        value_targets = self.build_segment_value_targets(
+            0,
+            len(moves),
+            len(moves),
+        )
+        value_trace_raw = self.rebuild_search3_value_trace_raw(
+            scramble,
+            moves,
+            source_ai,
+        )
+        value_trace = [sigmoid(value) for value in value_trace_raw]
+        return data_search3(
+            scramble,
+            moves,
+            value_targets.copy(),
+            value_trace[0],
+            value_trace,
+            value_trace[-1],
+            {'source': 'steps_to_goal_connected'},
+            policy_target = self._one_hot_policy_target(moves),
+            search_mode = 'search2',
+            sample_weight = 1.0,
+            value_targets = value_targets,
+            root_value_raw = value_trace_raw[0],
+            value_trace_raw = value_trace_raw,
+            best_value_raw = value_trace_raw[-1],
+            perfect_key = self.frame.solve_state.last_perfect_key,
+            top_group = self.frame.solve_state.last_top_group,
+            end_reason = 'solved',
+            source_succeeded = True,
+            solve_succeeded = True,
+            steps_to_goal = len(moves),
+            trajectory_source = 'direct-search',
+        )
+
     def _search3_sample_cache(self, state):
         cache = getattr(state, '_search3_training_sample_cache', None)
         if cache is None:
