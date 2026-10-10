@@ -37,6 +37,23 @@ _EFFECT_PART_LABELS = {
     "CtrX": "X型センター",
 }
 
+# Keep the complete set of discoveries that can be presented on the public
+# showcase. Outside that set, one concise representative per visible effect is
+# enough for the local archive; retaining every variation makes the checked-in
+# feed impractically large.
+PUBLIC_EFFECT_COUNT_LIMIT = 5
+COMPACT_EFFECT_COUNT_LIMIT = 10
+COMPACT_MOVE_COUNT_LIMIT = 10
+FEATURED_EFFECT_COMPONENT_PATTERNS = frozenset(
+    tuple(sorted(parts))
+    for parts in (
+        ("C2", "CtrCore4", "ME2"),
+        ("C2", "CtrCore6", "ME2"),
+        ("C2", "CtrCore4"),
+        ("C2", "CtrCore6"),
+    )
+)
+
 
 def default_discoveries_path() -> Path:
     """Return the web project's discovery feed when it is available locally."""
@@ -62,6 +79,86 @@ def _record_id(puzzle: str, setup: list[str], discovery_kind: str = "full-solve"
     if discovery_kind != "full-solve":
         parts = (discovery_kind, *parts)
     return sha256("\0".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def _effect_component_type(effect_part: str) -> str:
+    """Normalize component variants used by the showcase's featured effects."""
+    if effect_part.startswith("C2"):
+        return "C2"
+    if effect_part.startswith("CtrCore4"):
+        return "CtrCore4"
+    if effect_part.startswith("CtrCore6"):
+        return "CtrCore6"
+    if effect_part.startswith("ME2"):
+        return "ME2"
+    return effect_part
+
+
+def is_public_discovery(discovery: dict) -> bool:
+    """Return whether the static Web viewer is allowed to present a discovery."""
+    effect_count = discovery.get("effectCount")
+    moves = discovery.get("moves")
+    effect_class = discovery.get("effectClass")
+    if not isinstance(effect_count, int) or effect_count <= 0:
+        return False
+    if not isinstance(moves, list) or not moves:
+        return False
+    if not isinstance(effect_class, str) or not effect_class:
+        return False
+    if not all(isinstance(discovery.get(field), str) and discovery[field] for field in (
+        "effectName", "effectLabel",
+    )):
+        return False
+    if not isinstance(discovery.get("orientationCount"), int):
+        return False
+    featured_pattern = tuple(sorted(
+        _effect_component_type(part) for part in effect_class.split("+")
+    ))
+    return (
+        effect_count <= PUBLIC_EFFECT_COUNT_LIMIT
+        or (
+            effect_count <= COMPACT_EFFECT_COUNT_LIMIT
+            and len(moves) <= COMPACT_MOVE_COUNT_LIMIT
+        )
+        or featured_pattern in FEATURED_EFFECT_COMPONENT_PATTERNS
+    )
+
+
+def compact_discoveries(payload: dict) -> dict:
+    """Retain every public replay and one best replay for each other effect.
+
+    Full solves and terminal last-perm discoveries stay separate. Older records
+    without effect metadata are retained individually instead of being grouped
+    into an unknown effect.
+    """
+    discoveries = payload["discoveries"]
+    best_by_effect = {}
+    for discovery in discoveries:
+        effect_class = discovery.get("effectClass")
+        discovery_kind = discovery.get("discoveryKind", "full-solve")
+        if not isinstance(effect_class, str) or not effect_class:
+            key = ("legacy", discovery["id"])
+        else:
+            key = (discovery["puzzle"], effect_class, discovery_kind)
+        priority = (
+            discovery["moveCount"],
+            len(discovery["setup"]),
+            discovery["foundAt"],
+            discovery["id"],
+        )
+        previous = best_by_effect.get(key)
+        if previous is None or priority < previous[0]:
+            best_by_effect[key] = (priority, discovery["id"])
+
+    retained_ids = {
+        discovery["id"] for discovery in discoveries if is_public_discovery(discovery)
+    }
+    retained_ids.update(record_id for _, record_id in best_by_effect.values())
+    compacted = dict(payload)
+    compacted["discoveries"] = [
+        discovery for discovery in discoveries if discovery["id"] in retained_ids
+    ]
+    return compacted
 
 
 def point_canonical_discovery_sequences(cube, setup, moves, *, point_calculator = None) -> tuple[tuple, tuple]:
@@ -348,8 +445,20 @@ class AiDiscoveryStore:
 
         discoveries.sort(key=lambda item: (item["moveCount"], item["updatedAt"], item["id"]))
         payload["updatedAt"] = now
+        retained_payload = compact_discoveries(payload)
+        discoveries[:] = retained_payload["discoveries"]
+        if not any(item["id"] == record_id for item in discoveries):
+            return "unchanged"
         self._write(payload)
         return outcome
+
+    def compact(self) -> tuple[int, int]:
+        """Prune redundant discoveries and rewrite the feed in compact JSON."""
+        payload = self._read()
+        previous_count = len(payload["discoveries"])
+        payload = compact_discoveries(payload)
+        self._write(payload)
+        return previous_count, len(payload["discoveries"])
 
     def _read(self) -> dict:
         if not self.path.exists():
@@ -374,6 +483,5 @@ class AiDiscoveryStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path = self.path.with_suffix(self.path.suffix + ".tmp")
         with temporary_path.open("w", encoding="utf-8") as stream:
-            json.dump(payload, stream, ensure_ascii=False, indent=2)
-            stream.write("\n")
+            json.dump(payload, stream, ensure_ascii=False, separators=(",", ":"))
         temporary_path.replace(self.path)

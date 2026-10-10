@@ -161,6 +161,44 @@ class AiDiscoveryStoreTests(unittest.TestCase):
                 {"full-solve", "terminal-last-perm"},
             )
 
+    def test_compacts_non_public_variations_but_keeps_public_ones(self):
+        with TemporaryDirectory() as temporary_directory:
+            store = AiDiscoveryStore(Path(temporary_directory) / "ai-discoveries.json")
+            non_public_metadata = {
+                "effectName": "E11",
+                "effectClass": "E11",
+                "effectLabel": "エッジ：11個移動",
+                "effectCount": 11,
+                "orientationCount": 0,
+            }
+            public_metadata = {
+                "effectName": "C3",
+                "effectClass": "C3",
+                "effectLabel": "コーナー：3巡回",
+                "effectCount": 3,
+                "orientationCount": 0,
+            }
+
+            self.assertEqual(
+                store.save("3x3x3", ("R",), ("U", "U"), effect_metadata=non_public_metadata),
+                "added",
+            )
+            self.assertEqual(
+                store.save("3x3x3", ("F",), ("L", "L", "L"), effect_metadata=non_public_metadata),
+                "unchanged",
+            )
+            store.save("3x3x3", ("L",), ("F",), effect_metadata=public_metadata)
+            store.save("3x3x3", ("D",), ("B",), effect_metadata=public_metadata)
+
+            records = json.loads(store.path.read_text(encoding="utf-8"))["discoveries"]
+            self.assertEqual(len(records), 3)
+            self.assertEqual(
+                [record["moves"] for record in records if record["effectClass"] == "E11"],
+                [["U", "U"]],
+            )
+            self.assertEqual(sum(record["effectClass"] == "C3" for record in records), 2)
+            self.assertNotIn("\n", store.path.read_text(encoding="utf-8"))
+
     def test_point_canonical_sequences_keep_the_solution_valid_for_setup(self):
         cube = Rubiks_3(size=3)
         setup = (" R ", " U ", " F ")
