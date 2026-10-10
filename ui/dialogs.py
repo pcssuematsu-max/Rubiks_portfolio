@@ -739,10 +739,11 @@ class ExperimentSummaryDialog(Tk.Toplevel):
         budget = settings.get('search3Budget', {})
         replay = settings.get('search3Replay', {})
         ramp_depth = depth_schedule.get('rampDepth', 0) if isinstance(depth_schedule, dict) else 0
+        start_depth = depth_schedule.get('startDepth', 0) if isinstance(depth_schedule, dict) else 0
         if ramp_depth:
             search3_text = (
                 f"S3C={settings.get('search3C', '--')}→"
-                f"{depth_schedule.get('maxC', '--')}@d{ramp_depth}"
+                f"{depth_schedule.get('maxC', '--')}@d{start_depth}+{ramp_depth}"
             )
         else:
             search3_text = f"S3C={settings.get('search3C', '--')}"
@@ -951,6 +952,7 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"updates={latest['updatesDuringSolve']}  data={latest['trainingDataCount']}→{latest['retainedDataCount']}\n"
                 f"Search3 quality: {self._search3_quality_text(latest)}\n"
                 f"学習抽出: {self._training_sample_text(latest)}\n"
+                f"供給元: {self._training_data_sources_text(latest)}\n"
                 f"steps_to_goal: {self._steps_to_goal_regression_text(latest)}\n"
                 f"勾配: {self._gradient_metrics_text(latest)}\n"
                 f"固定検証: {self._fixed_validation_text(latest)}\n"
@@ -974,6 +976,8 @@ class LearningHistoryDialog(Tk.Toplevel):
                 lines.append(f"  Search3 quality: {self._search3_quality_text(record)}")
             if record.get('trainingSample') is not None:
                 lines.append(f"  学習抽出: {self._training_sample_text(record)}")
+            if record.get('trainingDataSources') is not None:
+                lines.append(f"  供給元: {self._training_data_sources_text(record)}")
             if record.get('stepsToGoalRegression') is not None:
                 lines.append(f"  steps_to_goal: {self._steps_to_goal_regression_text(record)}")
             if record.get('gradientMetrics') is not None:
@@ -1221,9 +1225,16 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"recent={sample.get('recentBatchCount', '--')} "
             f"random={sample.get('randomBatchCount', '--')}"
         )
+        stratified_text = ''
+        if sample.get('stepsToGoalStratifiedRatio', 0.0):
+            stratified_text = (
+                f"  steps層化={self._rate(sample.get('stepsToGoalStratifiedRatio'))}"
+                f" batch/item={sample.get('stepsToGoalStratifiedBatchCount', '--')}/"
+                f"{sample.get('stepsToGoalStratifiedItemCount', '--')}"
+            )
         minimum = sample.get('longSequenceMinSteps', 0)
         if not minimum:
-            return prefix + '  長手数replay=off'
+            return prefix + stratified_text + '  長手数replay=off'
         selected_items = sample.get('selectedItemCount')
         short_selected = sample.get('shortSelectedItemCount')
         medium_selected = sample.get('mediumSelectedItemCount')
@@ -1276,7 +1287,40 @@ class LearningHistoryDialog(Tk.Toplevel):
             + f" mean/max={self._number(sample.get('longSelectedStepMean'))}/"
             + f"{sample.get('longSelectedStepMax', '--')}"
             + provenance_text
+            + stratified_text
         )
+
+    @staticmethod
+    def _training_data_sources_text(record):
+        """Show whether each producer is represented in the current update."""
+        sources = record.get('trainingDataSources')
+        if not isinstance(sources, dict):
+            return '（未記録）'
+        available = sources.get('available')
+        selected = sources.get('selected')
+        if not isinstance(available, dict) or not isinstance(selected, dict):
+            return '（未記録）'
+        labels = {
+            'original_search2': 'Original S2',
+            'search3': 'Search3',
+            'steps_to_goal': 'steps_to_goal',
+            'bootstrap': 'bootstrap',
+            'legacy': 'legacy',
+        }
+        parts = []
+        for source in sorted(set(available) | set(selected)):
+            candidate = available.get(source, {})
+            chosen = selected.get(source, {})
+            objective, separator, origin = source.partition(':')
+            label = labels.get(objective, objective)
+            if separator:
+                label += '/' + {'direct_search': '直接', 'fallback': 'fallback'}.get(origin, origin)
+            parts.append(
+                f"{label}="
+                f"{chosen.get('trajectoryCount', 0)}/{candidate.get('trajectoryCount', 0)}route "
+                f"{chosen.get('stateCount', 0)}/{candidate.get('stateCount', 0)}state"
+            )
+        return ' | '.join(parts) if parts else 'データなし'
 
     @staticmethod
     def _long_replay_share(record):
@@ -1338,6 +1382,7 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"MAE/state={self._number(metrics.get('maePerState'))}  "
             f"Huber/state={self._number(metrics.get('huberPerState'))}"
             f"{self._steps_to_goal_origin_text(metrics.get('origins'))}"
+            f"{self._steps_to_goal_replay_text(metrics.get('replay'))}"
         )
 
     def _steps_to_goal_origin_text(self, origins):
@@ -1353,6 +1398,30 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"{metrics.get('stateCount', '--')}state MAE={self._number(metrics.get('maePerState'))}"
             )
         return '' if not parts else '  source[' + ' | '.join(parts) + ']'
+
+    def _steps_to_goal_replay_text(self, replay):
+        if not isinstance(replay,dict):
+            return ''
+        selected = replay.get('selected') or {}
+        available = replay.get('available') or {}
+        if not isinstance(selected,dict) or not isinstance(available,dict):
+            return ''
+        selected_bands = selected.get('remainingStepBands') or {}
+        selected_efficiency = selected.get('efficiencyBands') or {}
+        return (
+            f"  replay[r={self._rate(replay.get('stratifiedRatio'))} "
+            f"slot={replay.get('stratifiedItemCount', '--')} "
+            f"dist={self._steps_to_goal_band_text(selected_bands)} "
+            f"eff={selected_efficiency.get('efficient', '--')}/"
+            f"{selected_efficiency.get('medium', '--')}/"
+            f"{selected_efficiency.get('detour', '--')} "
+            f"dup={selected.get('duplicateStartStateCount', '--')}/"
+            f"{selected.get('conflictingStartStateCount', '--')} "
+            f"std={self._number(selected.get('duplicateTargetStdMean'))} "
+            f"shortest/skip={selected.get('shortestTargetRouteCount', '--')}/"
+            f"{selected.get('longerDuplicateRouteCount', '--')} "
+            f"all_conflict={available.get('conflictingStartStateCount', '--')} ]"
+        )
 
     @staticmethod
     def _steps_to_goal_band_text(bands):

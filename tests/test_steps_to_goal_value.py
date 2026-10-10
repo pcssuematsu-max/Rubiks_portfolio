@@ -48,6 +48,112 @@ class StepsToGoalValueTests(unittest.TestCase):
         self.assertLessEqual(sum(step >= 31 for step in selected_steps), 2)
         self.assertEqual(len(columns), 6)
 
+    def test_steps_to_goal_value_uses_only_shortest_duplicate_start_target(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search2_value_loss_type = 'steps_to_goal'
+        short = SimpleNamespace(scramble = ('R',), moves = ('A', 'B'))
+        long = SimpleNamespace(scramble = ('R',), moves = ('A', 'B', 'C', 'D'))
+
+        ai._prepare_steps_to_goal_shortest_targets([0,1], [short,long])
+
+        self.assertTrue(ai._uses_shortest_steps_to_goal_target(short))
+        self.assertFalse(ai._uses_shortest_steps_to_goal_target(long))
+
+    def test_steps_to_goal_value_excludes_only_strongly_detoured_routes(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.steps_to_goal_value_max_route_efficiency = 3.0
+
+        self.assertTrue(ai._uses_steps_to_goal_value_route(
+            SimpleNamespace(scramble = ('R', 'U'), moves = tuple(range(6))),
+        ))
+        self.assertFalse(ai._uses_steps_to_goal_value_route(
+            SimpleNamespace(scramble = ('R', 'U'), moves = tuple(range(7))),
+        ))
+
+    def test_steps_to_goal_value_balances_bands_across_one_batch(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search2_value_loss_type = 'steps_to_goal'
+        ai.steps_to_goal_states_per_band = 0
+        ai.steps_to_goal_value_batch_band_max_copies = 3
+        ai.steps_to_goal_value_max_route_efficiency = 0.0
+        ai._steps_to_goal_shortest_target_by_start = None
+        long_route = SimpleNamespace(
+            moves = tuple(range(40)), steps_to_goal = tuple(range(40,-1,-1)),
+            trajectory_origin = 'direct_search',
+        )
+        short_route = SimpleNamespace(
+            moves = tuple(range(10)), steps_to_goal = tuple(range(10,-1,-1)),
+            trajectory_origin = 'direct_search',
+        )
+
+        columns,value_indices,_ = ai._build_search2_value_loss_selection(
+            [long_route,short_route], [0,41,52],
+        )
+
+        self.assertEqual(value_indices[-1], len(columns))
+        summary = ai._last_steps_to_goal_value_selection
+        self.assertEqual(summary['candidate_state_bands'], {'0-10': 22, '11-30': 20, '31+': 10})
+        self.assertEqual(summary['selected_state_bands'], {'0-10': 22, '11-30': 22, '31+': 22})
+        self.assertEqual(summary['oversampled_state_count'], 14)
+
+    def test_steps_to_goal_direct_route_also_teaches_original_with_full_route(self):
+        shared_data = []
+        steps = SimpleNamespace(
+            search_mode = 'search2', search2_value_loss_type = 'steps_to_goal',
+            datas = shared_data, indices = [],
+        )
+        original = SimpleNamespace(
+            search_mode = 'search2', search2_value_loss_type = 'myloss',
+            datas = shared_data, indices = [],
+        )
+        frame = SimpleNamespace(
+            solve_state = SimpleNamespace(
+                s = ('scramble',), move_lis = [('A', 'B'), ('C',)],
+                search_TF = True, fallback_used = False,
+                last_perfect_key = '', last_top_group = None,
+            ),
+            cube = SimpleNamespace(
+                simplify = lambda moves: tuple(moves),
+                make_transformations = lambda scramble, moves: ((tuple(scramble),), (tuple(moves),)),
+            ),
+            AIs = [steps, original], AI_idx = 0, AInum = 2,
+        )
+
+        self.assertTrue(
+            SolveSessionManager(frame)._store_connected_original_search2_training_sample(steps),
+        )
+        self.assertEqual(shared_data[0].moves, ('A', 'B', 'C'))
+        self.assertEqual(shared_data[0].source_search2_value_loss_type, 'steps_to_goal_connected')
+        self.assertEqual(original.indices, [0])
+
+    def test_pairwise_direct_route_also_teaches_original_with_full_route(self):
+        shared_data = []
+        pairwise = SimpleNamespace(
+            search_mode = 'search2', search2_value_loss_type = 'myloss2_pairwise',
+            datas = shared_data, indices = [],
+        )
+        original = SimpleNamespace(
+            search_mode = 'search2', search2_value_loss_type = 'myloss',
+            datas = shared_data, indices = [],
+        )
+        frame = SimpleNamespace(
+            solve_state = SimpleNamespace(
+                s = ('scramble',), move_lis = [('A', 'B'), ('C',)],
+                search_TF = True, fallback_used = False,
+                last_perfect_key = '', last_top_group = None,
+            ),
+            cube = SimpleNamespace(
+                simplify = lambda moves: tuple(moves),
+                make_transformations = lambda scramble, moves: ((tuple(scramble),), (tuple(moves),)),
+            ),
+            AIs = [pairwise, original], AI_idx = 0, AInum = 2,
+        )
+
+        self.assertTrue(SolveSessionManager(frame)._store_connected_myloss_training_sample())
+        self.assertEqual(shared_data[0].moves, ('A', 'B', 'C'))
+        self.assertEqual(shared_data[0].source_search2_value_loss_type, 'myloss_connected')
+        self.assertEqual(original.indices, [0])
+
     def test_connected_search2_route_has_distances_to_the_final_goal(self):
         shared_data = []
         source_ai = SimpleNamespace(
@@ -68,6 +174,12 @@ class StepsToGoalValueTests(unittest.TestCase):
             datas = shared_data,
             indices = [],
         )
+        pairwise = SimpleNamespace(
+            search_mode = 'search2',
+            search2_value_loss_type = 'myloss2_pairwise',
+            datas = shared_data,
+            indices = [],
+        )
         cube = SimpleNamespace(
             simplify = lambda moves: tuple(moves),
             make_transformations = lambda scramble, moves: ((tuple(scramble),), (tuple(moves),)),
@@ -82,9 +194,9 @@ class StepsToGoalValueTests(unittest.TestCase):
         frame = SimpleNamespace(
             solve_state = state,
             cube = cube,
-            AIs = [source_ai, regression_one, regression_two],
+            AIs = [source_ai, regression_one, regression_two, pairwise],
             AI_idx = 0,
-            AInum = 3,
+            AInum = 4,
         )
 
         stored = SolveSessionManager(frame)._store_connected_steps_to_goal_training_sample()
@@ -99,6 +211,7 @@ class StepsToGoalValueTests(unittest.TestCase):
         self.assertEqual(source_ai.indices, [])
         self.assertEqual(regression_one.indices, [0])
         self.assertEqual(regression_two.indices, [0])
+        self.assertEqual(pairwise.indices, [0])
 
     def test_direct_steps_to_goal_route_creates_one_connected_sample_per_target_kind(self):
         source = SimpleNamespace(search_mode = 'search2', search2_value_loss_type = 'steps_to_goal')
@@ -116,14 +229,14 @@ class StepsToGoalValueTests(unittest.TestCase):
             ),
         )
         manager = SolveSessionManager(frame)
-        manager._store_connected_steps_to_goal_training_sample = lambda: calls.append('steps_connected') or True
+        manager._store_connected_steps_to_goal_training_sample = lambda *args: calls.append(('steps_connected', args)) or True
         manager._store_connected_original_search2_training_sample = lambda ai: calls.append(('original_connected', ai)) or True
         manager._store_search2_segment_training_samples = lambda: calls.append('segments') or True
 
         self.assertTrue(manager._store_completed_training_samples())
         self.assertEqual(
             calls,
-            ['steps_connected', ('original_connected', source), ('search3_connected', source)],
+            [('steps_connected', ()), ('original_connected', source), ('search3_connected', source)],
         )
 
     def test_fallback_steps_to_goal_route_stays_in_steps_to_goal_only(self):
@@ -140,11 +253,23 @@ class StepsToGoalValueTests(unittest.TestCase):
             ),
         )
         manager = SolveSessionManager(frame)
-        manager._store_connected_steps_to_goal_training_sample = lambda: calls.append('steps_connected') or True
+        manager._store_connected_steps_to_goal_training_sample = lambda *args: calls.append(('steps_connected', args)) or True
         manager._store_connected_original_search2_training_sample = lambda ai: calls.append(('original_connected', ai)) or True
 
         self.assertFalse(manager._store_completed_training_samples())
-        self.assertEqual(calls, ['steps_connected'])
+        self.assertEqual(calls, [('steps_connected', ([0],))])
+
+    def test_pairwise_fallback_stays_out_of_steps_to_goal_replay(self):
+        pairwise_one = SimpleNamespace(search_mode = 'search2', search2_value_loss_type = 'myloss2_pairwise')
+        steps = SimpleNamespace(search_mode = 'search2', search2_value_loss_type = 'steps_to_goal')
+        pairwise_two = SimpleNamespace(search_mode = 'search2', search2_value_loss_type = 'myloss2_pairwise')
+        frame = SimpleNamespace(AIs = [pairwise_one, steps, pairwise_two])
+        manager = SolveSessionManager(frame)
+        targets = []
+        manager._store_search2_segment_training_samples = lambda indices: targets.append(indices) or True
+
+        self.assertTrue(manager._store_search2_fallback_training_samples('myloss2_pairwise'))
+        self.assertEqual(targets, [[0, 2]])
 
     def test_direct_search3_route_also_creates_a_connected_steps_to_goal_sample(self):
         source = SimpleNamespace(search_mode = 'search3', search2_value_loss_type = 'myloss')
@@ -152,12 +277,12 @@ class StepsToGoalValueTests(unittest.TestCase):
         calls = []
         frame = SimpleNamespace(solve_state = state, AIs = [source], AI_idx = 0, AInum = 1)
         manager = SolveSessionManager(frame)
-        manager._store_connected_steps_to_goal_training_sample = lambda: calls.append('steps_connected') or True
+        manager._store_connected_steps_to_goal_training_sample = lambda *args: calls.append(('steps_connected', args)) or True
         manager._store_connected_myloss_training_sample = lambda: calls.append('pairwise_connected') or True
-        manager._store_search2_segment_training_samples = lambda: calls.append('original_segments') or True
+        manager._store_search2_segment_training_samples = lambda *args: calls.append(('original_segments', args)) or True
 
         self.assertFalse(manager._store_completed_training_samples())
-        self.assertEqual(calls, ['steps_connected', 'pairwise_connected', 'original_segments'])
+        self.assertEqual(calls, [('steps_connected', ()), 'pairwise_connected', ('original_segments', ([],))])
 
     def test_connected_steps_route_adds_one_search3_sample_per_search3_ai(self):
         source = SimpleNamespace(search_mode = 'search2')

@@ -28,6 +28,9 @@ class Search3BudgetModeTests(unittest.TestCase):
         ai.search3_budget_confidence_visit_share = 0.70
         ai.search3_budget_min_improvement = 0.05
         ai.search3_budget_min_playout_depth = 3.0
+        ai.search3_budget_rescue_playouts = 0
+        ai.search3_budget_rescue_min_visit_share_gain = 1.0
+        ai.search3_budget_rescue_min_improvement = 0.0
         ai.search_num3 = 100
         ai.search_repeat3 = 3
         requested = []
@@ -105,3 +108,39 @@ class Search3BudgetModeTests(unittest.TestCase):
         stages = result.search_diagnostics['budgetSummary']['stages']
         self.assertGreater(stages[1]['rootVisitShareGain'], 0.03)
         self.assertEqual(stages[1]['decision'], 'escalate')
+
+    def test_progressive_mode_uses_rescue_tier_only_for_a_growing_final_root(self):
+        ai, requested = self._ai('progressive', [
+            _result(20, 100, best_value=0.22, depth=1.0),
+            _result(100, 300, best_value=0.22, depth=4.0),
+            _result(300, 600, best_value=0.22, depth=4.0),
+            _result(190, 200, best_value=0.22, depth=4.0),
+        ])
+        ai.search3_budget_min_visit_share_gain = 0.03
+        ai.search3_budget_rescue_playouts = 200
+        ai.search3_budget_rescue_min_visit_share_gain = 0.05
+
+        result = ai._search3_with_repeats()
+
+        self.assertEqual(requested, [100, 300, 600, 200])
+        summary = result.search_diagnostics['budgetSummary']
+        self.assertEqual(summary['stopReason'], 'rescue_budget_exhausted')
+        self.assertEqual(summary['stageCount'], 4)
+        self.assertEqual(summary['stages'][2]['decision'], 'rescue')
+        self.assertEqual(summary['stages'][3]['decision'], 'rescue_budget_exhausted')
+
+    def test_progressive_mode_skips_rescue_when_value_regresses(self):
+        ai, requested = self._ai('progressive', [
+            _result(20, 100, best_value=0.22, depth=1.0),
+            _result(100, 300, best_value=0.22, depth=4.0),
+            _result(300, 600, best_value=0.15, depth=4.0),
+        ])
+        ai.search3_budget_min_visit_share_gain = 0.03
+        ai.search3_budget_rescue_playouts = 200
+        ai.search3_budget_rescue_min_visit_share_gain = 0.05
+        ai.search3_budget_rescue_min_improvement = 0.0
+
+        result = ai._search3_with_repeats()
+
+        self.assertEqual(requested, [100, 300, 600])
+        self.assertEqual(result.search_diagnostics['budgetSummary']['stopReason'], 'budget_exhausted')

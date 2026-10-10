@@ -16,6 +16,8 @@ class data:
         source_search2_value_loss_type = None,
         steps_to_goal = None,
         trajectory_origin = 'legacy',
+        source_objective = 'legacy',
+        training_target = 'unknown',
     ):
         self.scramble = scramble
         self.moves = moves
@@ -26,6 +28,10 @@ class data:
         self.source_search_mode = source_search_mode
         self.source_search2_value_loss_type = source_search2_value_loss_type
         self.trajectory_origin = str(trajectory_origin or 'legacy')
+        # Keep where a route came from separate from the dataset that consumes
+        # it.  A direct Search3 route, for example, can teach steps_to_goal.
+        self.source_objective = str(source_objective or 'legacy')
+        self.training_target = str(training_target or 'unknown')
         if steps_to_goal is None:
             steps_to_goal = tuple(range(len(moves),-1,-1))
         self.steps_to_goal = tuple(steps_to_goal)
@@ -58,6 +64,8 @@ class data_search3:
         solve_succeeded=False,
         steps_to_goal=None,
         trajectory_source='direct-search',
+        source_objective='legacy',
+        training_target='search3',
     ):
         self.scramble = scramble
         self.moves = moves
@@ -83,6 +91,8 @@ class data_search3:
         # A completed solution can contain a direct-search prefix followed
         # by greedy recovery, so retain how each segment was obtained.
         self.trajectory_source = str(trajectory_source or 'direct-search')
+        self.source_objective = str(source_objective or 'legacy')
+        self.training_target = str(training_target or 'search3')
         # A search result can be one segment of a much longer completed
         # solution.  Keep the remaining total so replay selection can target
         # difficult starting positions rather than only long local segments.

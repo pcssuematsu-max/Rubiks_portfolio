@@ -151,6 +151,7 @@ class Frame(Tk.Frame):
             out_cs = config.out_cs,
             search3_cs = config.search3_cs,
             search3_c_depth_maxes = config.search3_c_depth_maxes,
+            search3_c_depth_start_depths = config.search3_c_depth_start_depths,
             search3_c_depth_ramp_depths = config.search3_c_depth_ramp_depths,
             search3_budget_modes = config.search3_budget_modes,
             search3_budget_stage_playouts = config.search3_budget_stage_playouts,
@@ -158,15 +159,23 @@ class Frame(Tk.Frame):
             search3_budget_min_improvements = config.search3_budget_min_improvements,
             search3_budget_min_playout_depths = config.search3_budget_min_playout_depths,
             search3_budget_min_visit_share_gains = config.search3_budget_min_visit_share_gains,
+            search3_budget_rescue_playouts = config.search3_budget_rescue_playouts,
+            search3_budget_rescue_min_visit_share_gains = config.search3_budget_rescue_min_visit_share_gains,
+            search3_budget_rescue_min_improvements = config.search3_budget_rescue_min_improvements,
             search3_max_node_caches = config.search3_max_node_caches,
             search3_max_prediction_caches = config.search3_max_prediction_caches,
             search2_max_frontiers = config.search2_max_frontiers,
+            search2_skip_differences = config.search2_skip_differences,
             search2_torch_batch_sizes = config.search2_torch_batch_sizes,
             search2_value_loss_types = config.search2_value_loss_types,
             search2_value_loss_margins = config.search2_value_loss_margins,
             search2_value_target_scales = config.search2_value_target_scales,
             steps_to_goal_value_loss_weights = config.steps_to_goal_value_loss_weights,
             steps_to_goal_states_per_bands = config.steps_to_goal_states_per_bands,
+            steps_to_goal_replay_stratified_ratios = config.steps_to_goal_replay_stratified_ratios,
+            steps_to_goal_value_max_route_efficiencies = config.steps_to_goal_value_max_route_efficiencies,
+            steps_to_goal_value_batch_band_max_copies = config.steps_to_goal_value_batch_band_max_copies,
+            pairwise_fallback_max_ratios = config.pairwise_fallback_max_ratios,
             search2_rank_loss_mixes = config.search2_rank_loss_mixes,
             search2_rank_loss_apply_types = config.search2_rank_loss_apply_types,
             search3_rank_loss_mixes = config.search3_rank_loss_mixes,
@@ -561,6 +570,7 @@ class Frame(Tk.Frame):
                                    out_cs = None,
                                    search3_cs = None,
                                    search3_c_depth_maxes = None,
+                                   search3_c_depth_start_depths = None,
                                    search3_c_depth_ramp_depths = None,
                                    search3_budget_modes = None,
                                    search3_budget_stage_playouts = None,
@@ -568,15 +578,23 @@ class Frame(Tk.Frame):
                                    search3_budget_min_improvements = None,
                                    search3_budget_min_playout_depths = None,
                                    search3_budget_min_visit_share_gains = None,
+                                   search3_budget_rescue_playouts = None,
+                                   search3_budget_rescue_min_visit_share_gains = None,
+                                   search3_budget_rescue_min_improvements = None,
                                    search3_max_node_caches = None,
                                    search3_max_prediction_caches = None,
                                    search2_max_frontiers = None,
+                                   search2_skip_differences = None,
                                    search2_torch_batch_sizes = None,
                                    search2_value_loss_types = None,
                                    search2_value_loss_margins = None,
                                    search2_value_target_scales = None,
                                    steps_to_goal_value_loss_weights = None,
                                    steps_to_goal_states_per_bands = None,
+                                   steps_to_goal_replay_stratified_ratios = None,
+                                   steps_to_goal_value_max_route_efficiencies = None,
+                                   steps_to_goal_value_batch_band_max_copies = None,
+                                   pairwise_fallback_max_ratios = None,
                                    search2_rank_loss_mixes = None,
                                    search2_rank_loss_apply_types = None,
                                    search3_rank_loss_mixes = None,
@@ -623,6 +641,10 @@ class Frame(Tk.Frame):
                 self.AIs[i].search3_C_depth_max = float(search3_c_depth_maxes[i])
             else:
                 self.AIs[i].search3_C_depth_max = self.AIs[i].search3_C
+            if search3_c_depth_start_depths is not None:
+                self.AIs[i].search3_C_depth_start_depth = max(0,int(search3_c_depth_start_depths[i]))
+            else:
+                self.AIs[i].search3_C_depth_start_depth = 0
             if search3_c_depth_ramp_depths is not None:
                 self.AIs[i].search3_C_depth_ramp_depth = max(0,int(search3_c_depth_ramp_depths[i]))
             else:
@@ -647,6 +669,18 @@ class Frame(Tk.Frame):
                 self.AIs[i].search3_budget_min_visit_share_gain = max(
                     0.0,float(search3_budget_min_visit_share_gains[i])
                 )
+            if search3_budget_rescue_playouts is not None:
+                self.AIs[i].search3_budget_rescue_playouts = max(
+                    0,int(search3_budget_rescue_playouts[i])
+                )
+            if search3_budget_rescue_min_visit_share_gains is not None:
+                self.AIs[i].search3_budget_rescue_min_visit_share_gain = max(
+                    0.0,float(search3_budget_rescue_min_visit_share_gains[i])
+                )
+            if search3_budget_rescue_min_improvements is not None:
+                self.AIs[i].search3_budget_rescue_min_improvement = float(
+                    search3_budget_rescue_min_improvements[i]
+                )
             if search3_max_node_caches is not None:
                 self.AIs[i].search3_max_node_cache = max(0,int(search3_max_node_caches[i]))
             if search3_max_prediction_caches is not None:
@@ -655,6 +689,8 @@ class Frame(Tk.Frame):
                 )
             if search2_max_frontiers is not None:
                 self.AIs[i].search2_max_frontier = int(search2_max_frontiers[i])
+            if search2_skip_differences is not None:
+                self.AIs[i].skip_difference = max(0.0,float(search2_skip_differences[i]))
             if search2_torch_batch_sizes is not None:
                 self.AIs[i].search2_torch_batch_size = int(search2_torch_batch_sizes[i])
             if search2_value_loss_types is not None:
@@ -667,6 +703,22 @@ class Frame(Tk.Frame):
                 self.AIs[i].set_steps_to_goal_value_loss_weight(steps_to_goal_value_loss_weights[i])
             if steps_to_goal_states_per_bands is not None:
                 self.AIs[i].set_steps_to_goal_states_per_band(steps_to_goal_states_per_bands[i])
+            if steps_to_goal_replay_stratified_ratios is not None:
+                self.AIs[i].set_steps_to_goal_replay_stratified_ratio(
+                    steps_to_goal_replay_stratified_ratios[i]
+                )
+            if steps_to_goal_value_max_route_efficiencies is not None:
+                self.AIs[i].set_steps_to_goal_value_max_route_efficiency(
+                    steps_to_goal_value_max_route_efficiencies[i]
+                )
+            if steps_to_goal_value_batch_band_max_copies is not None:
+                self.AIs[i].set_steps_to_goal_value_batch_band_max_copies(
+                    steps_to_goal_value_batch_band_max_copies[i]
+                )
+            if pairwise_fallback_max_ratios is not None:
+                self.AIs[i].set_pairwise_fallback_max_ratio(
+                    pairwise_fallback_max_ratios[i]
+                )
             if search2_rank_loss_mixes is not None:
                 self.AIs[i].set_search2_rank_loss_mix(search2_rank_loss_mixes[i])
             if search2_rank_loss_apply_types is not None:

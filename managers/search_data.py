@@ -18,6 +18,17 @@ class SearchDataManager:
     def __init__(self, frame):
         self.frame = frame
 
+    @staticmethod
+    def source_objective(source_ai):
+        """Return the loss family that produced a training route."""
+        mode = str(getattr(source_ai, 'search_mode', '') or '')
+        loss_type = str(getattr(source_ai, 'search2_value_loss_type', '') or '')
+        if loss_type == 'steps_to_goal':
+            return 'steps_to_goal'
+        if mode in ('search3', 'transformer'):
+            return 'search3'
+        return 'original_search2'
+
     def append_bootstrap_search3_datas(self, bootstrap_datas = None):
         """Append bootstrap move sequences as Search3-format training data."""
         if bootstrap_datas is None:
@@ -73,6 +84,8 @@ class SearchDataManager:
             solve_succeeded = True,
             steps_to_goal = len(segment_moves),
             trajectory_source = 'bootstrap',
+            source_objective = 'bootstrap',
+            training_target = 'search3',
         )
 
     def _bootstrap_value_targets(self, segment_length):
@@ -180,6 +193,8 @@ class SearchDataManager:
             solve_succeeded = True,
             steps_to_goal = len(moves),
             trajectory_source = 'direct-search',
+            source_objective = self.source_objective(source_ai),
+            training_target = 'search3',
         )
 
     def _search3_sample_cache(self, state):
@@ -235,6 +250,8 @@ class SearchDataManager:
             solve_succeeded = False,
             steps_to_goal = remaining_steps,
             trajectory_source = history_item.get('trajectory_source','direct-search'),
+            source_objective = self.source_objective(source_ai),
+            training_target = 'search3',
         )
 
     def build_segment_value_targets(self, history_index, segment_length, remaining_length = None):

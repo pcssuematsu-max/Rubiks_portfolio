@@ -30,10 +30,18 @@ class LearningHistoryStore:
 
     def append(self, record: dict[str, Any]) -> None:
         """Persist one completed learning operation without discarding older points."""
+        self.append_many((record,))
+
+    def append_many(self, records: list[dict[str, Any]] | tuple[dict[str, Any], ...]) -> None:
+        """Persist a completed learning pass with one read/write cycle."""
+        records = list(records)
+        if len(records) == 0:
+            return
         payload = self._read()
-        _validate_record(record)
-        payload["records"].append(record)
-        payload["updatedAt"] = record["timestamp"]
+        for record in records:
+            _validate_record(record)
+        payload["records"].extend(records)
+        payload["updatedAt"] = records[-1]["timestamp"]
         self._write(payload)
 
     def records(self) -> list[dict[str, Any]]:
@@ -80,6 +88,7 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "valueSequenceCount": _safe_optional_int(metrics.get("valueSequenceCount")),
         "fixedValidation": _fixed_validation(metrics.get("fixedValidation")),
         "trainingSample": _training_sample(metrics.get("trainingSample")),
+        "trainingDataSources": _training_data_sources(metrics.get("trainingDataSources")),
         "gradientMetrics": _gradient_metrics(metrics.get("gradientMetrics")),
         "stepsToGoalRegression": _steps_to_goal_regression(metrics.get("stepsToGoalRegression")),
         "updatesDuringSolve": int(metrics.get("updatesDuringSolve", 0) or 0),
@@ -135,7 +144,7 @@ def _validate_record(record: Any) -> None:
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
-        "valueSequenceCount", "fixedValidation", "trainingSample", "gradientMetrics", "stepsToGoalRegression", "search3RankLossMix",
+        "valueSequenceCount", "fixedValidation", "trainingSample", "trainingDataSources", "gradientMetrics", "stepsToGoalRegression", "search3RankLossMix",
     }
     if not isinstance(record, dict) or not required.issubset(record) or set(record) - required - optional:
         raise ValueError("Invalid learning history record")
@@ -163,6 +172,7 @@ def _validate_record(record: Any) -> None:
         raise ValueError("Invalid learning history valueSequenceCount")
     _validate_fixed_validation(record.get("fixedValidation"))
     _validate_training_sample(record.get("trainingSample"))
+    _validate_training_data_sources(record.get("trainingDataSources"))
     _validate_gradient_metrics(record.get("gradientMetrics"))
     _validate_steps_to_goal_regression(record.get("stepsToGoalRegression"))
     _validate_optional_number(record.get("search3RankLossMix"))
@@ -229,12 +239,44 @@ _TRAINING_SAMPLE_OPTIONAL_INT_FIELDS = frozenset({
     "mediumBatchCount", "mediumSequenceMinSteps", "mediumSequenceMaxSteps",
     "mediumEligibleItemCount", "mediumReservedItemCount", "mediumSelectedItemCount",
     "directSearchSelectedItemCount", "fallbackSelectedItemCount",
+    "stepsToGoalStratifiedBatchCount", "stepsToGoalStratifiedItemCount",
 })
 
 _TRAINING_SAMPLE_NUMBER_FIELDS = frozenset({
     "shortReplayMinRatio", "shortSelectedRatio",
     "longReplayRatio", "longReplayMaxRatio", "longSelectedRatio",
+    "stepsToGoalStratifiedRatio",
 })
+
+
+def _training_data_sources(value: Any) -> dict[str, dict[str, dict[str, int]]] | None:
+    """Copy source-family counts for all candidates and selected batches."""
+    if not isinstance(value, dict) or set(value) != {"available", "selected"}:
+        return None
+    result = {}
+    for population in ("available", "selected"):
+        rows = value.get(population)
+        if not isinstance(rows, dict):
+            return None
+        copied = {}
+        for source, metrics in rows.items():
+            if not isinstance(source, str) or not source or not isinstance(metrics, dict):
+                return None
+            trajectories = _safe_optional_int(metrics.get("trajectoryCount"))
+            states = _safe_optional_int(metrics.get("stateCount"))
+            if trajectories is None or states is None or set(metrics) != {"trajectoryCount", "stateCount"}:
+                return None
+            copied[source] = {"trajectoryCount": trajectories, "stateCount": states}
+        result[population] = copied
+    return result
+
+
+def _validate_training_data_sources(value: Any) -> None:
+    if value is None:
+        return
+    normalized = _training_data_sources(value)
+    if normalized is None or normalized != value:
+        raise ValueError("Invalid learning history trainingDataSources")
 
 
 _GRADIENT_METRIC_NUMBER_FIELDS = frozenset({
@@ -249,6 +291,87 @@ _STEPS_TO_GOAL_REGRESSION_NUMBER_FIELDS = frozenset({
     "predictionMin", "predictionMean", "predictionMax",
     "signedErrorMean", "maePerState", "huberPerState",
 })
+
+
+_STEPS_TO_GOAL_REPLAY_POPULATION_REQUIRED_INT_FIELDS = frozenset({
+    "routeCount", "duplicateStartStateCount", "duplicateStartStateRouteCount",
+    "conflictingStartStateCount", "conflictingStartStateRouteCount",
+})
+
+_STEPS_TO_GOAL_REPLAY_POPULATION_OPTIONAL_INT_FIELDS = frozenset({
+    "shortestTargetRouteCount", "longerDuplicateRouteCount",
+})
+
+
+def _steps_to_goal_replay_population(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    required = set(_STEPS_TO_GOAL_REPLAY_POPULATION_REQUIRED_INT_FIELDS) | {
+        "remainingStepBands", "efficiencyBands", "routeEfficiencyMean",
+        "duplicateTargetStdMean",
+    }
+    allowed = required | set(_STEPS_TO_GOAL_REPLAY_POPULATION_OPTIONAL_INT_FIELDS)
+    if not required.issubset(value) or set(value) - allowed:
+        return None
+    result = {}
+    for key in _STEPS_TO_GOAL_REPLAY_POPULATION_REQUIRED_INT_FIELDS:
+        count = _safe_optional_int(value.get(key))
+        if count is None or count < 0:
+            return None
+        result[key] = count
+    for key in _STEPS_TO_GOAL_REPLAY_POPULATION_OPTIONAL_INT_FIELDS:
+        if key not in value:
+            continue
+        count = _safe_optional_int(value.get(key))
+        if count is None or count < 0:
+            return None
+        result[key] = count
+    bands = value.get("remainingStepBands")
+    expected_bands = {"0-10", "11-30", "31+"}
+    if not isinstance(bands, dict) or set(bands) != expected_bands:
+        return None
+    result["remainingStepBands"] = {label: _safe_optional_int(bands[label]) for label in expected_bands}
+    if any(count is None or count < 0 for count in result["remainingStepBands"].values()):
+        return None
+    efficiency = value.get("efficiencyBands")
+    expected_efficiency = {"efficient", "medium", "detour", "unknown"}
+    if not isinstance(efficiency, dict) or set(efficiency) != expected_efficiency:
+        return None
+    result["efficiencyBands"] = {label: _safe_optional_int(efficiency[label]) for label in expected_efficiency}
+    if any(count is None or count < 0 for count in result["efficiencyBands"].values()):
+        return None
+    for key in ("routeEfficiencyMean", "duplicateTargetStdMean"):
+        number = _finite_number(value.get(key))
+        if value.get(key) is not None and (number is None or number < 0.0):
+            return None
+        result[key] = number
+    return result
+
+
+def _steps_to_goal_replay(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or set(value) != {
+        "stratifiedRatio", "stratifiedBatchCount", "stratifiedItemCount",
+        "available", "selected",
+    }:
+        return None
+    ratio = _finite_number(value.get("stratifiedRatio"))
+    batches = _safe_optional_int(value.get("stratifiedBatchCount"))
+    items = _safe_optional_int(value.get("stratifiedItemCount"))
+    available = _steps_to_goal_replay_population(value.get("available"))
+    selected = _steps_to_goal_replay_population(value.get("selected"))
+    if (
+        ratio is None or not 0.0 <= ratio <= 1.0
+        or batches is None or batches < 0 or items is None or items < 0
+        or available is None or selected is None
+    ):
+        return None
+    return {
+        "stratifiedRatio": ratio,
+        "stratifiedBatchCount": batches,
+        "stratifiedItemCount": items,
+        "available": available,
+        "selected": selected,
+    }
 
 
 def _steps_to_goal_regression(value: Any) -> dict[str, Any] | None:
@@ -278,7 +401,7 @@ def _steps_to_goal_regression(value: Any) -> dict[str, Any] | None:
             if not isinstance(origin, str) or not origin:
                 return None
             copied = _steps_to_goal_regression(metrics)
-            if copied is None or "lossWeight" in copied or "origins" in copied or "remainingStepBands" in copied:
+            if copied is None or "lossWeight" in copied or "origins" in copied or "remainingStepBands" in copied or "replay" in copied:
                 return None
             origins[origin] = copied
         result["origins"] = origins
@@ -291,6 +414,11 @@ def _steps_to_goal_regression(value: Any) -> dict[str, Any] | None:
         if any(count is None for count in copied_bands.values()):
             return None
         result["remainingStepBands"] = copied_bands
+    if "replay" in value:
+        replay = _steps_to_goal_replay(value.get("replay"))
+        if replay is None:
+            return None
+        result["replay"] = replay
     return result
 
 
@@ -298,7 +426,7 @@ def _validate_steps_to_goal_regression(value: Any) -> None:
     if value is None:
         return
     required = {"stateCount", "trajectoryCount", *_STEPS_TO_GOAL_REGRESSION_NUMBER_FIELDS}
-    allowed = required | {"lossWeight", "origins", "remainingStepBands"}
+    allowed = required | {"lossWeight", "origins", "remainingStepBands", "replay"}
     if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed or _steps_to_goal_regression(value) != value:
         raise ValueError("Invalid learning history stepsToGoalRegression")
 

@@ -169,62 +169,25 @@ def _default_initial_scramble_groups(size,puzzle_type):
     if size == 3:
         return (
             [
-                (" U "," B2"," L2"," F "," L2"," B2"," U'"),
-                (" R "," D'"," R'"," F "," R "," D "," R'"),
-                (" M "," F "," U "," F "," U'"," F'"," M'"),
-                (" R "," E "," F "," M "," F'"," E'"," R'"),
-                (" R'"," U "," F'"," U "," F "," U'"," R "),
-                (" R'"," U "," F'"," U'"," F "," U'"," R "),
-                (" R'"," U "," F'"," U2"," F "," U'"," R "),
-                (" E'", ' B2', " L'", ' S ', ' L ', ' B2', ' E '),
-
-                (" R "," U "," R'"," U'"," F'"," U "," F "),
-                (" F'"," R "," U "," R'"," U'"," F'"," U "," F2"),
-                (" L'"," R "," U "," R'"," U'"," F'"," U "," F "," L "),
-                (" B "," R "," U "," R'"," U'"," F'"," U "," F "," B'"),
-
-                (" U "," F'"," U'"," R'"," F'"," R "," F "),
-                (" F "," U "," F'"," U'"," R'"," F'"," R "),
-                (" F'"," U "," F'"," U'"," R'"," F'"," R "," F2"),
-                (" F2"," U "," F'"," U'"," R'"," F'"," R "," F'"),
-
-                (" M "," U "," M'"," U'"),
-                (" R "," M "," U "," M'"," U'"," R'"),
-                (" R'"," M "," U "," M'"," U'"," R "),
-                (" M2"," U "," M2"," U'"),
-                (" R "," M2"," U "," M2"," U'"," R'"),
-                (" R'"," M2"," U "," M2"," U'"," R "),
-
-                (" U2"," R'"," F "," R "," F'"," U2"),
-                (" U'"," R'"," F "," R "," F'"," U "),
-                (" U "," R'"," F "," R "," F'"," U'"),
-
-                (" F "," R "," U2"," R'"," U2"," F'"),
-                (" F'"," R "," U2"," R'"," U2"," F "),
-                (" F2"," R "," U2"," R'"," U2"," F2"),
-
-                (" F'", " U'", ' F ', " R'", ' F ', ' R ', " F'", ' U '),
-                (" U'"," F'", " U'", ' F ', " R'", ' F ', ' R ', " F'", ' U2'),
-
-                (" F "," R'"," F'"," D'"," F "," D "," F2"," U "," B2"," U'"," F2"," U "," B2"," U'"," R "),
-                (" E'", ' L2', ' E ', ' L2', " R'", ' D ', ' R ', ' D2', ' F ', ' D ', ' R ', ' F ', " R'", " D'", " F'", ' D '),
-
-
+                (" R2"," U'"," R "," U'"," R "," U "," R'"," U "," R2"," U "," D'"," R "," U'"," R'"," D "),
+                (" D'"," R "," U "," R'"," D "," U'"," R2"," U'"," R "," U'"," R'"," U "," R'"," U "," R2"),
+                (' U ', ' R2', ' F ', ' B ', ' R ', ' B2', ' R ', ' U2', ' L ', ' B2', ' R ', " U'", " D'", ' R2', ' F ', " L'", ' R ', ' U2', ' D2', ' B2', ' D2', ' B2'),
+                (' U ', ' R2', ' F ', ' B ', ' R ', ' B2', ' R ', ' U2', ' L ', ' B2', ' R ', " U'", " D'", ' R2', ' F ', " R'", ' L ', ' B2', ' U2', ' F2'),
+                (" R " ," U "," R'"," U'"," F'"," U "," F "),
+                (' D ', ' F ', " D'", " L'", " F'", ' L ', ' F '),
+                (' D ', ' F ', " D'", " U'", ' B2', ' U ', ' F ', " U'", ' B2', ' U ', " F'"),
+                (' L ', " F'", " L'", " U'", ' F ', ' U '),
+                (" U'", ' F ', " D'", ' F ', ' U ', " F'", ' D '),
+                (' F2', " U'", ' F ', ' U ', ' L ', " F'", " L'"),
+                (" R "," U'"," R "," U "," R'"," D "," R "," D'"," R "," U'"," D "," R2"," U "," R2"," D'"," R2"),
                 (' D ', " U'", ' R ', " U'", " R'", ' U2', " F'", " U'", " R'", " F'", ' R ', ' U ', ' F ', " D'"),
-                (' L2', ' B ', ' L ', " B'", " L'", " D'", ' B ', ' D ', ' L ', " U'", ' L ', ' U '),
-                (' R ', " U'", " R'", ' U2', " F'", " U'", " R'", " F'", ' R ', ' U ', ' F ', " U'"),
-                (" R'", ' F ', " D'", ' B2', " U'", ' L ', ' U ', ' B2', ' F2', " L'", ' F2', ' L ', ' F2', ' D2', ' R ', ' D ', " R'", ' D2', " F'", ' R '),
-                (' R ', ' F ', " D'", ' B2', " U'", ' L ', ' U ', ' B2', ' F2', " L'", ' F2', ' L ', ' F2', ' D2', ' R ', ' D ', " R'", ' D2', " F'", " R'"),
-                (" U'", " R'", " U'", ' R ', " U'", ' B2', ' D ', " L'", " D'", ' B2', " U'"),
-                (' L ', " D'", " L'", ' D ', " L'", ' F2', ' R ', " U'", " R'", ' F2', ' L '),
-                (" U'", ' R2', " F'", ' R ', ' F ', ' R ', " U'", ' R2', ' F ', ' R ', ' F ', " R'", " F'", ' R ', ' U ', ' R ', ' U '),
-                (' L ', ' D2', " B'", ' D ', ' B ', ' D ', " L'", ' D2', ' B ', ' D ', ' B ', " D'", " B'", ' D ', ' L ', ' D ', " L'"),
-
+                (" R "," L "," U2"," R'"," L'"),  
+                (" R "," L "," U2"," R'"," L'"," U2"),
+                (" R'"," U "," F'"," U "," F "," U'"," R "),  
+                (" R'"," U "," F'"," U2"," F "," U'"," R "),              
             ],
             [
-                (' R2', ' B ', " L'", ' B2', ' U ', " F'", " U'", ' B ', ' U ', ' F ', " U'", ' R2', ' B ', ' L ', " B'"),
-                (" R "," F "," R'"," B2"," R "," F'"," R'"," B2"),
-                (" E "," F "," E "," F "," E "," F2"," E'"," F "," E'"," F "," E'"," F2"),
+                (" U ",),
             ],
             [
             ],
@@ -341,16 +304,38 @@ def build_experiment_frame_config():
     weight_decay = [True] * ai_count
     activations = ['SiLU'] * ai_count
     residuals = [True] * ai_count
-    search2_value_loss_types = ['myloss'] * 20 + ['steps_to_goal'] * 5
+    # AI21/23/24 compare route-state pairs again.  They share the same
+    # direct, connected routes as the calibrated steps_to_goal group, while
+    # retaining their own pairwise Value objective.
+    search2_value_loss_types = ['myloss'] * 20 + [
+        'steps_to_goal', 'myloss2_pairwise', 'steps_to_goal',
+        'myloss2_pairwise', 'myloss2_pairwise',
+    ]
     search2_value_loss_margins = [0.0] * ai_count
     # The calibrated regression group uses only its direct Huber objective.
     search2_value_target_scales = [1.0] * ai_count
     # Keep the target at -n.  This coefficient only balances the regression
     # loss after route-wise normalization.
-    steps_to_goal_value_loss_weights = [0.0] * 20 + [5.0,5.0,2.0,2.0,2.0]
+    steps_to_goal_value_loss_weights = [0.0] * 20 + [5.0,5.0,1.0,1.0,1.0]
     # Keep at most twelve Value states from each near/mid/far remaining-step
     # band in one route.  Policy training still sees the complete route.
     steps_to_goal_states_per_bands = [0] * 20 + [12] * 5
+    # Transformer steps_to_goal replay reserves most non-recent samples for
+    # an even mix of remaining-step bands and route efficiency.
+    # Linear models consume their full buffer, so this is observational there.
+    steps_to_goal_replay_stratified_ratios = [0.0] * 22 + [0.75] * 3
+    # A direct solve that takes over three times its initial scramble length
+    # is useful Policy data but a poor absolute remaining-step calibration
+    # target.  Keep its policy/pairwise training while excluding it only from
+    # the two calibrated steps_to_goal Value losses.
+    steps_to_goal_value_max_route_efficiencies = [0.0] * 20 + [3.0,0.0,3.0,0.0,0.0]
+    # Balance Huber supervision across remaining-step bands inside one batch.
+    # The cap is an oversampling bound, so every selected direct trajectory
+    # remains available to Policy even when 31+ Value states are scarce.
+    steps_to_goal_value_batch_band_max_copies = [1] * 20 + [3,1,3,1,1]
+    # Transformer pairwise buffers currently contain about one third fallback
+    # routes.  Keep a direct-route majority in each sampled learning pass.
+    pairwise_fallback_max_ratios = [1.0] * 23 + [0.25,0.25]
     search2_rank_loss_mixes = [0.0] * ai_count
     search2_rank_loss_apply_types = ['all'] * 20 + ['none'] * 5
     # Transformer Search3: fixed validation shows the rank-loss pair (10/11)
@@ -380,6 +365,24 @@ def build_experiment_frame_config():
     # A growing root preference after the middle tier is another sign that
     # additional Search3 budget can be useful, even before Value rises 0.05.
     search3_budget_min_visit_share_gains = [0.03] * ai_count
+    # Preserve the standard 10k allocation unless the final tier is still
+    # materially concentrating at the root.  This one rescue tier targets
+    # the otherwise unresolved deep branches without assuming that a large
+    # scramble necessarily needs more work.
+    search3_budget_rescue_playouts = [
+        10000 if ai_index in (3,5,7,10,18) else 0
+        for ai_index in range(ai_count)
+    ]
+    search3_budget_rescue_min_visit_share_gains = [
+        0.10 if ai_index in (3,5,7,10,18) else 1.0
+        for ai_index in range(ai_count)
+    ]
+    # Root concentration alone produced many unsuccessful rescue tiers.
+    # Require the final tier's Value estimate not to regress as well.
+    search3_budget_rescue_min_improvements = [
+        0.0 if ai_index in (3,5,7,10,18) else 1.0
+        for ai_index in range(ai_count)
+    ]
     # Retain enough of the tree and evaluator cache to make the fixed 10k
     # allocation comparable to a continuous 10k-playout PUCT call.
     search3_max_node_caches = [10000] * ai_count
@@ -491,22 +494,29 @@ def build_experiment_frame_config():
         lr_vs = [0.99] * ai_count,
         lr_hs = [0.99] * ai_count,
         out_cs = [1.0] * ai_count,
-        search3_cs = [0,0,3,3,5,5,7,7,0,0] + [1.0] * 10 + [0.0] * 5,
-        # Transformer Search3 keeps C=1 near the root, then widens its local
-        # exploration linearly to C=2 by depth 8.  This limits the broad
-        # root allocation previously seen with the C=2→4 schedule.  Linear
-        # Search3 keeps its C=3/5/7 comparison groups.
-        search3_c_depth_maxes = [0,0,3,3,5,5,7,7,0,0] + [2.0] * 10 + [0.0] * 5,
-        search3_c_depth_ramp_depths = [0] * 10 + [8] * 10 + [0] * 5,
+        # C=0.05 consistently left trees shallow while consuming budget.
+        # AI2/3 use C=0.5, AI4/5 widen from C=1 to 5, and AI6/7 retain
+        # C=5. Transformer rank/no-rank pairs all share the C=1→2 schedule.
+        search3_cs = [0,0,0.5,0.5,1.0,1.0,5,5,0,0] + [1.0] * 10 + [0.0] * 5,
+        search3_c_depth_maxes = [0,0,0.5,0.5,5.0,5.0,5,5,0,0] + [2.0] * 10 + [0.0] * 5,
+        search3_c_depth_start_depths = [0] * 10 + [4] * 10 + [0] * 5,
+        search3_c_depth_ramp_depths = [8] * 10 + [6] * 10 + [0] * 5,
         search3_budget_modes = search3_budget_modes,
         search3_budget_stage_playouts = search3_budget_stage_playouts,
         search3_budget_confidence_visit_shares = search3_budget_confidence_visit_shares,
         search3_budget_min_improvements = search3_budget_min_improvements,
         search3_budget_min_playout_depths = search3_budget_min_playout_depths,
         search3_budget_min_visit_share_gains = search3_budget_min_visit_share_gains,
+        search3_budget_rescue_playouts = search3_budget_rescue_playouts,
+        search3_budget_rescue_min_visit_share_gains = search3_budget_rescue_min_visit_share_gains,
+        search3_budget_rescue_min_improvements = search3_budget_rescue_min_improvements,
         search3_max_node_caches = search3_max_node_caches,
         search3_max_prediction_caches = search3_max_prediction_caches,
         search2_max_frontiers = [30000] * ai_count,
+        # One correct calibrated steps_to_goal move should increase Value by
+        # roughly one.  A 0.75 margin accepts that progress despite ordinary
+        # prediction noise; rank-based objectives retain the proven 1.0 gate.
+        search2_skip_differences = [1.0,5.0] + [1.0] * 6 + [10.0,1000.0] + [1.0,1.0,1.0,1.0,10.0,10.0,1000.0,1000.0,1.0,1.0] + [1.0,1.0,1.0,1.0,1000.0],
         search2_torch_batch_sizes = [
             64 if original_transformer_attention[ai_index] else 100
             for ai_index in range(ai_count)
@@ -516,6 +526,10 @@ def build_experiment_frame_config():
         search2_value_target_scales = search2_value_target_scales,
         steps_to_goal_value_loss_weights = steps_to_goal_value_loss_weights,
         steps_to_goal_states_per_bands = steps_to_goal_states_per_bands,
+        steps_to_goal_replay_stratified_ratios = steps_to_goal_replay_stratified_ratios,
+        steps_to_goal_value_max_route_efficiencies = steps_to_goal_value_max_route_efficiencies,
+        steps_to_goal_value_batch_band_max_copies = steps_to_goal_value_batch_band_max_copies,
+        pairwise_fallback_max_ratios = pairwise_fallback_max_ratios,
         search2_rank_loss_mixes = search2_rank_loss_mixes,
         search2_rank_loss_apply_types = search2_rank_loss_apply_types,
         search3_rank_loss_mixes = search3_rank_loss_mixes,
@@ -534,7 +548,13 @@ def build_experiment_frame_config():
         ],
         residuals = residuals,
         update_scales = [
-            (5.0, 1.0, 20.0) if is_search2_ai[ai_index] else (5.0, 1.0, 1.0)
+            # A restored Transformer model can receive a disproportionately
+            # large first Value update from its retained replay.  Use the
+            # same conservative Value multiplier for every Transformer
+            # Search2 model; keep the Linear comparison unchanged.
+            (5.0, 1.0, 1.0)
+            if original_transformer_attention[ai_index] and is_search2_ai[ai_index]
+            else ((5.0, 1.0, 20.0) if is_search2_ai[ai_index] else (5.0, 1.0, 1.0))
             for ai_index in range(ai_count)
         ],
         original_transformer_attention = original_transformer_attention,
@@ -554,7 +574,8 @@ def build_experiment_frame_config():
             for ai_index in range(ai_count)
         ],
         original_train_recent_ratios = [
-            0.5 if original_transformer_attention[ai_index] else 0.0
+            (0.25 if ai_index in (22,23,24)
+             else (0.5 if original_transformer_attention[ai_index] else 0.0))
             for ai_index in range(ai_count)
         ],
         # Keep a small base of reliable local trajectories while replaying

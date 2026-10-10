@@ -57,6 +57,7 @@ class FrameConfig:
     out_cs: Optional[Sequence[float]] = None
     search3_cs: Optional[Sequence[float]] = None
     search3_c_depth_maxes: Optional[Sequence[float]] = None
+    search3_c_depth_start_depths: Optional[Sequence[int]] = None
     search3_c_depth_ramp_depths: Optional[Sequence[int]] = None
     search3_budget_modes: Optional[Sequence[str]] = None
     search3_budget_stage_playouts: Optional[Sequence[Sequence[int]]] = None
@@ -64,15 +65,23 @@ class FrameConfig:
     search3_budget_min_improvements: Optional[Sequence[float]] = None
     search3_budget_min_playout_depths: Optional[Sequence[float]] = None
     search3_budget_min_visit_share_gains: Optional[Sequence[float]] = None
+    search3_budget_rescue_playouts: Optional[Sequence[int]] = None
+    search3_budget_rescue_min_visit_share_gains: Optional[Sequence[float]] = None
+    search3_budget_rescue_min_improvements: Optional[Sequence[float]] = None
     search3_max_node_caches: Optional[Sequence[int]] = None
     search3_max_prediction_caches: Optional[Sequence[int]] = None
     search2_max_frontiers: Optional[Sequence[int]] = None
+    search2_skip_differences: Optional[Sequence[float]] = None
     search2_torch_batch_sizes: Optional[Sequence[int]] = None
     search2_value_loss_types: Optional[Sequence[str]] = None
     search2_value_loss_margins: Optional[Sequence[float]] = None
     search2_value_target_scales: Optional[Sequence[float]] = None
     steps_to_goal_value_loss_weights: Optional[Sequence[float]] = None
     steps_to_goal_states_per_bands: Optional[Sequence[int]] = None
+    steps_to_goal_replay_stratified_ratios: Optional[Sequence[float]] = None
+    steps_to_goal_value_max_route_efficiencies: Optional[Sequence[float]] = None
+    steps_to_goal_value_batch_band_max_copies: Optional[Sequence[int]] = None
+    pairwise_fallback_max_ratios: Optional[Sequence[float]] = None
     search2_rank_loss_mixes: Optional[Sequence[float]] = None
     search2_rank_loss_apply_types: Optional[Sequence[str]] = None
     search3_rank_loss_mixes: Optional[Sequence[float]] = None
@@ -130,6 +139,7 @@ class FrameConfig:
         self._validate_ai_sequence_length('out_cs', self.out_cs, ai_count)
         self._validate_ai_sequence_length('search3_cs', self.search3_cs, ai_count)
         self._validate_ai_sequence_length('search3_c_depth_maxes', self.search3_c_depth_maxes, ai_count)
+        self._validate_ai_sequence_length('search3_c_depth_start_depths', self.search3_c_depth_start_depths, ai_count)
         self._validate_ai_sequence_length('search3_c_depth_ramp_depths', self.search3_c_depth_ramp_depths, ai_count)
         self._validate_ai_sequence_length('search3_budget_modes', self.search3_budget_modes, ai_count)
         self._validate_ai_sequence_length('search3_budget_stage_playouts', self.search3_budget_stage_playouts, ai_count)
@@ -137,15 +147,23 @@ class FrameConfig:
         self._validate_ai_sequence_length('search3_budget_min_improvements', self.search3_budget_min_improvements, ai_count)
         self._validate_ai_sequence_length('search3_budget_min_playout_depths', self.search3_budget_min_playout_depths, ai_count)
         self._validate_ai_sequence_length('search3_budget_min_visit_share_gains', self.search3_budget_min_visit_share_gains, ai_count)
+        self._validate_ai_sequence_length('search3_budget_rescue_playouts', self.search3_budget_rescue_playouts, ai_count)
+        self._validate_ai_sequence_length('search3_budget_rescue_min_visit_share_gains', self.search3_budget_rescue_min_visit_share_gains, ai_count)
+        self._validate_ai_sequence_length('search3_budget_rescue_min_improvements', self.search3_budget_rescue_min_improvements, ai_count)
         self._validate_ai_sequence_length('search3_max_node_caches', self.search3_max_node_caches, ai_count)
         self._validate_ai_sequence_length('search3_max_prediction_caches', self.search3_max_prediction_caches, ai_count)
         self._validate_ai_sequence_length('search2_max_frontiers', self.search2_max_frontiers, ai_count)
+        self._validate_ai_sequence_length('search2_skip_differences', self.search2_skip_differences, ai_count)
         self._validate_ai_sequence_length('search2_torch_batch_sizes', self.search2_torch_batch_sizes, ai_count)
         self._validate_ai_sequence_length('search2_value_loss_types', self.search2_value_loss_types, ai_count)
         self._validate_ai_sequence_length('search2_value_loss_margins', self.search2_value_loss_margins, ai_count)
         self._validate_ai_sequence_length('search2_value_target_scales', self.search2_value_target_scales, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_value_loss_weights', self.steps_to_goal_value_loss_weights, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_states_per_bands', self.steps_to_goal_states_per_bands, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_replay_stratified_ratios', self.steps_to_goal_replay_stratified_ratios, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_value_max_route_efficiencies', self.steps_to_goal_value_max_route_efficiencies, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_value_batch_band_max_copies', self.steps_to_goal_value_batch_band_max_copies, ai_count)
+        self._validate_ai_sequence_length('pairwise_fallback_max_ratios', self.pairwise_fallback_max_ratios, ai_count)
         self._validate_ai_sequence_length('search2_rank_loss_mixes', self.search2_rank_loss_mixes, ai_count)
         self._validate_ai_sequence_length('search2_rank_loss_apply_types', self.search2_rank_loss_apply_types, ai_count)
         self._validate_ai_sequence_length('search3_rank_loss_mixes', self.search3_rank_loss_mixes, ai_count)

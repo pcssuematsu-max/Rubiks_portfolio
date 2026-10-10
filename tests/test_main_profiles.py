@@ -26,8 +26,16 @@ class MainProfileTests(unittest.TestCase):
         self.assertEqual(config.cube_size, 3)
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(config.control_panel_mode, "advanced")
-        self.assertEqual(config.steps_to_goal_value_loss_weights[20:], [5.0, 5.0, 2.0, 2.0, 2.0])
+        self.assertEqual(config.steps_to_goal_value_loss_weights[20:], [5.0, 5.0, 1.0, 1.0, 1.0])
         self.assertEqual(config.steps_to_goal_states_per_bands[20:], [12, 12, 12, 12, 12])
+        self.assertEqual(config.steps_to_goal_replay_stratified_ratios[20:], [0.0, 0.0, 0.75, 0.75, 0.75])
+        self.assertEqual(config.steps_to_goal_value_max_route_efficiencies[20:], [3.0, 0.0, 3.0, 0.0, 0.0])
+        self.assertEqual(config.steps_to_goal_value_batch_band_max_copies[20:], [3, 1, 3, 1, 1])
+        self.assertEqual(config.pairwise_fallback_max_ratios[20:], [1.0, 1.0, 1.0, 0.25, 0.25])
+        self.assertEqual(config.search2_skip_differences[20:], [0.75, 1.0, 0.75, 1.0, 1.0])
+        self.assertEqual(config.search3_budget_rescue_playouts[3], 10000)
+        self.assertEqual(config.search3_budget_rescue_playouts[2], 0)
+        self.assertEqual(config.original_train_recent_ratios[20:], [0.0, 0.0, 0.25, 0.25, 0.25])
 
     def test_test_profile_is_an_alias_for_experiment(self):
         config = build_frame_config("test")

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -103,6 +104,18 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['trainingSample']['fallbackSelectedItemCount'], 11)
             self.assertEqual(saved['search3RankLossMix'], 0.05)
 
+    def test_writes_multiple_records_with_one_history_operation(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'learning.json'
+            first = completed_learning_record(1, _FakeAI(), 1.0)
+            second = completed_learning_record(2, _FakeAI(), 2.0)
+
+            LearningHistoryStore(path).append_many([first, second])
+
+            saved = LearningHistoryStore(path).records()
+            self.assertEqual([record['aiIndex'] for record in saved], [1, 2])
+            self.assertEqual(json.loads(path.read_text(encoding='utf-8'))['updatedAt'], second['timestamp'])
+
     def test_writes_steps_to_goal_regression_calibration_when_available(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / 'learning.json'
@@ -131,6 +144,79 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['signedErrorMean'], 3.0)
             self.assertEqual(saved['lossWeight'], 1.0)
             self.assertEqual(saved['origins']['direct_search']['stateCount'], 12)
+
+    def test_writes_steps_to_goal_replay_diagnostics_when_available(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'learning.json'
+            ai = _FakeAI()
+            ai.search2_value_loss_type = 'steps_to_goal'
+            ai.last_training_metrics = dict(ai.last_training_metrics)
+            population = {
+                'routeCount': 4,
+                'remainingStepBands': {'0-10': 1, '11-30': 2, '31+': 1},
+                'efficiencyBands': {'efficient': 2, 'medium': 1, 'detour': 1, 'unknown': 0},
+                'routeEfficiencyMean': 1.75,
+                'duplicateStartStateCount': 1,
+                'duplicateStartStateRouteCount': 2,
+                'conflictingStartStateCount': 1,
+                'conflictingStartStateRouteCount': 2,
+                'duplicateTargetStdMean': 3.0,
+            }
+            ai.last_training_metrics['stepsToGoalRegression'] = {
+                'stateCount': 12, 'trajectoryCount': 2,
+                'targetMin': -8.0, 'targetMean': -4.0, 'targetMax': 0.0,
+                'predictionMin': -3.0, 'predictionMean': -1.0, 'predictionMax': 1.0,
+                'signedErrorMean': 3.0, 'maePerState': 3.2, 'huberPerState': 2.7,
+                'replay': {
+                    'stratifiedRatio': 0.5,
+                    'stratifiedBatchCount': 1,
+                    'stratifiedItemCount': 2,
+                    'available': population,
+                    'selected': population,
+                },
+            }
+
+            LearningHistoryStore(path).append(completed_learning_record(20, ai, 1.0))
+
+            replay = LearningHistoryStore(path).records()[0]['stepsToGoalRegression']['replay']
+            self.assertEqual(replay['selected']['conflictingStartStateCount'], 1)
+            self.assertEqual(replay['stratifiedItemCount'], 2)
+
+    def test_writes_training_source_counts_when_available(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'learning.json'
+            ai = _FakeAI()
+            ai.last_training_metrics = dict(ai.last_training_metrics)
+            ai.last_training_metrics['trainingDataSources'] = {
+                'available': {
+                    'search3:direct_search': {'trajectoryCount': 8, 'stateCount': 80},
+                    'steps_to_goal:fallback': {'trajectoryCount': 3, 'stateCount': 30},
+                },
+                'selected': {
+                    'search3:direct_search': {'trajectoryCount': 4, 'stateCount': 40},
+                    'steps_to_goal:fallback': {'trajectoryCount': 1, 'stateCount': 10},
+                },
+            }
+            LearningHistoryStore(path).append(completed_learning_record(20, ai, 1.0))
+
+            saved = LearningHistoryStore(path).records()[0]['trainingDataSources']
+            self.assertEqual(saved['available']['search3:direct_search']['trajectoryCount'], 8)
+            self.assertEqual(saved['selected']['steps_to_goal:fallback']['stateCount'], 10)
+
+    def test_training_source_summary_separates_objective_and_fallback(self):
+        direct = SimpleNamespace(source_objective='search3', trajectory_source='direct-search', moves=(0, 1))
+        fallback = SimpleNamespace(source_objective='steps_to_goal', trajectory_origin='fallback', moves=(0,))
+
+        summary = Rubiks_3_AI._training_data_source_summary(
+            available_indices=[0, 1],
+            selected_indices=[1],
+            data_source=[direct, fallback],
+            state_count_fn=lambda item: len(item.moves) + 1,
+        )
+
+        self.assertEqual(summary['available']['search3:direct_search']['state_count'], 3)
+        self.assertEqual(summary['available']['steps_to_goal:fallback']['trajectory_count'], 1)
+        self.assertEqual(summary['selected']['steps_to_goal:fallback']['state_count'], 2)
 
     def test_writes_fixed_validation_metrics_when_available(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

@@ -1388,10 +1388,16 @@ class SolveSessionManager:
         )
 
         if steps_to_goal_source:
-            self._store_connected_steps_to_goal_training_sample()
             if direct_success:
+                self._store_connected_steps_to_goal_training_sample()
                 self._store_connected_original_search2_training_sample(source_ai)
                 self.frame.search_data_manager.store_connected_search3_data(source_ai)
+            else:
+                # A fallback never cross-teaches pairwise Value, even though
+                # direct routes are deliberately shared with it.
+                self._store_connected_steps_to_goal_training_sample(
+                    self._steps_to_goal_search2_ai_indices()
+                )
             return direct_success
 
         if direct_success:
@@ -1400,7 +1406,13 @@ class SolveSessionManager:
             # route to the final goal.
             self._store_connected_steps_to_goal_training_sample()
             self._store_connected_myloss_training_sample()
-            self._store_search2_segment_training_samples()
+            # Pairwise Value and calibrated Value both consume the connected
+            # route above.  Keep local Search2 segments for the Original
+            # Search2 objective only, so the two shared objectives see the
+            # same direct-success data distribution.
+            self._store_search2_segment_training_samples(
+                self._myloss_search2_ai_indices()
+            )
             return False
 
         if source_mode == 'search2':
@@ -1414,7 +1426,7 @@ class SolveSessionManager:
         connected_moves = tuple(
             move for moves in state.move_lis for move in moves
         )
-        target_ai_indices = self._non_steps_to_goal_search2_ai_indices()
+        target_ai_indices = self._myloss_search2_ai_indices()
         if len(connected_moves) == 0 or not target_ai_indices:
             return False
         return self._store_search2_training_sample(
@@ -1446,21 +1458,13 @@ class SolveSessionManager:
     def _store_search2_fallback_training_samples(self, source_loss_type):
         """Keep a Search2 fallback only for Search2 AIs with the same loss."""
         if source_loss_type == 'steps_to_goal':
-            return self._store_connected_steps_to_goal_training_sample()
+            return self._store_connected_steps_to_goal_training_sample(
+                self._steps_to_goal_search2_ai_indices()
+            )
         target_ai_indices = self._search2_ai_indices_with_value_loss(source_loss_type)
         if not target_ai_indices:
             return False
         return self._store_search2_segment_training_samples(target_ai_indices)
-
-    def _non_steps_to_goal_search2_ai_indices(self):
-        return [
-            ai_index
-            for ai_index, ai in enumerate(self.frame.AIs)
-            if (
-                getattr(ai, 'search_mode', None) == 'search2'
-                and getattr(ai, 'search2_value_loss_type', None) != 'steps_to_goal'
-            )
-        ]
 
     def _search2_ai_indices_with_value_loss(self, loss_type):
         return [
@@ -1581,17 +1585,26 @@ class SolveSessionManager:
             },
             'search2': {
                 'maxFrontier': getattr(ai, 'search2_max_frontier', None),
+                'skipDifference': getattr(ai, 'skip_difference', None),
                 'batchSize': getattr(ai, 'search2_torch_batch_size', None),
                 'valueLossType': getattr(ai, 'search2_value_loss_type', None),
                 'valueTargetScale': getattr(ai, 'search2_value_target_scale', None),
                 'stepsToGoalValueLossWeight': getattr(ai, 'steps_to_goal_value_loss_weight', None),
                 'stepsToGoalStatesPerBand': getattr(ai, 'steps_to_goal_states_per_band', None),
+                'stepsToGoalValueMaxRouteEfficiency': getattr(
+                    ai, 'steps_to_goal_value_max_route_efficiency', None,
+                ),
+                'stepsToGoalValueBatchBandMaxCopies': getattr(
+                    ai, 'steps_to_goal_value_batch_band_max_copies', None,
+                ),
+                'pairwiseFallbackMaxRatio': getattr(ai, 'pairwise_fallback_max_ratio', None),
                 'rankLossMix': getattr(ai, 'search2_rank_loss_mix', None),
                 'rankLossApplyType': getattr(ai, 'search2_rank_loss_apply_type', None),
             },
             'search3C': getattr(ai, 'search3_C', None),
             'search3DepthSchedule': {
                 'maxC': getattr(ai, 'search3_C_depth_max', getattr(ai, 'search3_C', None)),
+                'startDepth': getattr(ai, 'search3_C_depth_start_depth', 0),
                 'rampDepth': getattr(ai, 'search3_C_depth_ramp_depth', 0),
             },
             'search3Budget': {
@@ -1601,6 +1614,13 @@ class SolveSessionManager:
                 'minImprovement': getattr(ai, 'search3_budget_min_improvement', None),
                 'minPlayoutDepth': getattr(ai, 'search3_budget_min_playout_depth', None),
                 'minVisitShareGain': getattr(ai, 'search3_budget_min_visit_share_gain', None),
+                'rescuePlayouts': getattr(ai, 'search3_budget_rescue_playouts', None),
+                'rescueMinVisitShareGain': getattr(
+                    ai, 'search3_budget_rescue_min_visit_share_gain', None,
+                ),
+                'rescueMinImprovement': getattr(
+                    ai, 'search3_budget_rescue_min_improvement', None,
+                ),
                 'maxNodeCache': getattr(ai, 'search3_max_node_cache', None),
                 'maxPredictionCache': getattr(ai, 'search3_max_prediction_cache', None),
             },
@@ -1656,19 +1676,23 @@ class SolveSessionManager:
             target_ai_indices = target_ai_indices,
         )
 
-    def _store_connected_steps_to_goal_training_sample(self):
-        """Store one whole successful Search2 route for calibrated Value learning.
+    def _store_connected_steps_to_goal_training_sample(self, target_ai_indices = None):
+        """Store one whole successful Search2 route for shared Value learning.
 
         Search2 can apply several separately searched move segments before the
-        goal.  Regression targets must use the distance to that final goal,
-        not the length of each local segment, so join the route before
-        simplifying and calculating the descending step labels.
+        goal.  The regression target must use the distance to that final
+        goal, not the length of each local segment; pairwise consumes the
+        same complete ordering.  Join the route before simplifying and
+        calculating the descending step labels.
         """
         state = self.frame.solve_state
         source_ai = self._current_source_ai()
         if getattr(source_ai, 'search_mode', None) not in ('search2', 'search3', 'transformer'):
             return False
-        target_ai_indices = self._steps_to_goal_search2_ai_indices()
+        if target_ai_indices is None:
+            # Direct successes are intentionally shared: the regression and
+            # pairwise objectives observe precisely the same whole route.
+            target_ai_indices = self._steps_to_goal_shared_search2_ai_indices()
         if not target_ai_indices:
             return False
         connected_moves = tuple(
@@ -1702,6 +1726,22 @@ class SolveSessionManager:
             if (
                 getattr(ai, 'search_mode', None) == 'search2'
                 and getattr(ai, 'search2_value_loss_type', None) == 'steps_to_goal'
+            )
+        ]
+
+    def _steps_to_goal_shared_search2_ai_indices(self):
+        """Return direct-route consumers shared with steps_to_goal.
+
+        Pairwise fallback trajectories are *not* sent here; callers use the
+        steps-only helper above for that case.
+        """
+        return [
+            ai_index
+            for ai_index, ai in enumerate(self.frame.AIs)
+            if (
+                getattr(ai, 'search_mode', None) == 'search2'
+                and getattr(ai, 'search2_value_loss_type', None)
+                in ('steps_to_goal', 'myloss2_pairwise')
             )
         ]
 
@@ -1739,6 +1779,8 @@ class SolveSessionManager:
         if not state.search_TF:
             source_search_mode = 'myval'
             source_value_loss_type = 'myval'
+        if target_ai_indices is None:
+            target_ai_indices = self._default_search2_target_ai_indices(source_value_loss_type)
         data_item = data(
             datas[0][0],
             datas[1][0],
@@ -1749,6 +1791,8 @@ class SolveSessionManager:
             source_search_mode = source_search_mode,
             source_search2_value_loss_type = source_value_loss_type,
             trajectory_origin = ('fallback' if getattr(state,'fallback_used',False) else 'direct_search'),
+            source_objective = self._training_source_objective(source_ai, source_search_mode),
+            training_target = self._training_target_label(target_ai_indices),
             steps_to_goal = (
                 tuple(range(len(simplified_moves), -1, -1))
                 if steps_to_goal is None else steps_to_goal
@@ -1758,11 +1802,36 @@ class SolveSessionManager:
         self.frame.AIs[self.frame.AI_idx].datas.append(data_item)
 
         data_index = len(self.frame.AIs[self.frame.AI_idx].datas) - 1
-        if target_ai_indices is None:
-            target_ai_indices = self._default_search2_target_ai_indices(source_value_loss_type)
         for ai_index in target_ai_indices:
             self.frame.AIs[ai_index].indices.append(data_index)
         return True
+
+    @staticmethod
+    def _training_source_objective(source_ai, source_search_mode):
+        """Classify the producer without conflating it with the target loss."""
+        loss_type = str(getattr(source_ai, 'search2_value_loss_type', '') or '')
+        if loss_type == 'steps_to_goal':
+            return 'steps_to_goal'
+        if str(source_search_mode or '') in ('search3', 'transformer'):
+            return 'search3'
+        return 'original_search2'
+
+    def _training_target_label(self, target_ai_indices):
+        """Describe which loss family consumes this Search2 sample."""
+        if target_ai_indices is None:
+            return 'unknown'
+        target_losses = {
+            str(getattr(self.frame.AIs[index], 'search2_value_loss_type', '') or '')
+            for index in target_ai_indices
+            if 0 <= index < len(self.frame.AIs)
+        }
+        if target_losses == {'steps_to_goal'}:
+            return 'steps_to_goal'
+        if target_losses == {'steps_to_goal', 'myloss2_pairwise'}:
+            return 'steps_to_goal_shared'
+        if target_losses == {'myloss2_pairwise'}:
+            return 'myloss2_pairwise'
+        return 'original_search2'
 
     def _default_search2_target_ai_indices(self, source_value_loss_type):
         """通常Search2データを学習対象にするAI indexを返す。"""

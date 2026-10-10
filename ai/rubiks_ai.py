@@ -25,7 +25,7 @@ from ai.transformer_variance import transformer_parameter_target_variance
 
 
 class Rubiks_3_AI:
-    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_short_sequence_max_steps = None,train_short_sequence_min_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_value_target_scale = 1.0,steps_to_goal_value_loss_weight = 1.0,steps_to_goal_states_per_band = 0,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
+    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_short_sequence_max_steps = None,train_short_sequence_min_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_value_target_scale = 1.0,steps_to_goal_value_loss_weight = 1.0,steps_to_goal_states_per_band = 0,steps_to_goal_replay_stratified_ratio = 0.0,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None):
         if cube == None:
             self.cube = Rubiks_3(size = cube_size)
         else:
@@ -73,13 +73,22 @@ class Rubiks_3_AI:
         Mid = self.Mid
 
         self.skip_search = False
-        self.skip_difference = 10.0
+        self.skip_difference = 1.0
         self.search_mode = search_mode
         self.search2_value_loss_type = self._normalize_search2_value_loss_type(search2_value_loss_type)
         self.search2_value_loss_margin = float(search2_value_loss_margin)
         self.search2_value_target_scale = max(0.0,float(search2_value_target_scale))
         self.steps_to_goal_value_loss_weight = max(0.0,float(steps_to_goal_value_loss_weight))
         self.steps_to_goal_states_per_band = max(0,int(steps_to_goal_states_per_band))
+        self.steps_to_goal_replay_stratified_ratio = min(
+            1.0,max(0.0,float(steps_to_goal_replay_stratified_ratio)),
+        )
+        self.steps_to_goal_value_batch_band_max_copies = 1
+        # Absolute remaining-step targets are trustworthy only when the
+        # completed route is not an obvious detour from its scramble.  Zero
+        # leaves this guard disabled for backwards-compatible profiles.
+        self.steps_to_goal_value_max_route_efficiency = 0.0
+        self.pairwise_fallback_max_ratio = 1.0
         self.search2_rank_loss_mix = float(search2_rank_loss_mix)
         self.search2_rank_loss_apply_type = self._normalize_search2_rank_loss_apply_type(search2_rank_loss_apply_type)
         self.search3_rank_loss_mix = float(search3_rank_loss_mix)
@@ -286,11 +295,15 @@ class Rubiks_3_AI:
         self.search3_budget_min_improvement = 0.05
         self.search3_budget_min_playout_depth = 3.0
         self.search3_budget_min_visit_share_gain = 0.03
+        self.search3_budget_rescue_playouts = 0
+        self.search3_budget_rescue_min_visit_share_gain = 1.0
+        self.search3_budget_rescue_min_improvement = 0.0
         self.search_batch3 = 40
         self.search_depth3 = 200
         self.search3_C = 0.05
         # A zero ramp keeps the conventional fixed-C PUCT behavior.
         self.search3_C_depth_max = self.search3_C
+        self.search3_C_depth_start_depth = 0
         self.search3_C_depth_ramp_depth = 0
         self.search3_max_node_cache = 5000
         self.search3_max_prediction_cache = 5000
@@ -331,6 +344,28 @@ class Rubiks_3_AI:
     def set_steps_to_goal_states_per_band(self, cap):
         """Cap sampled states in each remaining-step band of one route."""
         self.steps_to_goal_states_per_band = max(0,int(cap))
+
+    def set_steps_to_goal_replay_stratified_ratio(self, ratio):
+        """Reserve part of replay for balanced distance/efficiency strata."""
+        self.steps_to_goal_replay_stratified_ratio = min(
+            1.0,max(0.0,float(ratio)),
+        )
+
+    def set_steps_to_goal_value_max_route_efficiency(self, maximum):
+        """Limit detoured routes used by the absolute remaining-step loss.
+
+        Zero keeps the guard disabled.  Policy and pairwise training continue
+        to use every direct successful route regardless of this setting.
+        """
+        self.steps_to_goal_value_max_route_efficiency = max(0.0,float(maximum))
+
+    def set_steps_to_goal_value_batch_band_max_copies(self, copies):
+        """Bound within-batch oversampling used to equalize Value step bands."""
+        self.steps_to_goal_value_batch_band_max_copies = max(1,int(copies))
+
+    def set_pairwise_fallback_max_ratio(self, ratio):
+        """Limit fallback-origin replay only for sampled pairwise training."""
+        self.pairwise_fallback_max_ratio = min(1.0,max(0.0,float(ratio)))
 
     def set_search2_rank_loss_mix(self, mix):
         """Set the auxiliary Search2 rank-loss coefficient."""
@@ -1247,6 +1282,7 @@ class Rubiks_3_AI:
             'margin': float(getattr(self,'search2_value_loss_margin',0.0)),
             'target_scale': float(getattr(self,'search2_value_target_scale',1.0)),
             'steps_to_goal_value_loss_weight': float(getattr(self,'steps_to_goal_value_loss_weight',1.0)),
+            'steps_to_goal_value_selection': None,
         }
 
     @staticmethod
@@ -1314,6 +1350,7 @@ class Rubiks_3_AI:
             'target_scale': float(self.search2_value_target_scale),
             'steps_to_goal_value_loss_weight': float(self.steps_to_goal_value_loss_weight),
             'steps_to_goal_stats': getattr(self,'_last_steps_to_goal_regression_stats',None),
+            'steps_to_goal_value_selection': getattr(self,'_last_steps_to_goal_value_selection',None),
         }
 
     def _build_loss_indices(self, d_Lis):
@@ -1327,23 +1364,136 @@ class Rubiks_3_AI:
 
     def _build_search2_value_loss_selection(self, d_lis, indices):
         """Return output columns/index boundaries used by the Search2 value loss."""
-        columns = []
-        value_indices = [0]
+        route_columns = []
         trajectory_origins = []
-        total = 0
+        selection = self._new_steps_to_goal_value_selection_summary()
         for data_index,data_item in enumerate(d_lis):
             start = indices[data_index]
             end = indices[data_index + 1]
             if not self._uses_search2_value_loss_for_sample(data_item):
+                self._record_steps_to_goal_value_route_exclusion(selection,data_item)
                 continue
-            route_columns = self._steps_to_goal_value_columns_for_route(data_item,start,end)
-            if not route_columns:
+            item_columns = self._steps_to_goal_value_columns_for_route(data_item,start,end)
+            if not item_columns:
                 continue
-            columns.extend(route_columns)
-            total += len(route_columns)
-            value_indices.append(total)
+            route_columns.append((data_index,item_columns))
             trajectory_origins.append(self._steps_to_goal_trajectory_origin(data_item))
+            self._record_steps_to_goal_value_route_selection(
+                selection,data_item,start,end,item_columns,
+            )
+
+        oversampled_count = self._balance_steps_to_goal_value_state_bands(
+            route_columns,d_lis,indices,
+        )
+        if selection is not None:
+            selection['oversampled_state_count'] = oversampled_count
+            selection['selected_state_bands'] = self._steps_to_goal_value_state_bands(
+                route_columns,d_lis,indices,
+            )
+            self._last_steps_to_goal_value_selection = selection
+        else:
+            self._last_steps_to_goal_value_selection = None
+
+        columns = []
+        value_indices = [0]
+        total = 0
+        for _,item_columns in route_columns:
+            item_columns.sort()
+            columns.extend(item_columns)
+            total += len(item_columns)
+            value_indices.append(total)
         return np.asarray(columns,dtype = 'i'), value_indices, trajectory_origins
+
+    def _new_steps_to_goal_value_selection_summary(self):
+        if self.search2_value_loss_type != 'steps_to_goal':
+            return None
+        return {
+            'candidate_route_count': 0,
+            'selected_route_count': 0,
+            'source_excluded_route_count': 0,
+            'detour_excluded_route_count': 0,
+            'longer_duplicate_excluded_route_count': 0,
+            'candidate_state_bands': {'0-10': 0, '11-30': 0, '31+': 0},
+            'selected_state_bands': {'0-10': 0, '11-30': 0, '31+': 0},
+            'oversampled_state_count': 0,
+        }
+
+    def _record_steps_to_goal_value_route_exclusion(self, selection,data_item):
+        if selection is None:
+            return
+        selection['candidate_route_count'] += 1
+        source_loss_type = getattr(data_item,'source_search2_value_loss_type',None)
+        if source_loss_type not in (None,'bootstrap','steps_to_goal_regression'):
+            selection['source_excluded_route_count'] += 1
+        elif not self._uses_steps_to_goal_value_route(data_item):
+            selection['detour_excluded_route_count'] += 1
+        elif not self._uses_shortest_steps_to_goal_target(data_item):
+            selection['longer_duplicate_excluded_route_count'] += 1
+
+    def _record_steps_to_goal_value_route_selection(self, selection,data_item,start,end,item_columns):
+        if selection is None:
+            return
+        selection['candidate_route_count'] += 1
+        selection['selected_route_count'] += 1
+        bands = self._steps_to_goal_value_state_bands(
+            [(0,item_columns)], [data_item], [start,end],
+        )
+        for label,count in bands.items():
+            selection['candidate_state_bands'][label] += count
+
+    def _balance_steps_to_goal_value_state_bands(self, route_columns,d_lis,indices):
+        """Oversample scarce remaining-step bands within one Value batch.
+
+        The per-route cap alone still leaves 31+ states rare because most
+        trajectories spend many more states near the goal.  Duplicating only
+        existing Value columns preserves the complete Policy trajectory while
+        giving Huber comparable batch-level exposure to each available band.
+        """
+        if self.search2_value_loss_type != 'steps_to_goal':
+            return 0
+        copies = max(1,int(getattr(self,'steps_to_goal_value_batch_band_max_copies',1)))
+        if copies <= 1 or not route_columns:
+            return 0
+        buckets = {'0-10': [], '11-30': [], '31+': []}
+        route_lookup = {data_index: columns for data_index,columns in route_columns}
+        for data_index,columns in route_columns:
+            steps = self._steps_to_goal_for_search2_data(
+                d_lis[data_index],indices[data_index + 1] - indices[data_index],
+            )
+            for column in columns:
+                band = self._steps_to_goal_value_state_band(steps[column - indices[data_index]])
+                buckets[band].append((data_index,column))
+        available = [rows for rows in buckets.values() if rows]
+        if len(available) < 2:
+            return 0
+        target = min(max(len(rows) for rows in available), min(len(rows) for rows in available) * copies)
+        added = 0
+        for rows in buckets.values():
+            while rows and len(rows) < target:
+                data_index,column = random.choice(rows)
+                route_lookup[data_index].append(column)
+                rows.append((data_index,column))
+                added += 1
+        return added
+
+    def _steps_to_goal_value_state_bands(self, route_columns,d_lis,indices):
+        bands = {'0-10': 0, '11-30': 0, '31+': 0}
+        for data_index,columns in route_columns:
+            steps = self._steps_to_goal_for_search2_data(
+                d_lis[data_index],indices[data_index + 1] - indices[data_index],
+            )
+            start = indices[data_index]
+            for column in columns:
+                bands[self._steps_to_goal_value_state_band(steps[column - start])] += 1
+        return bands
+
+    @staticmethod
+    def _steps_to_goal_value_state_band(step):
+        if step <= 10:
+            return '0-10'
+        if step <= 30:
+            return '11-30'
+        return '31+'
 
     def _steps_to_goal_value_columns_for_route(self, data_item, start, end):
         """Balance near/mid/far Value supervision within a long route."""
@@ -1398,13 +1548,47 @@ class Rubiks_3_AI:
             return True
         source_loss_type = getattr(data_item,'source_search2_value_loss_type',None)
         if self.search2_value_loss_type == 'steps_to_goal':
-            return source_loss_type in (None, 'bootstrap', 'steps_to_goal_regression')
+            return (
+                source_loss_type in (None, 'bootstrap', 'steps_to_goal_regression')
+                and self._uses_steps_to_goal_value_route(data_item)
+                and self._uses_shortest_steps_to_goal_target(data_item)
+            )
         if source_loss_type is None:
             return True
         try:
             return self._normalize_search2_value_loss_type(source_loss_type) != 'myloss2'
         except ValueError:
             return True
+
+    def _uses_steps_to_goal_value_route(self, data_item):
+        """Reject only strongly detoured routes from absolute Value labels.
+
+        Policy still uses the complete route.  This prevents a successful but
+        circuitous recovery path from teaching that a reachable state is much
+        farther from the goal than the retained direct paths indicate.
+        """
+        maximum = max(
+            0.0,float(getattr(self,'steps_to_goal_value_max_route_efficiency',0.0) or 0.0),
+        )
+        if maximum <= 0.0:
+            return True
+        efficiency = self._steps_to_goal_route_efficiency(data_item)
+        return efficiency is None or efficiency <= maximum
+
+    def _uses_shortest_steps_to_goal_target(self, data_item):
+        """Keep one calibrated Value label for a repeated start state.
+
+        Policy still trains on every successful route. Only the calibrated
+        Value head skips a route when the same start has a shorter completion
+        in the retained buffer.
+        """
+        shortest = getattr(self,'_steps_to_goal_shortest_target_by_start',None)
+        if not shortest:
+            return True
+        target = self._replay_sequence_steps(data_item)
+        return target <= shortest.get(
+            self._steps_to_goal_start_state_key(data_item),target,
+        )
 
     def _fill_loss_tensors(self, d_Lis, transformation, flip_inside, args, x):
         """Search2 学習データ列をまとめて入力 tensor に展開する。"""
@@ -2152,6 +2336,7 @@ class Rubiks_3_AI:
             'trainingDataCount': max(0,int(original_len)),
             'retainedDataCount': max(0,int(retained_len)),
             'trainingSample': self._training_sample_history_metrics(),
+            'trainingDataSources': self._training_data_source_history_metrics(),
             'gradientMetrics': self._gradient_history_metrics(),
             'stepsToGoalRegression': self._steps_to_goal_history_metrics(),
         }
@@ -2178,7 +2363,106 @@ class Rubiks_3_AI:
             if origin_metrics is not None:
                 origins[str(origin)] = origin_metrics
         result['origins'] = origins
+        selection = components.get('steps_to_goal_value_selection')
+        if isinstance(selection,dict):
+            result['valueSelection'] = {
+                'candidateRouteCount': int(selection.get('candidate_route_count',0) or 0),
+                'selectedRouteCount': int(selection.get('selected_route_count',0) or 0),
+                'sourceExcludedRouteCount': int(selection.get('source_excluded_route_count',0) or 0),
+                'detourExcludedRouteCount': int(selection.get('detour_excluded_route_count',0) or 0),
+                'longerDuplicateExcludedRouteCount': int(selection.get('longer_duplicate_excluded_route_count',0) or 0),
+                'oversampledStateCount': int(selection.get('oversampled_state_count',0) or 0),
+                'candidateStateBands': {
+                    label: int(count or 0)
+                    for label,count in (selection.get('candidate_state_bands') or {}).items()
+                },
+                'selectedStateBands': {
+                    label: int(count or 0)
+                    for label,count in (selection.get('selected_state_bands') or {}).items()
+                },
+            }
+        replay = getattr(self,'_last_steps_to_goal_replay_metrics',None)
+        if isinstance(replay,dict):
+            result['replay'] = replay
         return result
+
+    def _steps_to_goal_replay_history_metrics(self, available_indices, selected_indices, data_source):
+        """Summarize replay balance and duplicate start-state targets.
+
+        Each Search2 sample describes its start scramble plus one completed
+        route.  Comparing duplicate starts exposes contradictory calibrated
+        targets without persisting individual states or routes to history.
+        """
+        if getattr(self,'search2_value_loss_type',None) != 'steps_to_goal':
+            return None
+        summary = getattr(self,'_last_training_sample_summary',None) or {}
+        return {
+            'stratifiedRatio': self._steps_to_goal_replay_stratified_ratio(),
+            'stratifiedBatchCount': max(0,int(summary.get('steps_to_goal_stratified_batches',0) or 0)),
+            'stratifiedItemCount': max(0,int(summary.get('steps_to_goal_stratified_items',0) or 0)),
+            'available': self._steps_to_goal_replay_population_metrics(available_indices,data_source),
+            'selected': self._steps_to_goal_replay_population_metrics(selected_indices,data_source),
+        }
+
+    def _prepare_steps_to_goal_shortest_targets(self, indices, data_source):
+        """Index the shortest observed completion per exact start scramble."""
+        if getattr(self,'search2_value_loss_type',None) != 'steps_to_goal':
+            self._steps_to_goal_shortest_target_by_start = None
+            return
+        shortest = {}
+        for data_index in indices:
+            data_item = data_source[data_index]
+            key = self._steps_to_goal_start_state_key(data_item)
+            target = self._replay_sequence_steps(data_item)
+            shortest[key] = min(shortest.get(key,target),target)
+        self._steps_to_goal_shortest_target_by_start = shortest
+
+    @staticmethod
+    def _steps_to_goal_start_state_key(data_item):
+        scramble = getattr(data_item,'scramble',())
+        try:
+            key = tuple(scramble)
+            hash(key)
+            return key
+        except (TypeError,ValueError):
+            return tuple(np.asarray(scramble).reshape(-1).tolist())
+
+    @staticmethod
+    def _steps_to_goal_replay_population_metrics(indices, data_source):
+        distance_bands = {'0-10': 0, '11-30': 0, '31+': 0}
+        efficiency_bands = {'efficient': 0, 'medium': 0, 'detour': 0, 'unknown': 0}
+        efficiencies = []
+        targets_by_start = {}
+        for data_index in indices:
+            data_item = data_source[data_index]
+            target = Rubiks_3_AI._replay_sequence_steps(data_item)
+            distance_bands[Rubiks_3_AI._steps_to_goal_replay_distance_band(data_item)] += 1
+            efficiency_bands[Rubiks_3_AI._steps_to_goal_replay_efficiency_band(data_item)] += 1
+            efficiency = Rubiks_3_AI._steps_to_goal_route_efficiency(data_item)
+            if efficiency is not None:
+                efficiencies.append(efficiency)
+            key = Rubiks_3_AI._steps_to_goal_start_state_key(data_item)
+            targets_by_start.setdefault(key,[]).append(target)
+        duplicates = [targets for targets in targets_by_start.values() if len(targets) > 1]
+        conflicts = [targets for targets in duplicates if len(set(targets)) > 1]
+        target_stds = [float(np.std(targets)) for targets in duplicates]
+        shortest_target_routes = sum(
+            sum(target == min(targets) for target in targets)
+            for targets in targets_by_start.values()
+        )
+        return {
+            'routeCount': max(0,int(len(indices))),
+            'remainingStepBands': distance_bands,
+            'efficiencyBands': efficiency_bands,
+            'routeEfficiencyMean': None if not efficiencies else float(np.mean(efficiencies)),
+            'duplicateStartStateCount': len(duplicates),
+            'duplicateStartStateRouteCount': sum(len(targets) for targets in duplicates),
+            'conflictingStartStateCount': len(conflicts),
+            'conflictingStartStateRouteCount': sum(len(targets) for targets in conflicts),
+            'duplicateTargetStdMean': None if not target_stds else float(np.mean(target_stds)),
+            'shortestTargetRouteCount': shortest_target_routes,
+            'longerDuplicateRouteCount': len(indices) - shortest_target_routes,
+        }
 
     @staticmethod
     def _steps_to_goal_history_metrics_for_summary(summary):
@@ -2250,6 +2534,8 @@ class Rubiks_3_AI:
             'longSelectedStepMax': 'long_selected_step_max',
             'directSearchSelectedItemCount': 'direct_search_selected_items',
             'fallbackSelectedItemCount': 'fallback_selected_items',
+            'stepsToGoalStratifiedBatchCount': 'steps_to_goal_stratified_batches',
+            'stepsToGoalStratifiedItemCount': 'steps_to_goal_stratified_items',
         }
         result = {
             field: max(0,int(summary.get(source,0) or 0))
@@ -2269,6 +2555,33 @@ class Rubiks_3_AI:
         result['shortSelectedRatio'] = min(
             1.0,max(0.0,float(summary.get('short_selected_ratio',0.0) or 0.0)),
         )
+        result['stepsToGoalStratifiedRatio'] = self._steps_to_goal_replay_stratified_ratio()
+        result['fallbackSelectedRatio'] = min(
+            1.0,max(0.0,float(summary.get('fallback_selected_ratio',0.0) or 0.0)),
+        )
+        result['pairwiseFallbackMaxRatio'] = min(
+            1.0,max(0.0,float(summary.get('pairwise_fallback_max_ratio',1.0) or 0.0)),
+        )
+        return result
+
+    def _training_data_source_history_metrics(self):
+        """Return candidate and selected routes grouped by producing objective."""
+        summary = getattr(self, '_last_training_data_sources', None)
+        if not isinstance(summary, dict):
+            return None
+        result = {}
+        for population in ('available', 'selected'):
+            rows = summary.get(population)
+            if not isinstance(rows, dict):
+                return None
+            result[population] = {
+                str(source): {
+                    'trajectoryCount': max(0, int(metrics.get('trajectory_count', 0) or 0)),
+                    'stateCount': max(0, int(metrics.get('state_count', 0) or 0)),
+                }
+                for source,metrics in sorted(rows.items())
+                if isinstance(metrics, dict)
+            }
         return result
 
     @staticmethod
@@ -2286,6 +2599,7 @@ class Rubiks_3_AI:
         batch_size = max(1,int(getattr(self,'train_batch_size',100)))
         state_batch_size = max(0,int(getattr(self,'train_state_batch_size',0)))
         pack_state_batch_size = self._training_pack_state_batch_size(state_batch_size)
+        self._prepare_steps_to_goal_shortest_targets(indices,data_source)
         if int(getattr(self,'train_max_batches',0)) > 0:
             batches,remainder_indices = self._build_sampled_training_batches(
                 indices,
@@ -2302,6 +2616,17 @@ class Rubiks_3_AI:
                 pack_state_batch_size,
                 state_count_fn,
             )
+        self._last_training_data_sources = self._training_data_source_summary(
+            available_indices = indices,
+            selected_indices = self._flatten_batches(batches),
+            data_source = data_source,
+            state_count_fn = state_count_fn,
+        )
+        self._last_steps_to_goal_replay_metrics = self._steps_to_goal_replay_history_metrics(
+            available_indices = indices,
+            selected_indices = self._flatten_batches(batches),
+            data_source = data_source,
+        )
         epoch_state = self._init_training_epoch_state(indices,len(batches))
         self._report_training_sample(progress_callback)
 
@@ -2342,6 +2667,33 @@ class Rubiks_3_AI:
             epoch_state['epoch_num'],
             epoch_state['l1_max'],
         )
+
+    @staticmethod
+    def _training_data_source_summary(available_indices, selected_indices, data_source, state_count_fn):
+        """Count retained candidates and this pass's selection by source loss family."""
+        def collect(indices):
+            result = {}
+            for data_index in indices:
+                data_item = data_source[data_index]
+                objective = str(getattr(data_item, 'source_objective', '') or 'legacy')
+                origin = str(
+                    getattr(data_item, 'trajectory_origin',
+                            getattr(data_item, 'trajectory_source', 'legacy'))
+                    or 'legacy'
+                ).replace('-', '_')
+                if origin in ('search3_fallback_prefix', 'greedy_fallback'):
+                    origin = 'fallback'
+                elif origin in ('direct', 'direct_search'):
+                    origin = 'direct_search'
+                source = f'{objective}:{origin}'
+                row = result.setdefault(source, {'trajectory_count': 0, 'state_count': 0})
+                row['trajectory_count'] += 1
+                row['state_count'] += max(0, int(state_count_fn(data_item)))
+            return result
+        return {
+            'available': collect(available_indices),
+            'selected': collect(selected_indices),
+        }
 
     def _training_pack_state_batch_size(self, state_batch_size):
         """Torch piece-token training uses state_batch_size as a micro-batch limit."""
@@ -2388,6 +2740,8 @@ class Rubiks_3_AI:
             f'({summary["short_selected_items"]}/{summary["short_eligible_items"]}) '
             f'medium_batches={summary["medium_batches"]} '
             f'long_batches={summary["long_batches"]} '
+            f'steps_stratified={summary["steps_to_goal_stratified_batches"]}/'
+            f'{summary["steps_to_goal_stratified_items"]} '
             f'medium={summary["medium_min_steps"]}-{summary["medium_max_steps"]}'
             f'({summary["medium_selected_items"]}/{summary["medium_eligible_items"]}) '
             f'long>={summary["long_min_steps"]}({summary["long_eligible_items"]}) '
@@ -2473,6 +2827,7 @@ class Rubiks_3_AI:
                 'steps_to_goal_value_loss_weight': float(components.get('steps_to_goal_value_loss_weight',1.0)),
                 'items': 0,
                 'steps_to_goal_stats': None,
+                'steps_to_goal_value_selection': None,
             }
         for key in ('base','rank_raw','rank_scaled','total'):
             current[key] = float(current.get(key,0.0)) + float(components.get(key,0.0))
@@ -2491,6 +2846,36 @@ class Rubiks_3_AI:
             current.get('steps_to_goal_stats'),
             components.get('steps_to_goal_stats'),
         )
+        current['steps_to_goal_value_selection'] = self._merge_steps_to_goal_value_selection(
+            current.get('steps_to_goal_value_selection'),
+            components.get('steps_to_goal_value_selection'),
+        )
+        return current
+
+    @staticmethod
+    def _merge_steps_to_goal_value_selection(current,incoming):
+        if incoming is None:
+            return current
+        if current is None:
+            current = {
+                'candidate_route_count': 0,
+                'selected_route_count': 0,
+                'source_excluded_route_count': 0,
+                'detour_excluded_route_count': 0,
+                'longer_duplicate_excluded_route_count': 0,
+                'candidate_state_bands': {'0-10': 0, '11-30': 0, '31+': 0},
+                'selected_state_bands': {'0-10': 0, '11-30': 0, '31+': 0},
+                'oversampled_state_count': 0,
+            }
+        for key in (
+            'candidate_route_count','selected_route_count',
+            'source_excluded_route_count','detour_excluded_route_count',
+            'longer_duplicate_excluded_route_count','oversampled_state_count',
+        ):
+            current[key] += int(incoming.get(key,0) or 0)
+        for band_key in ('candidate_state_bands','selected_state_bands'):
+            for label,count in (incoming.get(band_key) or {}).items():
+                current[band_key][label] = current[band_key].get(label,0) + int(count or 0)
         return current
 
     @staticmethod
@@ -2651,14 +3036,44 @@ class Rubiks_3_AI:
         )
         long_items = set(self._flatten_batches(long_batches))
 
-        # When there are not enough long trajectories yet, give the unused
-        # slots back to ordinary random replay instead of reducing updates.
-        random_count = max_batches - len(recent_batches) - len(medium_batches) - len(long_batches)
+        # For calibrated -remaining_steps Value learning, reserve part of
+        # the non-recent pool for a round-robin mix of distance and route
+        # efficiency strata.  This changes selection only; it never drops a
+        # stratum when a buffer is too small to fill every one.
+        remaining_count = max_batches - len(recent_batches) - len(medium_batches) - len(long_batches)
+        stratified_count = min(
+            remaining_count,
+            int(round(remaining_count * self._steps_to_goal_replay_stratified_ratio())),
+        )
+        stratified_order = [
+            data_index for data_index in all_indices
+            if data_index not in recent_items
+            and data_index not in medium_items
+            and data_index not in long_items
+        ]
+        stratified_order = self._steps_to_goal_stratified_replay_order(
+            stratified_order,data_source,
+        )
+        stratified_batches,_ = self._pack_training_batches(
+            stratified_order,
+            data_source,
+            batch_size,
+            state_batch_size,
+            state_count_fn,
+            max_batches = stratified_count,
+        )
+        stratified_items = set(self._flatten_batches(stratified_batches))
+
+        # When there are not enough long or stratified trajectories yet, give
+        # unused slots back to ordinary random replay instead of reducing
+        # updates.
+        random_count = remaining_count - len(stratified_batches)
         random_order = [
             data_index for data_index in all_indices
             if data_index not in recent_items
             and data_index not in medium_items
             and data_index not in long_items
+            and data_index not in stratified_items
         ]
         random.shuffle(random_order)
         random_batches,_ = self._pack_training_batches(
@@ -2670,7 +3085,7 @@ class Rubiks_3_AI:
             max_batches = random_count,
         )
 
-        selected_batches = recent_batches + medium_batches + long_batches + random_batches
+        selected_batches = recent_batches + medium_batches + long_batches + stratified_batches + random_batches
         selected_batches = self._cap_long_replay_selection(
             selected_batches,
             all_indices,
@@ -2685,6 +3100,9 @@ class Rubiks_3_AI:
             protected_items = self._flatten_batches(medium_batches) + self._flatten_batches(long_batches),
             short_max_steps = short_max_steps,
         )
+        selected_batches = self._cap_pairwise_fallback_replay_selection(
+            selected_batches,all_indices,data_source,
+        )
         selected_items = set(self._flatten_batches(selected_batches))
         reserved_long_items = self._flatten_batches(long_batches)
         remainder_indices = [data_index for data_index in all_indices if data_index not in selected_items]
@@ -2697,6 +3115,8 @@ class Rubiks_3_AI:
             long_batch_count = len(long_batches),
             reserved_medium_items = self._flatten_batches(medium_batches),
             reserved_long_items = reserved_long_items,
+            stratified_batch_count = len(stratified_batches),
+            stratified_items = self._flatten_batches(stratified_batches),
             random_batch_count = len(random_batches),
             short_max_steps = short_max_steps,
             short_min_ratio = short_min_ratio,
@@ -2730,6 +3150,70 @@ class Rubiks_3_AI:
 
     def _long_sequence_max_ratio(self):
         return min(max(float(getattr(self,'train_long_sequence_max_ratio',0.0)),0.0),1.0)
+
+    def _steps_to_goal_replay_stratified_ratio(self):
+        if getattr(self,'search2_value_loss_type',None) != 'steps_to_goal':
+            return 0.0
+        return min(max(float(getattr(self,'steps_to_goal_replay_stratified_ratio',0.0)),0.0),1.0)
+
+    @staticmethod
+    def _steps_to_goal_replay_distance_band(data_item):
+        steps = Rubiks_3_AI._replay_sequence_steps(data_item)
+        if steps <= 10:
+            return '0-10'
+        if steps <= 30:
+            return '11-30'
+        return '31+'
+
+    @staticmethod
+    def _steps_to_goal_route_efficiency(data_item):
+        scramble = getattr(data_item,'scramble',())
+        try:
+            scramble_steps = len(scramble)
+        except TypeError:
+            scramble_steps = 0
+        if scramble_steps <= 0:
+            return None
+        return float(len(getattr(data_item,'moves',()))) / scramble_steps
+
+    @staticmethod
+    def _steps_to_goal_replay_efficiency_band(data_item):
+        efficiency = Rubiks_3_AI._steps_to_goal_route_efficiency(data_item)
+        if efficiency is None:
+            return 'unknown'
+        if efficiency <= 1.5:
+            return 'efficient'
+        if efficiency <= 3.0:
+            return 'medium'
+        return 'detour'
+
+    def _steps_to_goal_stratified_replay_order(self, indices, data_source):
+        """Interleave every available distance/efficiency stratum fairly."""
+        if self._steps_to_goal_replay_stratified_ratio() <= 0.0:
+            random.shuffle(indices)
+            return indices
+        buckets = {}
+        for data_index in indices:
+            item = data_source[data_index]
+            key = (
+                self._steps_to_goal_replay_distance_band(item),
+                self._steps_to_goal_replay_efficiency_band(item),
+            )
+            buckets.setdefault(key,[]).append(data_index)
+        for bucket in buckets.values():
+            random.shuffle(bucket)
+        order = []
+        keys = sorted(buckets)
+        while keys:
+            next_keys = []
+            for key in keys:
+                bucket = buckets[key]
+                if bucket:
+                    order.append(bucket.pop())
+                if bucket:
+                    next_keys.append(key)
+            keys = next_keys
+        return order
 
     def _cap_long_replay_selection(self, batches, all_indices, data_source, reserved_long_items, long_min_steps):
         """Replace non-reserved long items when recent replay exceeds its cap.
@@ -2814,6 +3298,42 @@ class Rubiks_3_AI:
                 selected_short += 1
         return batches
 
+    def _cap_pairwise_fallback_replay_selection(self, batches, all_indices, data_source):
+        """Prefer direct routes when pairwise replay becomes fallback-heavy."""
+        if getattr(self,'search2_value_loss_type',None) != 'myloss2_pairwise':
+            return batches
+        maximum_ratio = min(
+            1.0,max(0.0,float(getattr(self,'pairwise_fallback_max_ratio',1.0))),
+        )
+        if maximum_ratio >= 1.0:
+            return batches
+        selected_items = self._flatten_batches(batches)
+        maximum = int(len(selected_items) * maximum_ratio)
+        fallback_items = [
+            data_index for data_index in selected_items
+            if self._training_trajectory_origin(data_source[data_index]) == 'fallback'
+        ]
+        if len(fallback_items) <= maximum:
+            return batches
+        selected_set = set(selected_items)
+        replacements = [
+            data_index for data_index in all_indices
+            if data_index not in selected_set
+            and self._training_trajectory_origin(data_source[data_index]) == 'direct_search'
+        ]
+        random.shuffle(replacements)
+        replacement_index = 0
+        for batch in batches:
+            for item_index,data_index in enumerate(batch):
+                if len(fallback_items) <= maximum or replacement_index >= len(replacements):
+                    return batches
+                if self._training_trajectory_origin(data_source[data_index]) != 'fallback':
+                    continue
+                batch[item_index] = replacements[replacement_index]
+                replacement_index += 1
+                fallback_items.pop()
+        return batches
+
     @staticmethod
     def _replay_sequence_steps(data_item):
         """Return total remaining solution length when the sample records it."""
@@ -2833,7 +3353,7 @@ class Rubiks_3_AI:
             items += batch
         return items
 
-    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, medium_batch_count, long_batch_count, reserved_medium_items, reserved_long_items, random_batch_count, short_max_steps, short_min_ratio, medium_min_steps, medium_max_steps, long_min_steps, long_max_ratio, short_eligible_item_count, medium_eligible_item_count, long_eligible_item_count, remainder_indices, data_source, state_count_fn):
+    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, medium_batch_count, long_batch_count, reserved_medium_items, reserved_long_items, stratified_batch_count, stratified_items, random_batch_count, short_max_steps, short_min_ratio, medium_min_steps, medium_max_steps, long_min_steps, long_max_ratio, short_eligible_item_count, medium_eligible_item_count, long_eligible_item_count, remainder_indices, data_source, state_count_fn):
         selected_items = self._flatten_batches(selected_batches)
         selected_states = sum(int(state_count_fn(data_source[data_index])) for data_index in selected_items)
         if long_min_steps > 0:
@@ -2857,13 +3377,11 @@ class Rubiks_3_AI:
             if self._replay_is_short_sequence(data_source[data_index], short_max_steps)
         ]
         direct_search_selected_items = sum(
-            getattr(data_source[data_index], 'trajectory_source', 'direct-search')
-            == 'direct-search'
+            self._training_trajectory_origin(data_source[data_index]) == 'direct_search'
             for data_index in selected_items
         )
         fallback_selected_items = sum(
-            getattr(data_source[data_index], 'trajectory_source', 'direct-search')
-            in ('search3-fallback-prefix', 'greedy-fallback')
+            self._training_trajectory_origin(data_source[data_index]) == 'fallback'
             for data_index in selected_items
         )
         if selected_items:
@@ -2879,6 +3397,8 @@ class Rubiks_3_AI:
             'short_selected_items': len(selected_short_steps),
             'medium_batches': medium_batch_count,
             'long_batches': long_batch_count,
+            'steps_to_goal_stratified_batches': stratified_batch_count,
+            'steps_to_goal_stratified_items': len(stratified_items),
             'medium_reserved_items': len(reserved_medium_items),
             'medium_selected_items': len(selected_medium_steps),
             'long_reserved_items': len(reserved_long_items),
@@ -2893,6 +3413,11 @@ class Rubiks_3_AI:
             ),
             'direct_search_selected_items': direct_search_selected_items,
             'fallback_selected_items': fallback_selected_items,
+            'fallback_selected_ratio': (
+                0.0 if len(selected_items) == 0
+                else float(fallback_selected_items) / len(selected_items)
+            ),
+            'pairwise_fallback_max_ratio': self._pairwise_fallback_max_ratio(),
             'long_selected_step_mean': (
                 None if len(selected_long_steps) == 0
                 else float(np.mean(selected_long_steps))
@@ -2918,6 +3443,25 @@ class Rubiks_3_AI:
             'selected_index_min': selected_index_min,
             'selected_index_max': selected_index_max,
         }
+
+    @staticmethod
+    def _training_trajectory_origin(data_item):
+        """Normalize the legacy source and current origin labels for replay."""
+        origin = str(
+            getattr(data_item,'trajectory_origin',
+                    getattr(data_item,'trajectory_source','legacy'))
+            or 'legacy'
+        ).lower().replace('-','_')
+        if origin in ('fallback','greedy_fallback','search3_fallback_prefix'):
+            return 'fallback'
+        if origin in ('direct','direct_search','directsearch'):
+            return 'direct_search'
+        return origin
+
+    def _pairwise_fallback_max_ratio(self):
+        if getattr(self,'search2_value_loss_type',None) != 'myloss2_pairwise':
+            return 1.0
+        return min(1.0,max(0.0,float(getattr(self,'pairwise_fallback_max_ratio',1.0))))
 
     def _init_training_epoch_state(self, indices, epoch_num):
         """学習 epoch の集計用状態を初期化する。"""
@@ -3798,6 +4342,45 @@ class Rubiks_3_AI:
 
             is_final_stage = stage_index == len(stage_playouts)
             if is_final_stage:
+                rescue_playouts = self._search3_budget_rescue_playouts()
+                if rescue_playouts > 0 and self._search3_rescue_branch(
+                    last_result,
+                    previous_result = attempt_results[-2] if len(attempt_results) >= 2 else None,
+                ):
+                    stage_record['decision'] = 'rescue'
+                    rescue_result = self.search3(rescue_playouts)
+                    rescue_result.attempt_index = stage_index + 1
+                    attempt_results.append(rescue_result)
+                    rescue_record = self._search3_budget_stage_record(
+                        rescue_result,
+                        stage_index + 1,
+                        rescue_playouts,
+                    )
+                    rescue_record['rootVisitShareGain'] = (
+                        rescue_record['rootVisitShare'] - stage_record['rootVisitShare']
+                    )
+                    stage_records.append(rescue_record)
+                    if rescue_result.end_reason == 'solved':
+                        rescue_record['decision'] = 'solved'
+                        if progress_callback is not None:
+                            progress_callback(rescue_result)
+                        return self._finalize_search3_budget_result(
+                            rescue_result,
+                            attempt_results,
+                            mode = 'progressive',
+                            stop_reason = 'solved_after_rescue',
+                            stage_records = stage_records,
+                        )
+                    rescue_record['decision'] = 'rescue_budget_exhausted'
+                    if progress_callback is not None:
+                        progress_callback(rescue_result)
+                    return self._finalize_search3_budget_result(
+                        rescue_result,
+                        attempt_results,
+                        mode = 'progressive',
+                        stop_reason = 'rescue_budget_exhausted',
+                        stage_records = stage_records,
+                    )
                 stage_record['decision'] = 'budget_exhausted'
                 if progress_callback is not None:
                     progress_callback(last_result)
@@ -3887,6 +4470,27 @@ class Rubiks_3_AI:
                 or visit_share_gain >= float(
                     getattr(self,'search3_budget_min_visit_share_gain',0.03)
                 )
+            )
+        )
+
+    def _search3_budget_rescue_playouts(self):
+        """Return the optional final Search3 tier without widening defaults."""
+        return max(0,int(getattr(self,'search3_budget_rescue_playouts',0) or 0))
+
+    def _search3_rescue_branch(self, result, previous_result = None):
+        """Spend the rescue tier only while root concentration is still growing."""
+        diagnostics = getattr(result,'search_diagnostics',{}) or {}
+        depth = float(diagnostics.get('playoutDepthMean',0.0) or 0.0)
+        visit_share_gain = self._search3_root_visit_share(result)
+        if previous_result is not None:
+            visit_share_gain -= self._search3_root_visit_share(previous_result)
+        return (
+            depth >= float(getattr(self,'search3_budget_min_playout_depth',3.0))
+            and visit_share_gain >= float(
+                getattr(self,'search3_budget_rescue_min_visit_share_gain',1.0)
+            )
+            and self._search3_best_improvement(result) >= float(
+                getattr(self,'search3_budget_rescue_min_improvement',0.0)
             )
         )
 

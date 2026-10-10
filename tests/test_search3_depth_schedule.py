@@ -34,6 +34,20 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(engine._exploration_c(0), 2.0)
         self.assertEqual(engine._exploration_c(20), 2.0)
 
+    def test_schedule_can_hold_root_c_before_decreasing_at_depth(self):
+        engine = Search3Engine.__new__(Search3Engine)
+        engine.ai = SimpleNamespace(
+            search3_C = 1.0,
+            search3_C_depth_max = 0.5,
+            search3_C_depth_start_depth = 4,
+            search3_C_depth_ramp_depth = 8,
+        )
+
+        self.assertEqual(engine._exploration_c(0), 1.0)
+        self.assertEqual(engine._exploration_c(4), 1.0)
+        self.assertEqual(engine._exploration_c(8), 0.75)
+        self.assertEqual(engine._exploration_c(12), 0.5)
+
     def test_node_uses_the_depth_specific_coefficient_at_selection_time(self):
         node = Node(np.array([0.9, 0.1], dtype = 'f'), value = 0.0, C = 2.0)
         node.S = 100
@@ -60,6 +74,7 @@ class Search3DepthScheduleTests(unittest.TestCase):
             ai_search_modes = ('search3',),
             search3_cs = (2.0,),
             search3_c_depth_maxes = (4.0,),
+            search3_c_depth_start_depths = (3,),
             search3_c_depth_ramp_depths = (12,),
             search3_budget_modes = ('progressive',),
             search3_budget_stage_playouts = ((100, 300, 600),),
@@ -78,6 +93,7 @@ class Search3DepthScheduleTests(unittest.TestCase):
         )
 
         self.assertEqual(config.search3_c_depth_maxes, (4.0,))
+        self.assertEqual(config.search3_c_depth_start_depths, (3,))
         self.assertEqual(config.search3_c_depth_ramp_depths, (12,))
         self.assertEqual(config.search3_budget_modes, ('progressive',))
         self.assertEqual(config.search3_budget_stage_playouts, ((100, 300, 600),))
@@ -88,6 +104,12 @@ class Search3DepthScheduleTests(unittest.TestCase):
 
     def test_runtime_settings_apply_the_depth_schedule(self):
         ai = SimpleNamespace(search3_C = 0.05)
+        ai.set_steps_to_goal_value_batch_band_max_copies = lambda value: setattr(
+            ai, 'steps_to_goal_value_batch_band_max_copies', value,
+        )
+        ai.set_pairwise_fallback_max_ratio = lambda value: setattr(
+            ai, 'pairwise_fallback_max_ratio', value,
+        )
         frame = SimpleNamespace(
             AInum = 1,
             AIs = [ai],
@@ -98,6 +120,7 @@ class Search3DepthScheduleTests(unittest.TestCase):
             frame,
             search3_cs = (2.0,),
             search3_c_depth_maxes = (4.0,),
+            search3_c_depth_start_depths = (3,),
             search3_c_depth_ramp_depths = (12,),
             search3_budget_modes = ('progressive',),
             search3_budget_stage_playouts = ((100, 300, 600),),
@@ -105,19 +128,32 @@ class Search3DepthScheduleTests(unittest.TestCase):
             search3_budget_min_improvements = (0.05,),
             search3_budget_min_playout_depths = (3.0,),
             search3_budget_min_visit_share_gains = (0.03,),
+            search3_budget_rescue_playouts = (10000,),
+            search3_budget_rescue_min_visit_share_gains = (0.10,),
+            search3_budget_rescue_min_improvements = (0.0,),
             search3_max_node_caches = (10000,),
             search3_max_prediction_caches = (10000,),
+            search2_skip_differences = (0.75,),
+            steps_to_goal_value_batch_band_max_copies = (3,),
+            pairwise_fallback_max_ratios = (0.25,),
         )
 
         self.assertEqual(ai.search3_C, 2.0)
         self.assertEqual(ai.search3_C_depth_max, 4.0)
+        self.assertEqual(ai.search3_C_depth_start_depth, 3)
         self.assertEqual(ai.search3_C_depth_ramp_depth, 12)
         self.assertEqual(ai.search3_budget_mode, 'progressive')
         self.assertEqual(ai.search3_budget_stage_playouts, (100, 300, 600))
         self.assertEqual(ai.search3_budget_confidence_visit_share, 0.7)
         self.assertEqual(ai.search3_budget_min_visit_share_gain, 0.03)
+        self.assertEqual(ai.search3_budget_rescue_playouts, 10000)
+        self.assertEqual(ai.search3_budget_rescue_min_visit_share_gain, 0.10)
+        self.assertEqual(ai.search3_budget_rescue_min_improvement, 0.0)
         self.assertEqual(ai.search3_max_node_cache, 10000)
         self.assertEqual(ai.search3_max_prediction_cache, 10000)
+        self.assertEqual(ai.skip_difference, 0.75)
+        self.assertEqual(ai.steps_to_goal_value_batch_band_max_copies, 3)
+        self.assertEqual(ai.pairwise_fallback_max_ratio, 0.25)
 
     def test_experiment_profile_enables_progressive_budget_for_linear_search3(self):
         config = build_experiment_frame_config()
@@ -143,13 +179,23 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(config.search3_rank_loss_mixes[11], 0.10)
         self.assertEqual(config.search3_rank_loss_mixes[18], 0.0)
         self.assertEqual(config.search3_rank_loss_mixes[19], 0.0)
+        self.assertEqual([config.search3_cs[index] for index in (2,3,4,5,6,7)], [0.5,0.5,1.0,1.0,5.0,5.0])
+        self.assertEqual([config.search3_c_depth_maxes[index] for index in (2,3,4,5,6,7)], [0.5,0.5,5.0,5.0,5.0,5.0])
+        self.assertEqual([config.search3_cs[index] for index in (10,11,18,19)], [1.0,1.0,1.0,1.0])
+        self.assertEqual([config.search3_c_depth_start_depths[index] for index in (10,11,18,19)], [4,4,4,4])
+        self.assertEqual([config.search3_c_depth_maxes[index] for index in (10,11,18,19)], [2.0,2.0,2.0,2.0])
+        self.assertEqual([config.search3_c_depth_ramp_depths[index] for index in (10,11,18,19)], [6,6,6,6])
+        self.assertEqual([config.update_scales[index][2] for index in (12,13,14,15,16,17,20,21,22,23,24)], [1.0,1.0,1.0,1.0,1.0,1.0,20.0,20.0,1.0,1.0,1.0])
+        self.assertEqual(config.steps_to_goal_value_loss_weights[20:25], [5.0,5.0,1.0,1.0,1.0])
+        self.assertEqual(config.steps_to_goal_replay_stratified_ratios[20:25], [0.0,0.0,0.75,0.75,0.75])
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(
             [config.search2_value_loss_types[index] for index in range(20, 25)],
-            ['steps_to_goal'] * 5,
+            ['steps_to_goal', 'myloss2_pairwise', 'steps_to_goal', 'myloss2_pairwise', 'myloss2_pairwise'],
         )
         self.assertEqual(config.search2_rank_loss_mixes[20:25], [0.0] * 5)
         self.assertEqual(config.search2_rank_loss_apply_types[20:25], ['none'] * 5)
+        self.assertEqual(config.search2_value_loss_margins[20:25], [0.0] * 5)
         self.assertEqual(config.search2_value_target_scales[20:25], [1.0] * 5)
         self.assertEqual(config.original_transformer_attention[20:25], [False, False, True, True, True])
         self.assertEqual(config.transform_idx[20:25], [0] * 5)

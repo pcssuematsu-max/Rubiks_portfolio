@@ -167,10 +167,11 @@ class Search3Engine:
         """
         base_c = float(getattr(self.ai, 'search3_C', 0.05))
         max_c = float(getattr(self.ai, 'search3_C_depth_max', base_c))
+        start_depth = max(0, int(getattr(self.ai, 'search3_C_depth_start_depth', 0)))
         ramp_depth = max(0, int(getattr(self.ai, 'search3_C_depth_ramp_depth', 0)))
         if ramp_depth == 0 or max_c == base_c:
             return base_c
-        progress = min(max(int(depth), 0), ramp_depth) / ramp_depth
+        progress = min(max(int(depth) - start_depth, 0), ramp_depth) / ramp_depth
         return base_c + (max_c - base_c) * progress
 
     def _create_node_from_current_state(self, C=0.05):

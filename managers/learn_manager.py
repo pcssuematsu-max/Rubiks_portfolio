@@ -31,11 +31,15 @@ class LearnManager:
     def learn_indices(self, indices):
         """指定されたAI index群だけを順番に学習する。"""
         indices = tuple(indices)
-        for position,index in enumerate(indices,1):
-            if self.should_learn(index):
-                self._set_status(f'学習中: AI {index} ({position}/{len(indices)})')
-                result = self.learn_one(index)
-                self.log_result(index,result)
+        self._pending_learning_history_records = []
+        try:
+            for position,index in enumerate(indices,1):
+                if self.should_learn(index):
+                    self._set_status(f'学習中: AI {index} ({position}/{len(indices)})')
+                    result = self.learn_one(index)
+                    self.log_result(index,result)
+        finally:
+            self._flush_pending_learning_history()
         self._set_status('学習後処理中')
         self.prune_training_data()
         self.release_memory()
@@ -98,11 +102,31 @@ class LearnManager:
     def record_learning_history(self, index, ai, elapsed_seconds):
         """Persist one completed AI learning point without interrupting learning."""
         record = completed_learning_record(index, ai, elapsed_seconds)
+        pending = getattr(self, '_pending_learning_history_records', None)
+        if isinstance(pending, list):
+            pending.append(record)
+            self._log_learning_history_record(index, record, deferred = True)
+            return
         try:
             LearningHistoryStore().append(record)
         except (OSError, ValueError) as error:
             self.frame.append_log(f'学習履歴: 保存できませんでした ({error})')
             return
+        self._log_learning_history_record(index, record)
+
+    def _flush_pending_learning_history(self):
+        records = getattr(self, '_pending_learning_history_records', None)
+        self._pending_learning_history_records = None
+        if not records:
+            return
+        try:
+            LearningHistoryStore().append_many(records)
+        except (OSError, ValueError) as error:
+            self.frame.append_log(f'学習履歴: 保存できませんでした ({error})')
+            return
+        self.frame.append_log(f'学習履歴: {len(records)}件をまとめて保存しました。')
+
+    def _log_learning_history_record(self, index, record, deferred = False):
         policy_loss = record['policyLoss']
         value_loss = record['valueLoss']
         gradients = record.get('gradientMetrics')
@@ -114,7 +138,8 @@ class LearnManager:
             f"学習履歴: AI {index} {record['searchMode']} "
             f"P={policy_loss if policy_loss is not None else '-'} "
             f"V={value_loss if value_loss is not None else '-'} "
-            f"updates={record['updatesDuringSolve']}{gradient_text} を保存しました。"
+            f"updates={record['updatesDuringSolve']}{gradient_text} "
+            f"を{'保存待ちにしました' if deferred else '保存しました'}。"
         )
 
     def run_learning(self, index, ai):
