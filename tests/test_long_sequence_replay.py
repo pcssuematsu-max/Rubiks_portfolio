@@ -233,6 +233,52 @@ class LongSequenceReplayTests(unittest.TestCase):
         self.assertEqual(summary['steps_to_goal_stratified_items'], 6)
         self.assertEqual(summary['random_batches'], 0)
 
+    def test_steps_to_goal_long_route_minimum_oversamples_direct_canonical_routes(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.train_max_batches = 10
+        ai.train_recent_ratio = 1.0
+        ai.train_short_sequence_max_steps = 0
+        ai.train_short_sequence_min_ratio = 0.0
+        ai.train_medium_sequence_min_steps = 0
+        ai.train_medium_sequence_max_steps = 0
+        ai.train_medium_sequence_ratio = 0.0
+        ai.train_long_sequence_min_steps = 0
+        ai.train_long_sequence_ratio = 0.0
+        ai.train_long_sequence_max_ratio = 0.0
+        ai.search2_value_loss_type = 'steps_to_goal'
+        ai.steps_to_goal_replay_stratified_ratio = 0.0
+        ai.steps_to_goal_long_route_min_ratio = 0.5
+        data = [
+            SimpleNamespace(
+                scramble = ('short',index), moves = tuple(range(8)),
+                trajectory_origin = 'direct_search',
+            )
+            for index in range(8)
+        ] + [
+            SimpleNamespace(
+                scramble = ('long',index), moves = tuple(range(35)),
+                trajectory_origin = 'direct_search',
+            )
+            for index in range(2)
+        ]
+
+        batches, _ = ai._build_sampled_training_batches(
+            list(range(len(data))), data, batch_size = 1, state_batch_size = 0,
+            state_count_fn = lambda item: len(item.moves) + 1,
+        )
+
+        selected = [index for batch in batches for index in batch]
+        summary = ai._last_training_sample_summary
+        self.assertEqual(len(selected), 10)
+        self.assertEqual(summary['steps_to_goal_long_route_eligible_items'], 2)
+        self.assertEqual(summary['steps_to_goal_long_route_required_items'], 5)
+        self.assertEqual(summary['steps_to_goal_long_route_selected_items'], 5)
+        self.assertEqual(summary['steps_to_goal_long_route_oversampled_items'], 3)
+        self.assertEqual(sum(index >= 8 for index in selected), 5)
+        history = ai._training_sample_history_metrics()
+        self.assertEqual(history['stepsToGoalLongRouteMinRatio'], 0.5)
+        self.assertEqual(history['stepsToGoalLongRouteSelectedItemCount'], 5)
+
     def test_steps_to_goal_replay_diagnostics_detect_conflicting_start_targets(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         ai.search2_value_loss_type = 'steps_to_goal'

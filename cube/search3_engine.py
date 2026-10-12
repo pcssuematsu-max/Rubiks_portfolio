@@ -174,6 +174,21 @@ class Search3Engine:
         progress = min(max(int(depth) - start_depth, 0), ramp_depth) / ramp_depth
         return base_c + (max_c - base_c) * progress
 
+    def _widening_action_limit(self, node):
+        """Return the number of policy actions available at one tree node.
+
+        A full 18-way PUCT expansion is useful once a node is well sampled,
+        but it is counterproductive at a newly reached node: almost every
+        playout terminates after one more move.  The optional widening rule
+        keeps a small policy-prior set first and grows it with ``sqrt(visits)``.
+        A zero initial count preserves the legacy all-actions behavior.
+        """
+        initial = max(0, int(getattr(self.ai, 'search3_widening_initial_actions', 0)))
+        if initial == 0:
+            return 0
+        growth = max(0.0, float(getattr(self.ai, 'search3_widening_visit_growth', 0.0)))
+        return min(len(node.P), max(1, initial + int(growth * np.sqrt(max(0, node.S)))))
+
     def _create_node_from_current_state(self, C=0.05):
         state_key = self._state_key()
         node_PV = self._predict_current_state()
@@ -302,12 +317,15 @@ class Search3Engine:
         path_moves = []
         path_state_keys = {root_node.state_key}
         selection_cs = []
+        widening_limits = []
         while True:
             exploration_c = self._exploration_c(len(path_moves))
             selection_cs.append(exploration_c)
+            widening_limits.append(self._widening_action_limit(node))
             index = node.select_node(
                 self._find_invalid_indices(path_moves),
                 C = exploration_c,
+                action_limit = widening_limits[-1],
             )
             if index is None:
                 return {
@@ -318,6 +336,7 @@ class Search3Engine:
                     'path_moves': path_moves,
                     'node_value': 0.0,
                     'selectionCs': selection_cs,
+                    'wideningLimits': widening_limits,
                 }
             move_label = self.cube.move_keys[index]
             path_indices.append(index)
@@ -336,6 +355,7 @@ class Search3Engine:
                     'path_moves': path_moves,
                     'node_value': 0.0,
                     'selectionCs': selection_cs,
+                    'wideningLimits': widening_limits,
                 }
             try:
                 self.cube.make_move(move_label)
@@ -351,6 +371,7 @@ class Search3Engine:
                     'path_moves': path_moves,
                     'node_value': 0.0,
                     'selectionCs': selection_cs,
+                    'wideningLimits': widening_limits,
                 }
             if self.cube.is_perfect():
                 return {
@@ -361,6 +382,7 @@ class Search3Engine:
                     'path_moves': path_moves,
                     'node_value': 1.0,
                     'selectionCs': selection_cs,
+                    'wideningLimits': widening_limits,
                 }
 
             state_key = self._state_key()
@@ -373,6 +395,7 @@ class Search3Engine:
                     'path_indices': path_indices,
                     'path_moves': path_moves,
                     'selectionCs': selection_cs,
+                    'wideningLimits': widening_limits,
                     'node_value': 0.0,
                 }
             if len(path_moves) >= max_depth:
@@ -387,6 +410,7 @@ class Search3Engine:
                     'path_indices': path_indices,
                     'path_moves': path_moves,
                     'selectionCs': selection_cs,
+                    'wideningLimits': widening_limits,
                 }
             child_node = node.children.get(move_label)
             if child_node is None or child_node.state_key != state_key:
@@ -405,6 +429,7 @@ class Search3Engine:
                     'path_indices': path_indices,
                     'path_moves': path_moves,
                     'selectionCs': selection_cs,
+                    'wideningLimits': widening_limits,
                 }
             path_state_keys.add(state_key)
             path_nodes.append(child_node)
@@ -443,6 +468,7 @@ class Search3Engine:
         total_playouts = 0
         playout_depths = []
         selection_cs = []
+        widening_limits = []
 
         while remaining_playouts > 0 and solved_move is None:
             current_batch_size = min(batch_size, remaining_playouts)
@@ -453,6 +479,7 @@ class Search3Engine:
                 processed_playouts += 1
                 playout_depths.append(len(leaf_path['path_moves']))
                 selection_cs.extend(leaf_path.get('selectionCs',()))
+                widening_limits.extend(leaf_path.get('wideningLimits',()))
                 self._revert_path(leaf_path['path_moves'])
                 if leaf_path['resolved']:
                     self._backup_path(leaf_path['path_nodes'], leaf_path['path_indices'], leaf_path['node_value'])
@@ -471,7 +498,9 @@ class Search3Engine:
 
         local_visits = root_node.visited - start_root_visits
         stats = np.array([np.max(local_visits), total_playouts], dtype='i')
-        search_diagnostics = self._search_diagnostics(playout_depths, selection_cs)
+        search_diagnostics = self._search_diagnostics(
+            playout_depths, selection_cs, widening_limits,
+        )
 
         if solved_move is not None:
             best_moves = self._legal_prefix(solved_move)
@@ -499,10 +528,11 @@ class Search3Engine:
         return result
 
     @staticmethod
-    def _search_diagnostics(playout_depths, selection_cs):
-        """Summarize actual PUCT depth and C use for experiment logs."""
+    def _search_diagnostics(playout_depths, selection_cs, widening_limits=()):
+        """Summarize actual PUCT depth, C, and widening use for logs."""
         depths = np.asarray(playout_depths, dtype = 'f')
         coefficients = np.asarray(selection_cs, dtype = 'f')
+        limits = np.asarray(widening_limits, dtype = 'f')
         if depths.size == 0:
             return {}
         result = {
@@ -519,6 +549,13 @@ class Search3Engine:
                 'selectionCMin': float(np.min(coefficients)),
                 'selectionCMean': float(np.mean(coefficients)),
                 'selectionCMax': float(np.max(coefficients)),
+            })
+        active_limits = limits[limits > 0]
+        if active_limits.size > 0:
+            result.update({
+                'wideningSelectionCount': int(active_limits.size),
+                'wideningActionLimitMean': float(np.mean(active_limits)),
+                'wideningActionLimitMax': int(np.max(active_limits)),
             })
         return result
 
@@ -550,7 +587,7 @@ class Node:
         self.children = {}
         self.score = None
 
-    def select_node(self, invalid_index=None, C=None):
+    def select_node(self, invalid_index=None, C=None, action_limit=0):
         masked = self.blocked.copy()
         if invalid_index is not None:
             if isinstance(invalid_index, (set, list, tuple, np.ndarray)):
@@ -560,6 +597,17 @@ class Node:
                 masked[invalid_index] = True
         if np.all(masked):
             return None
+        action_limit = max(0, int(action_limit))
+        if action_limit > 0:
+            available = np.flatnonzero(~masked)
+            if available.size > action_limit:
+                # ``argpartition`` avoids sorting every legal action on every
+                # PUCT selection, while the secondary sort makes ties stable.
+                selected = available[np.argpartition(self.P[available], -action_limit)[-action_limit:]]
+                selected = selected[np.argsort(-self.P[selected], kind='stable')]
+                restricted = np.ones_like(masked, dtype=bool)
+                restricted[selected] = False
+                masked |= restricted
         average_value = np.full_like(self.P, self.value, dtype='f')
         np.divide(self.val, self.visited, out=average_value, where=self.visited != 0)
         exploration_c = self.C if C is None else float(C)

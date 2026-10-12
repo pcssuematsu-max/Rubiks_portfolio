@@ -22,6 +22,8 @@ class FixedValidationTests(unittest.TestCase):
         self.assertEqual(first['stateCount'], 540)
         self.assertEqual(first['byLength']['12']['stateCount'], 36)
         self.assertEqual(first['byLength']['60']['stateCount'], 180)
+        self.assertEqual(first['long40Plus']['fixtureCount'], 6)
+        self.assertEqual(first['long40Plus']['stateCount'], 324)
         self.assertIn('policyTop1Accuracy', first['byLength']['48'])
         self.assertIn('valuePathCrossEntropy', first)
         self.assertNotIn('valueMae', first)

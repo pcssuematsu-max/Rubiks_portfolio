@@ -59,6 +59,8 @@ class FrameConfig:
     search3_c_depth_maxes: Optional[Sequence[float]] = None
     search3_c_depth_start_depths: Optional[Sequence[int]] = None
     search3_c_depth_ramp_depths: Optional[Sequence[int]] = None
+    search3_widening_initial_actions: Optional[Sequence[int]] = None
+    search3_widening_visit_growths: Optional[Sequence[float]] = None
     search3_budget_modes: Optional[Sequence[str]] = None
     search3_budget_stage_playouts: Optional[Sequence[Sequence[int]]] = None
     search3_budget_confidence_visit_shares: Optional[Sequence[float]] = None
@@ -79,6 +81,7 @@ class FrameConfig:
     steps_to_goal_value_loss_weights: Optional[Sequence[float]] = None
     steps_to_goal_states_per_bands: Optional[Sequence[int]] = None
     steps_to_goal_replay_stratified_ratios: Optional[Sequence[float]] = None
+    steps_to_goal_long_route_min_ratios: Optional[Sequence[float]] = None
     steps_to_goal_value_max_route_efficiencies: Optional[Sequence[float]] = None
     steps_to_goal_value_batch_band_max_copies: Optional[Sequence[int]] = None
     pairwise_fallback_max_ratios: Optional[Sequence[float]] = None
@@ -141,6 +144,8 @@ class FrameConfig:
         self._validate_ai_sequence_length('search3_c_depth_maxes', self.search3_c_depth_maxes, ai_count)
         self._validate_ai_sequence_length('search3_c_depth_start_depths', self.search3_c_depth_start_depths, ai_count)
         self._validate_ai_sequence_length('search3_c_depth_ramp_depths', self.search3_c_depth_ramp_depths, ai_count)
+        self._validate_ai_sequence_length('search3_widening_initial_actions', self.search3_widening_initial_actions, ai_count)
+        self._validate_ai_sequence_length('search3_widening_visit_growths', self.search3_widening_visit_growths, ai_count)
         self._validate_ai_sequence_length('search3_budget_modes', self.search3_budget_modes, ai_count)
         self._validate_ai_sequence_length('search3_budget_stage_playouts', self.search3_budget_stage_playouts, ai_count)
         self._validate_ai_sequence_length('search3_budget_confidence_visit_shares', self.search3_budget_confidence_visit_shares, ai_count)
@@ -161,6 +166,7 @@ class FrameConfig:
         self._validate_ai_sequence_length('steps_to_goal_value_loss_weights', self.steps_to_goal_value_loss_weights, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_states_per_bands', self.steps_to_goal_states_per_bands, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_replay_stratified_ratios', self.steps_to_goal_replay_stratified_ratios, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_long_route_min_ratios', self.steps_to_goal_long_route_min_ratios, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_value_max_route_efficiencies', self.steps_to_goal_value_max_route_efficiencies, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_value_batch_band_max_copies', self.steps_to_goal_value_batch_band_max_copies, ai_count)
         self._validate_ai_sequence_length('pairwise_fallback_max_ratios', self.pairwise_fallback_max_ratios, ai_count)

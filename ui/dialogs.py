@@ -686,6 +686,7 @@ class ExperimentSummaryDialog(Tk.Toplevel):
                     f"時間={self._format_numbers(group['elapsedSeconds'])}"
                 )
                 lines.append(f"  設定手数別: {self._setup_length_bands_text(group)}")
+                lines.append(f"  局面Effect別: {self._setup_effect_bands_text(group)}")
                 lines.append(f"  設定: {self._settings_text(group.get('aiSettings', {}))}")
         self._set_text('\n'.join(lines))
 
@@ -785,6 +786,21 @@ class ExperimentSummaryDialog(Tk.Toplevel):
                 f"({cls._format_rate(band.get('directSearchSuccessRate'))})"
             )
         return '  '.join(parts) if parts else 'データなし'
+
+    @classmethod
+    def _setup_effect_bands_text(cls, group):
+        """Format direct success by whole-rotation-normalized piece effect."""
+        parts = []
+        for band in group.get('setupEffectBands', ()):
+            count = band.get('classifiedRunCount', 0)
+            if count == 0:
+                continue
+            parts.append(
+                f"E{band.get('label', '?')}="
+                f"{band.get('directSearchSuccessCount', 0)}/{count}"
+                f"({cls._format_rate(band.get('directSearchSuccessRate'))})"
+            )
+        return '  '.join(parts) if parts else '3x3の次の探索から記録'
 
     @staticmethod
     def _format_summary(summary):
@@ -931,11 +947,12 @@ class LearningHistoryDialog(Tk.Toplevel):
         ai_index = int(self.ai_var.get().replace('AI ', ''))
         selected = [record for record in records if record['aiIndex'] == ai_index]
         depth_bands = self._recent_search3_depth_bands(ai_index, selected)
+        effect_bands = self._recent_setup_effect_bands(ai_index, selected)
         self._draw_chart(selected)
         self._draw_search3_depth_chart(depth_bands)
-        self._show_records(ai_index, selected, depth_bands)
+        self._show_records(ai_index, selected, depth_bands, effect_bands)
 
-    def _show_records(self, ai_index, records, depth_bands):
+    def _show_records(self, ai_index, records, depth_bands, effect_bands):
         if not records:
             self.summary_label.configure(text = f'AI {ai_index}: まだ保存済みの学習履歴はありません。')
             self._set_details('学習を実行すると、loss・更新回数・学習率・Search方式がここへ蓄積されます。')
@@ -957,6 +974,7 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"勾配: {self._gradient_metrics_text(latest)}\n"
                 f"固定検証: {self._fixed_validation_text(latest)}\n"
                 f"Search3 深さ別: {self._search3_depth_summary_text(depth_bands)}\n"
+                f"局面Effect別: {self._setup_effect_summary_text(effect_bands)}\n"
                 f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
                 f"update scale={self._number(update_scales['shared'])}/"
                 f"{self._number(update_scales['policy'])}/{self._number(update_scales['value'])}  "
@@ -994,6 +1012,9 @@ class LearningHistoryDialog(Tk.Toplevel):
         if depth_bands:
             lines += ['', 'Search3 深さ別（直近の探索ログ、深さ帯は playout 深さ中央値）']
             lines += [f'  {self._search3_depth_band_text(band)}' for band in depth_bands if band.get('runCount', 0)]
+        if effect_bands:
+            lines += ['', '局面Effect別（全体回転を除いた辺・角の移動数）']
+            lines += [f'  {self._setup_effect_band_text(band)}' for band in effect_bands if band.get('runCount', 0)]
         self._set_details('\n'.join(lines))
 
     def _recent_search3_depth_bands(self, ai_index, records):
@@ -1007,6 +1028,22 @@ class LearningHistoryDialog(Tk.Toplevel):
                 ai_index,
                 puzzle = puzzle,
                 limit = self.RECENT_SEARCH_DEPTH_LIMIT,
+            )
+        except (OSError, ValueError):
+            return []
+
+    def _recent_setup_effect_bands(self, ai_index, records):
+        if not records:
+            return []
+        puzzle_type = getattr(self.frame, 'puzzle_type', '')
+        cube_size = getattr(self.frame, 'cube_size', None)
+        puzzle = None if cube_size is None else f'{puzzle_type}-{cube_size}x{cube_size}'
+        try:
+            return ExperimentLogStore().recent_ai_setup_effect_bands(
+                ai_index,
+                puzzle = puzzle,
+                search_mode = records[-1]['searchMode'],
+                limit = self.RECENT_SOLVE_LIMIT,
             )
         except (OSError, ValueError):
             return []
@@ -1053,8 +1090,8 @@ class LearningHistoryDialog(Tk.Toplevel):
         fixed_top1 = [self._fixed_validation_value(record, 'policyTop1Accuracy', fixture_id) for record in visible]
         fixed_top3 = [self._fixed_validation_value(record, 'policyTop3Accuracy', fixture_id) for record in visible]
         fixed_correlation = [self._fixed_validation_value(record, 'valueRankCorrelation', fixture_id) for record in visible]
-        fixed_long_top1 = [self._fixed_validation_length_value(record, '60', 'policyTop1Accuracy', fixture_id) for record in visible]
-        fixed_long_correlation = [self._fixed_validation_length_value(record, '60', 'valueRankCorrelation', fixture_id) for record in visible]
+        fixed_long_top1 = [self._fixed_validation_bucket_value(record, 'policyTop1Accuracy', fixture_id) for record in visible]
+        fixed_long_correlation = [self._fixed_validation_bucket_value(record, 'valueRankCorrelation', fixture_id) for record in visible]
         short_replay_share = [self._short_replay_share(record) for record in visible]
         long_replay_share = [self._long_replay_share(record) for record in visible]
         medium_replay_share = [self._medium_replay_share(record) for record in visible]
@@ -1112,7 +1149,7 @@ class LearningHistoryDialog(Tk.Toplevel):
         else:
             self.chart.create_text(width // 2, 390, text = '勾配は次回の学習から記録されます', fill = '#A0A0A0', tags = 'trend')
         fixture_label = fixture_id or '未記録'
-        self.chart.create_text(8, 448, text = f'固定検証・replay（{fixture_label}）  全体P@1=orange  60手P@1=yellow  全体Value順位=green  60手順位=magenta  短手数=gray  中手数=white  長手数=cyan', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        self.chart.create_text(8, 448, text = f'固定検証・replay（{fixture_label}）  全体P@1=orange  40+手P@1=yellow  全体Value順位=green  40+手順位=magenta  短手数=gray  中手数=white  長手数=cyan', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
         if any(item is not None for item in fixed_top1 + fixed_long_top1 + fixed_correlation + fixed_long_correlation + short_replay_share + medium_replay_share + long_replay_share):
             self._draw_loss_series(fixed_top1, '#E68A00', 25, width - 12, 478, 528)
             self._draw_loss_series(fixed_long_top1, '#E6D200', 25, width - 12, 478, 528)
@@ -1124,8 +1161,8 @@ class LearningHistoryDialog(Tk.Toplevel):
             self.chart.create_text(
                 8, 538,
                 text = (
-                    f'全体P@1 {self._series_range(fixed_top1)}  60手P@1 {self._series_range(fixed_long_top1)}  '
-                    f'全体順位 {self._series_range(fixed_correlation)}  60手順位 {self._series_range(fixed_long_correlation)}  '
+                    f'全体P@1 {self._series_range(fixed_top1)}  40+手P@1 {self._series_range(fixed_long_top1)}  '
+                    f'全体順位 {self._series_range(fixed_correlation)}  40+手順位 {self._series_range(fixed_long_correlation)}  '
                     f'短手数採用比 {self._series_range(short_replay_share)}  '
                     f'中手数採用比 {self._series_range(medium_replay_share)}  '
                     f'長手数採用比 {self._series_range(long_replay_share)}'
@@ -1145,7 +1182,7 @@ class LearningHistoryDialog(Tk.Toplevel):
         active = [band for band in bands if band.get('runCount', 0) > 0]
         chart.create_text(
             8, 8,
-            text = 'Search3 深さ別（直近200探索、帯は playout 深さ中央値）  直接成功率=orange  平均ノード数=cyan  実効C=magenta（各系列は個別スケール）',
+            text = 'Search3 深さ別（直近200探索、帯は playout 深さ中央値）  成功率=orange  ノード数=cyan  実効C=magenta  根候補数=green  展開候補数=yellow（各系列は個別スケール）',
             fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 9), tags = 'depth',
         )
         if not active:
@@ -1154,14 +1191,19 @@ class LearningHistoryDialog(Tk.Toplevel):
         success = [band.get('directSearchSuccessRate') for band in active]
         nodes = [band.get('averageNodeCount') for band in active]
         coefficients = [band.get('averageSelectionC') for band in active]
+        root_widths = [band.get('averageVisitedRootChildCount') for band in active]
+        widening_limits = [band.get('averageWideningActionLimit') for band in active]
         self._draw_loss_series(success, '#E68A00', 25, width - 12, 36, 130, canvas = chart, tag = 'depth')
         self._draw_loss_series(nodes, '#49C7D4', 25, width - 12, 36, 130, canvas = chart, tag = 'depth')
         self._draw_loss_series(coefficients, '#DE5CE6', 25, width - 12, 36, 130, canvas = chart, tag = 'depth')
+        self._draw_loss_series(root_widths, '#78C850', 25, width - 12, 36, 130, canvas = chart, tag = 'depth')
+        self._draw_loss_series(widening_limits, '#E6D200', 25, width - 12, 36, 130, canvas = chart, tag = 'depth')
         chart.create_text(
             8, 138,
             text = (
                 f'成功率 {self._series_range(success)}  ノード数 {self._series_range(nodes)}  '
-                f'C {self._series_range(coefficients)}'
+                f'C {self._series_range(coefficients)}  根候補 {self._series_range(root_widths)}  '
+                f'展開候補 {self._series_range(widening_limits)}'
             ),
             fill = '#A0A0A0', anchor = 'nw', font = ('Menlo', 9), tags = 'depth',
         )
@@ -1232,9 +1274,18 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f" batch/item={sample.get('stepsToGoalStratifiedBatchCount', '--')}/"
                 f"{sample.get('stepsToGoalStratifiedItemCount', '--')}"
             )
+        long_route_text = ''
+        if sample.get('stepsToGoalLongRouteMinRatio', 0.0):
+            long_route_text = (
+                f"  steps長経路={self._rate(sample.get('stepsToGoalLongRouteMinRatio'))}"
+                f" selected/required/eligible="
+                f"{sample.get('stepsToGoalLongRouteSelectedItemCount', '--')}/"
+                f"{sample.get('stepsToGoalLongRouteRequiredItemCount', '--')}/"
+                f"{sample.get('stepsToGoalLongRouteEligibleItemCount', '--')}"
+            )
         minimum = sample.get('longSequenceMinSteps', 0)
         if not minimum:
-            return prefix + stratified_text + '  長手数replay=off'
+            return prefix + stratified_text + long_route_text + '  長手数replay=off'
         selected_items = sample.get('selectedItemCount')
         short_selected = sample.get('shortSelectedItemCount')
         medium_selected = sample.get('mediumSelectedItemCount')
@@ -1382,6 +1433,7 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"MAE/state={self._number(metrics.get('maePerState'))}  "
             f"Huber/state={self._number(metrics.get('huberPerState'))}"
             f"{self._steps_to_goal_origin_text(metrics.get('origins'))}"
+            f"{self._steps_to_goal_value_selection_text(metrics.get('valueSelection'))}"
             f"{self._steps_to_goal_replay_text(metrics.get('replay'))}"
         )
 
@@ -1423,6 +1475,18 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"all_conflict={available.get('conflictingStartStateCount', '--')} ]"
         )
 
+    def _steps_to_goal_value_selection_text(self, selection):
+        if not isinstance(selection,dict):
+            return ''
+        return (
+            f"  valueSel={selection.get('selectedRouteCount', '--')}/"
+            f"{selection.get('candidateRouteCount', '--')}route "
+            f"drop[src/detour/dup]={selection.get('sourceExcludedRouteCount', '--')}/"
+            f"{selection.get('detourExcludedRouteCount', '--')}/"
+            f"{selection.get('longerDuplicateExcludedRouteCount', '--')} "
+            f"state={self._steps_to_goal_band_text(selection.get('selectedStateBands'))}"
+        )
+
     @staticmethod
     def _steps_to_goal_band_text(bands):
         if not isinstance(bands, dict):
@@ -1450,6 +1514,13 @@ class LearningHistoryDialog(Tk.Toplevel):
                     for label in ('0-10','11-30','31+')
                     if label in steps_bands
                 )
+            )
+        long_bucket = validation.get('long40Plus') or {}
+        if isinstance(long_bucket, dict):
+            value_parts.append(
+                '40+手='
+                f"P@1:{self._rate(long_bucket.get('policyTop1Accuracy'))} "
+                f"Value順位:{self._number(long_bucket.get('valueRankCorrelation'))}"
             )
         return (
             '  '.join(value_parts)
@@ -1498,6 +1569,21 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"depthMean={self._number(band.get('averagePlayoutDepth'))}"
         )
 
+    def _setup_effect_summary_text(self, bands):
+        active = [band for band in bands if band.get('runCount', 0) > 0]
+        if not active:
+            return '（次の探索から記録）'
+        return '  '.join(self._setup_effect_band_text(band) for band in active)
+
+    def _setup_effect_band_text(self, band):
+        return (
+            f"E{band.get('label', '?')}: direct="
+            f"{band.get('directSearchSuccessCount', 0)}/{band.get('classifiedRunCount', 0)}"
+            f"({self._rate(band.get('directSearchSuccessRate'))}) "
+            f"orient={self._number(band.get('averageOrientationCount'))} "
+            f"reduced={self._number(band.get('averageReducedMoveCount'))}"
+        )
+
     @staticmethod
     def _latest_fixed_validation_fixture_id(records):
         for record in reversed(records):
@@ -1522,6 +1608,14 @@ class LearningHistoryDialog(Tk.Toplevel):
         by_length = validation.get('byLength') or {}
         metrics = by_length.get(str(length))
         return None if not isinstance(metrics, dict) else metrics.get(key)
+
+    @staticmethod
+    def _fixed_validation_bucket_value(record, key, fixture_id = None):
+        validation = record.get('fixedValidation') or {}
+        if fixture_id is not None and validation.get('fixtureId') != fixture_id:
+            return None
+        bucket = validation.get('long40Plus') or {}
+        return bucket.get(key) if isinstance(bucket, dict) else None
 
     @staticmethod
     def _gradient_metric_value(record, key):

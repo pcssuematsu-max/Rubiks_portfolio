@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,7 @@ from statistics import median
 from typing import Any
 
 
-EXPERIMENT_LOG_SCHEMA_VERSION = 4
+EXPERIMENT_LOG_SCHEMA_VERSION = 5
 SETUP_LENGTH_BANDS = (
     (0, 19, "0-19"),
     (20, 29, "20-29"),
@@ -27,6 +28,19 @@ SEARCH3_PLAYOUT_DEPTH_BANDS = (
     (10, 19, "10-19"),
     (20, None, "20+"),
 )
+# The physical effect after normalizing the cube's whole orientation.  These
+# bands complement, rather than replace, the nominal scramble move count.
+SETUP_EFFECT_BANDS = (
+    (0, 7, "0-7"),
+    (8, 13, "8-13"),
+    (14, 19, "14-19"),
+    (20, None, "20+"),
+)
+# The GUI consumes a recent solve window, not an unbounded archive.  Keep the
+# setting snapshot on each row, while bounding the history per AI/search mode
+# so tiny incidental setting changes cannot defeat compaction.
+EXPERIMENT_RECORDS_PER_AI_MODE = 200
+EXPERIMENT_COMPACT_THRESHOLD_BYTES = 32 * 1024 * 1024
 EXPERIMENT_LOG_FILE_NAME = "ai-experiments.jsonl"
 EXPERIMENT_CSV_FILE_NAME = "ai-experiments.csv"
 EXPERIMENT_SUMMARY_FILE_NAME = "ai-experiment-summary.json"
@@ -60,7 +74,7 @@ CSV_FIELDS = (
     "searchMode", "aiIndex", "solveIndex", "stage", "succeeded",
     "searchSucceeded", "fallbackUsed", "outcome",
     "elapsedSeconds", "setupMoveCount", "moveCount", "score", "rootScore",
-    "bestScore", "endReason", "stats", "directSearch", "setup", "moves", "aiSettings",
+    "bestScore", "endReason", "stats", "directSearch", "setup", "moves", "setupEffect", "aiSettings",
 )
 
 
@@ -97,6 +111,7 @@ class ExperimentLogRecord:
     end_reason: str | None
     stats: tuple[Any, ...]
     direct_search: dict[str, Any]
+    setup_effect: dict[str, Any] | None
     ai_settings: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
@@ -128,8 +143,11 @@ class ExperimentLogRecord:
             # Preserve the direct-search result before a greedy fallback
             # replaces the session's display/result state.
             "directSearch": self.direct_search,
-            "setup": list(self.setup),
-            "moves": list(self.moves),
+            # The raw routes are saved in the discovery feed when useful.
+            # Benchmark logs retain only their scalar effect summaries.
+            "setup": [],
+            "moves": [],
+            "setupEffect": self.setup_effect,
             "aiSettings": self.ai_settings,
         }
 
@@ -146,13 +164,63 @@ class ExperimentLogStore:
         )
 
     def append(self, record: ExperimentLogRecord) -> None:
-        """Append one completed solve without rewriting prior experiment data."""
+        """Append one compact solve record and bound retained benchmark history."""
         payload = record.to_dict()
+        if self.path.exists() and self.path.stat().st_size >= EXPERIMENT_COMPACT_THRESHOLD_BYTES:
+            self.compact()
         self.path.parent.mkdir(parents = True, exist_ok = True)
         with self.path.open("a", encoding = "utf-8", newline = "\n") as stream:
             json.dump(payload, stream, ensure_ascii = False, separators = (",", ":"))
             stream.write("\n")
         self._append_csv(payload)
+
+    def compact(self) -> tuple[int, int]:
+        """Keep a compact recent window per AI/search mode and rebuild both logs.
+
+        Full route sequences and per-attempt arrays are intentionally omitted:
+        the experiment log is for outcome analysis, while reproducible notable
+        routes belong in the discovery archive.
+        """
+        if not self.path.exists():
+            return (0, 0)
+        retained: dict[tuple[str, str, int | None], list[dict[str, Any]]] = {}
+        total = 0
+        with self.path.open(encoding = "utf-8") as stream:
+            for line_number, line in enumerate(stream, 1):
+                if not line.strip():
+                    continue
+                payload = json.loads(line)
+                record = _normalize_experiment_record(payload, line_number)
+                effect = record.get("setupEffect")
+                if effect is None:
+                    effect = setup_effect_metrics(
+                        record["puzzle"], payload.get("cubeSize"), record.get("setup", ()),
+                    )
+                compacted = _compact_experiment_payload(record, effect)
+                key = (record["puzzle"], record["searchMode"], record["aiIndex"])
+                rows = retained.setdefault(key, [])
+                rows.append(compacted)
+                if len(rows) > EXPERIMENT_RECORDS_PER_AI_MODE:
+                    del rows[0]
+                total += 1
+        records = [record for rows in retained.values() for record in rows]
+        records.sort(key = lambda record: record["timestamp"])
+        self._write_compacted_records(records)
+        return (total, len(records))
+
+    def _write_compacted_records(self, records: list[dict[str, Any]]) -> None:
+        self.path.parent.mkdir(parents = True, exist_ok = True)
+        temporary_path = self.path.with_suffix(self.path.suffix + ".tmp")
+        with temporary_path.open("w", encoding = "utf-8", newline = "\n") as stream:
+            for payload in records:
+                json.dump(payload, stream, ensure_ascii = False, separators = (",", ":"))
+                stream.write("\n")
+        temporary_path.replace(self.path)
+        with self.csv_path.open("w", encoding = "utf-8", newline = "") as stream:
+            writer = csv.DictWriter(stream, fieldnames = CSV_FIELDS)
+            writer.writeheader()
+            for payload in records:
+                writer.writerow({field: self._csv_value(payload.get(field)) for field in CSV_FIELDS})
 
     def _append_csv(self, payload: dict[str, Any]) -> None:
         self.csv_path.parent.mkdir(parents = True, exist_ok = True)
@@ -273,6 +341,23 @@ class ExperimentLogStore:
         ]
         return _search3_depth_bands(rows[-max(1, int(limit)):])
 
+    def recent_ai_setup_effect_bands(
+        self,
+        ai_index: int,
+        *,
+        puzzle: str | None = None,
+        search_mode: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Return direct-search outcomes by orientation-normalized effect band."""
+        rows = [
+            row for row in self._read_records("jsonl")
+            if row["aiIndex"] == int(ai_index)
+            and (puzzle is None or row["puzzle"] == puzzle)
+            and (search_mode is None or row["searchMode"] == search_mode)
+        ]
+        return _setup_effect_bands(rows[-max(1, int(limit)):])
+
     def export_summary(self, path: Path | None = None, source = "jsonl") -> Path:
         """Write compact JSON and CSV summaries ready for Web or spreadsheet use."""
         destination = (
@@ -354,6 +439,7 @@ def completed_experiment_record(
     normalized_type = str(puzzle_type).strip().lower() or "unknown"
     normalized_size = int(cube_size)
     normalized_stats = () if stats is None else stats
+    normalized_setup = tuple(str(move).strip() for move in setup if str(move).strip())
     return ExperimentLogRecord(
         timestamp = datetime.now(timezone.utc).isoformat(timespec = "seconds"),
         puzzle_type = normalized_type,
@@ -372,7 +458,7 @@ def completed_experiment_record(
             fallback_used = fallback_used,
         ),
         elapsed_seconds = round(max(0.0, float(elapsed_seconds)), 6),
-        setup = tuple(str(move).strip() for move in setup if str(move).strip()),
+        setup = normalized_setup,
         moves = tuple(str(move).strip() for move in moves if str(move).strip()),
         score = best_score,
         root_score = root_score,
@@ -380,6 +466,11 @@ def completed_experiment_record(
         end_reason = None if end_reason is None else str(end_reason),
         stats = tuple(_json_scalar(value) for value in normalized_stats),
         direct_search = _normalize_json_object(direct_search),
+        setup_effect = setup_effect_metrics(
+            f"{normalized_type}-{normalized_size}x{normalized_size}",
+            normalized_size,
+            normalized_setup,
+        ),
         ai_settings = _normalize_ai_settings(ai_settings),
     )
 
@@ -421,6 +512,150 @@ def _normalize_json_value(value: Any) -> Any:
     return _json_scalar(value)
 
 
+def setup_effect_metrics(puzzle: str, cube_size: Any, setup) -> dict[str, Any] | None:
+    """Return compact physical difficulty metrics for a 3x3 setup.
+
+    A whole-cube rotation changes notation but not puzzle difficulty.  We
+    append the shortest orientation-restoring rotation before analysing the
+    net permutation, then count only visible piece effects.
+    """
+    if str(puzzle) not in {"cube-3x3", "rubiks-3x3"}:
+        return None
+    try:
+        if int(cube_size) != 3:
+            return None
+    except (TypeError, ValueError):
+        return None
+    try:
+        moves = tuple(str(move).strip() for move in setup if str(move).strip())
+    except TypeError:
+        return None
+    return _cube_setup_effect_metrics(moves)
+
+
+@lru_cache(maxsize = 8192)
+def _cube_setup_effect_metrics(moves: tuple[str, ...]) -> dict[str, Any] | None:
+    """Analyse one normalized 3x3 route once, even when many AIs share it."""
+    try:
+        cube, analyzer, display_to_key, orientation_suffixes = _rubiks_effect_context()
+        moves = tuple(display_to_key[move] for move in moves)
+        suffix = _orientation_restoring_suffix(cube, moves, orientation_suffixes)
+        effect = analyzer.analyze(moves + suffix)
+        visible = tuple(
+            component for component in effect.components
+            if not component.is_internal_center_permutation()
+        )
+        simplified = cube.simplify(moves)
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return None
+    return {
+        "version": 1,
+        "movedPieceCount": sum(component.moved_count for component in visible),
+        "orientationCount": sum(component.orientation_count for component in visible),
+        "componentCount": len(visible),
+        "reducedMoveCount": len(simplified),
+        "orientationNormalizationMoveCount": len(suffix),
+    }
+
+
+@lru_cache(maxsize = 1)
+def _rubiks_effect_context():
+    """Build one immutable 3x3 effect-analysis context for experiment logs."""
+    from cube.rubiks_cube import Rubiks_3
+    from core.myperm_effects import MypermEffectAnalyzer
+
+    cube = Rubiks_3()
+    display_to_key = {str(key).strip(): key for key in cube.move_keys}
+    orientation_keys = tuple(
+        key for key in cube.move_keys if str(key).strip().lstrip("1234567890")[:1] in {"x", "y", "z"}
+    )
+    center_positions = tuple(int(piece[0]) for piece in cube.center_index)
+    identity = tuple(range(len(cube.state_0)))
+    queue = [()]
+    seen = {tuple(identity[position] for position in center_positions)}
+    suffixes = []
+    while queue:
+        sequence = queue.pop(0)
+        suffixes.append(sequence)
+        for move in orientation_keys:
+            candidate = sequence + (move,)
+            state = _move_permutation(cube, candidate)
+            signature = tuple(state[position] for position in center_positions)
+            if signature not in seen:
+                seen.add(signature)
+                queue.append(candidate)
+    return cube, MypermEffectAnalyzer(cube), display_to_key, tuple(suffixes)
+
+
+def _move_permutation(cube, moves):
+    state = list(range(len(cube.state_0)))
+    for move in moves:
+        state = [state[int(index)] for index in cube.move[move]]
+    return state
+
+
+def _orientation_restoring_suffix(cube, moves, suffixes):
+    center_positions = tuple(int(piece[0]) for piece in cube.center_index)
+    for suffix in suffixes:
+        state = _move_permutation(cube, moves + suffix)
+        if all(state[position] == position for position in center_positions):
+            return suffix
+    return ()
+
+
+def _setup_effect(value: Any) -> dict[str, Any] | None:
+    required = {
+        "version", "movedPieceCount", "orientationCount", "componentCount",
+        "reducedMoveCount", "orientationNormalizationMoveCount",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        return None
+    normalized = {key: _safe_int(value.get(key)) for key in required}
+    if any(number is None or number < 0 for number in normalized.values()):
+        return None
+    if normalized["version"] != 1:
+        return None
+    return normalized
+
+
+def _compact_direct_search(value: Any) -> dict[str, Any]:
+    """Drop repeated attempt arrays while keeping diagnostics used by the GUI."""
+    source = _normalize_json_object(value)
+    result = {}
+    for key in ("attemptCount", "terminalEndReason", "endReasonCounts", "totals", "finalAttempt"):
+        if key in source:
+            result[key] = source[key]
+    final_attempt = result.get("finalAttempt")
+    if isinstance(final_attempt, dict):
+        final_attempt.pop("budgetStages", None)
+    return result
+
+
+def _compact_experiment_payload(record: dict[str, Any], effect: dict[str, Any] | None) -> dict[str, Any]:
+    """Convert a normalized row into the bounded on-disk experiment schema."""
+    return {
+        "schemaVersion": EXPERIMENT_LOG_SCHEMA_VERSION,
+        "timestamp": record["timestamp"],
+        "puzzle": record["puzzle"],
+        "searchMode": record["searchMode"],
+        "aiIndex": record["aiIndex"],
+        "solveIndex": record["solveIndex"],
+        "succeeded": record["succeeded"],
+        "searchSucceeded": record["searchSucceeded"],
+        "fallbackUsed": record["fallbackUsed"],
+        "outcome": record["outcome"],
+        "elapsedSeconds": record["elapsedSeconds"],
+        "setupMoveCount": record["setupMoveCount"],
+        "moveCount": record["moveCount"],
+        "score": record["score"],
+        "directSearch": _compact_direct_search(record["directSearch"]),
+        "setup": [],
+        "moves": [],
+        "setupEffect": effect,
+        "aiSettings": record["aiSettings"],
+    }
+
+
 def _normalize_experiment_record(payload: Any, line_number: int) -> dict[str, Any]:
     """Normalize older rows while preserving their unavailable settings."""
     if not isinstance(payload, dict):
@@ -454,6 +689,7 @@ def _normalize_experiment_record(payload: Any, line_number: int) -> dict[str, An
         ),
         "setup": list(payload.get("setup", [])),
         "moves": list(payload.get("moves", [])),
+        "setupEffect": _setup_effect(payload.get("setupEffect")),
         "aiSettings": _normalize_ai_settings(
             payload.get("aiSettings") if schema_version >= 3 else {}
         ),
@@ -506,6 +742,7 @@ def _summarize_group(
         # Keep direct-search success stratified by the initial setup length.
         # A changed scramble mix must not look like a model improvement.
         "setupLengthBands": _setup_length_bands(rows),
+        "setupEffectBands": _setup_effect_bands(rows),
         "search3DepthBands": _search3_depth_bands(rows),
         "interestingDiscoveries": [
             {
@@ -556,6 +793,41 @@ def _setup_length_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
+def _setup_effect_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Summarize direct success by net visible-piece effect, not raw moves."""
+    result = []
+    for minimum, maximum, label in SETUP_EFFECT_BANDS:
+        band_rows = [
+            row for row in rows
+            if isinstance(row.get("setupEffect"), dict)
+            and isinstance(row["setupEffect"].get("movedPieceCount"), int)
+            and row["setupEffect"]["movedPieceCount"] >= minimum
+            and (maximum is None or row["setupEffect"]["movedPieceCount"] <= maximum)
+        ]
+        classified = [row for row in band_rows if row["outcome"] != "legacy_unknown"]
+        direct = [row for row in band_rows if row["outcome"] == "search_success"]
+        orientations = [
+            row["setupEffect"].get("orientationCount") for row in band_rows
+            if isinstance(row["setupEffect"].get("orientationCount"), int)
+        ]
+        reduced = [
+            row["setupEffect"].get("reducedMoveCount") for row in band_rows
+            if isinstance(row["setupEffect"].get("reducedMoveCount"), int)
+        ]
+        result.append({
+            "label": label,
+            "minimum": minimum,
+            "maximum": maximum,
+            "runCount": len(band_rows),
+            "classifiedRunCount": len(classified),
+            "directSearchSuccessCount": len(direct),
+            "directSearchSuccessRate": _rate(len(direct), len(classified)),
+            "averageOrientationCount": _mean_number(orientations),
+            "averageReducedMoveCount": _mean_number(reduced),
+        })
+    return result
+
+
 def _search3_depth_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Aggregate Search3 attempts by the reached playout-depth band."""
     diagnostic_rows = []
@@ -576,8 +848,10 @@ def _search3_depth_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         classified = [item for item in band_rows if item[0]["outcome"] != "legacy_unknown"]
         direct = [item for item in band_rows if item[0]["outcome"] == "search_success"]
         node_counts = [_safe_float(item[1].get("treeNodeCount")) for item in band_rows]
+        root_widths = [_safe_float(item[1].get("visitedRootChildCount")) for item in band_rows]
         coefficients = [_safe_float(item[1].get("selectionCMean")) for item in band_rows]
         mean_depths = [_safe_float(item[1].get("playoutDepthMean")) for item in band_rows]
+        widening_limits = [_safe_float(item[1].get("wideningActionLimitMean")) for item in band_rows]
         result.append({
             "label": label,
             "minimum": minimum,
@@ -587,8 +861,10 @@ def _search3_depth_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "directSearchSuccessCount": len(direct),
             "directSearchSuccessRate": _rate(len(direct), len(classified)),
             "averageNodeCount": _mean_number(node_counts),
+            "averageVisitedRootChildCount": _mean_number(root_widths),
             "averageSelectionC": _mean_number(coefficients),
             "averagePlayoutDepth": _mean_number(mean_depths),
+            "averageWideningActionLimit": _mean_number(widening_limits),
         })
     return result
 

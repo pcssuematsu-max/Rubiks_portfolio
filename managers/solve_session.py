@@ -465,9 +465,14 @@ class SolveSessionManager:
             'playoutDepthMax', 'playoutDepthAtLeast20Count',
             'playoutDepthAtLeast20Rate', 'selectionCount', 'selectionCMin',
             'selectionCMean', 'selectionCMax',
+            'wideningSelectionCount', 'wideningActionLimitMean',
+            'wideningActionLimitMax',
         ):
             value = diagnostics.get(key)
-            if key in ('playoutDepthMin', 'playoutDepthMax', 'playoutDepthAtLeast20Count', 'selectionCount'):
+            if key in (
+                'playoutDepthMin', 'playoutDepthMax', 'playoutDepthAtLeast20Count',
+                'selectionCount', 'wideningSelectionCount', 'wideningActionLimitMax',
+            ):
                 value = cls._optional_int(value)
             else:
                 value = cls._optional_float(value)
@@ -1591,6 +1596,9 @@ class SolveSessionManager:
                 'valueTargetScale': getattr(ai, 'search2_value_target_scale', None),
                 'stepsToGoalValueLossWeight': getattr(ai, 'steps_to_goal_value_loss_weight', None),
                 'stepsToGoalStatesPerBand': getattr(ai, 'steps_to_goal_states_per_band', None),
+                'stepsToGoalLongRouteMinRatio': getattr(
+                    ai, 'steps_to_goal_long_route_min_ratio', None,
+                ),
                 'stepsToGoalValueMaxRouteEfficiency': getattr(
                     ai, 'steps_to_goal_value_max_route_efficiency', None,
                 ),

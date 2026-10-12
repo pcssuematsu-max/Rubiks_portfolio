@@ -74,6 +74,24 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
         }
         for length, length_slice in length_slices.items()
     }
+    # A 60-move probe alone is sparse and noisy.  Keep the individual lengths
+    # for diagnosis, and also expose a stable held-out 40+ bucket (48/60) for
+    # deciding whether Search2 is learning genuinely difficult positions.
+    long_start = length_slices[48].start
+    long_stop = length_slices[60].stop
+    long_slice = slice(long_start, long_stop)
+    metrics["long40Plus"] = {
+        "fixtureCount": FIXTURES_PER_LENGTH * 2,
+        "stateCount": int(long_stop - long_start),
+        **_quality_metrics(
+            ai,
+            policy_logits[:, long_slice],
+            raw_values[long_slice],
+            policy_targets[long_slice],
+            value_targets[long_slice],
+            _relative_path_slices(path_slices, long_slice),
+        ),
+    }
     if getattr(ai, "search2_value_loss_type", "") == "steps_to_goal":
         metrics["stepsToGoalByRemainingSteps"] = _steps_to_goal_remaining_step_metrics(
             ai, policy_logits, raw_values, policy_targets, value_targets, remaining_steps,

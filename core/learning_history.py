@@ -11,6 +11,9 @@ from typing import Any
 
 LEARNING_HISTORY_SCHEMA_VERSION = 1
 LEARNING_HISTORY_FILE_NAME = "ai-learning-history.json"
+# The history chart displays the latest 60 learning events; retain two full
+# chart windows per AI so the file stays quick to parse and rewrite.
+LEARNING_HISTORY_RECORDS_PER_AI = 120
 _PAYLOAD_FIELDS = frozenset({"schemaVersion", "updatedAt", "records"})
 
 
@@ -41,8 +44,19 @@ class LearningHistoryStore:
         for record in records:
             _validate_record(record)
         payload["records"].extend(records)
+        payload["records"] = _compact_records(payload["records"])
         payload["updatedAt"] = records[-1]["timestamp"]
         self._write(payload)
+
+    def compact(self) -> tuple[int, int]:
+        """Keep the recent, graph-visible history window for each AI."""
+        payload = self._read()
+        original_count = len(payload["records"])
+        payload["records"] = _compact_records(payload["records"])
+        if payload["records"]:
+            payload["updatedAt"] = payload["records"][-1]["timestamp"]
+        self._write(payload)
+        return original_count, len(payload["records"])
 
     def records(self) -> list[dict[str, Any]]:
         """Return a copy of the complete, chronological history."""
@@ -64,9 +78,23 @@ class LearningHistoryStore:
         self.path.parent.mkdir(parents = True, exist_ok = True)
         temporary_path = self.path.with_suffix(self.path.suffix + ".tmp")
         with temporary_path.open("w", encoding = "utf-8") as stream:
-            json.dump(payload, stream, ensure_ascii = False, indent = 2)
+            json.dump(payload, stream, ensure_ascii = False, separators = (",", ":"))
             stream.write("\n")
         temporary_path.replace(self.path)
+
+
+def _compact_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Retain a bounded chronological window without mixing AI histories."""
+    retained_by_ai: dict[int, list[dict[str, Any]]] = {}
+    for record in records:
+        ai_index = int(record["aiIndex"])
+        bucket = retained_by_ai.setdefault(ai_index, [])
+        bucket.append(record)
+        if len(bucket) > LEARNING_HISTORY_RECORDS_PER_AI:
+            del bucket[0]
+    retained = [record for bucket in retained_by_ai.values() for record in bucket]
+    retained.sort(key = lambda record: record["timestamp"])
+    return retained
 
 
 def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict[str, Any]:
@@ -209,6 +237,9 @@ def _fixed_validation(value: Any) -> dict[str, Any] | None:
     by_length = _fixed_validation_by_length(value.get("byLength"))
     if by_length is not None:
         result["byLength"] = by_length
+    long_40_plus = _fixed_validation_bucket(value.get("long40Plus"))
+    if long_40_plus is not None:
+        result["long40Plus"] = long_40_plus
     remaining_steps = _fixed_validation_remaining_steps(value.get("stepsToGoalByRemainingSteps"))
     if remaining_steps is not None:
         result["stepsToGoalByRemainingSteps"] = remaining_steps
@@ -240,12 +271,15 @@ _TRAINING_SAMPLE_OPTIONAL_INT_FIELDS = frozenset({
     "mediumEligibleItemCount", "mediumReservedItemCount", "mediumSelectedItemCount",
     "directSearchSelectedItemCount", "fallbackSelectedItemCount",
     "stepsToGoalStratifiedBatchCount", "stepsToGoalStratifiedItemCount",
+    "stepsToGoalLongRouteEligibleItemCount", "stepsToGoalLongRouteRequiredItemCount",
+    "stepsToGoalLongRouteSelectedItemCount", "stepsToGoalLongRouteOversampledItemCount",
 })
 
 _TRAINING_SAMPLE_NUMBER_FIELDS = frozenset({
     "shortReplayMinRatio", "shortSelectedRatio",
     "longReplayRatio", "longReplayMaxRatio", "longSelectedRatio",
     "stepsToGoalStratifiedRatio",
+    "stepsToGoalLongRouteMinRatio",
 })
 
 
@@ -302,6 +336,12 @@ _STEPS_TO_GOAL_REPLAY_POPULATION_OPTIONAL_INT_FIELDS = frozenset({
     "shortestTargetRouteCount", "longerDuplicateRouteCount",
 })
 
+_STEPS_TO_GOAL_VALUE_SELECTION_INT_FIELDS = frozenset({
+    "candidateRouteCount", "selectedRouteCount", "sourceExcludedRouteCount",
+    "detourExcludedRouteCount", "longerDuplicateExcludedRouteCount",
+    "oversampledStateCount",
+})
+
 
 def _steps_to_goal_replay_population(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
@@ -349,10 +389,21 @@ def _steps_to_goal_replay_population(value: Any) -> dict[str, Any] | None:
 
 
 def _steps_to_goal_replay(value: Any) -> dict[str, Any] | None:
-    if not isinstance(value, dict) or set(value) != {
+    required_fields = {
         "stratifiedRatio", "stratifiedBatchCount", "stratifiedItemCount",
         "available", "selected",
-    }:
+    }
+    long_route_fields = {
+        "longRouteMinRatio", "longRouteEligibleItemCount",
+        "longRouteRequiredItemCount", "longRouteSelectedItemCount",
+        "longRouteOversampledItemCount",
+    }
+    if (
+        not isinstance(value, dict)
+        or not required_fields.issubset(value)
+        or set(value) - required_fields - long_route_fields
+        or bool(set(value) & long_route_fields) != (set(value) >= long_route_fields)
+    ):
         return None
     ratio = _finite_number(value.get("stratifiedRatio"))
     batches = _safe_optional_int(value.get("stratifiedBatchCount"))
@@ -365,13 +416,52 @@ def _steps_to_goal_replay(value: Any) -> dict[str, Any] | None:
         or available is None or selected is None
     ):
         return None
-    return {
+    result = {
         "stratifiedRatio": ratio,
         "stratifiedBatchCount": batches,
         "stratifiedItemCount": items,
         "available": available,
         "selected": selected,
     }
+    if set(value) >= long_route_fields:
+        long_ratio = _finite_number(value.get("longRouteMinRatio"))
+        counts = {
+            key: _safe_optional_int(value.get(key))
+            for key in long_route_fields - {"longRouteMinRatio"}
+        }
+        if (
+            long_ratio is None or not 0.0 <= long_ratio <= 1.0
+            or any(count is None or count < 0 for count in counts.values())
+        ):
+            return None
+        result["longRouteMinRatio"] = long_ratio
+        result.update(counts)
+    return result
+
+
+def _steps_to_goal_value_selection(value: Any) -> dict[str, Any] | None:
+    """Validate compact Value-teacher filtering diagnostics."""
+    required = set(_STEPS_TO_GOAL_VALUE_SELECTION_INT_FIELDS) | {
+        "candidateStateBands", "selectedStateBands",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        return None
+    result = {}
+    for key in _STEPS_TO_GOAL_VALUE_SELECTION_INT_FIELDS:
+        count = _safe_optional_int(value.get(key))
+        if count is None or count < 0:
+            return None
+        result[key] = count
+    expected_bands = {"0-10", "11-30", "31+"}
+    for key in ("candidateStateBands", "selectedStateBands"):
+        bands = value.get(key)
+        if not isinstance(bands, dict) or set(bands) != expected_bands:
+            return None
+        copied = {label: _safe_optional_int(bands[label]) for label in expected_bands}
+        if any(count is None or count < 0 for count in copied.values()):
+            return None
+        result[key] = copied
+    return result
 
 
 def _steps_to_goal_regression(value: Any) -> dict[str, Any] | None:
@@ -401,7 +491,7 @@ def _steps_to_goal_regression(value: Any) -> dict[str, Any] | None:
             if not isinstance(origin, str) or not origin:
                 return None
             copied = _steps_to_goal_regression(metrics)
-            if copied is None or "lossWeight" in copied or "origins" in copied or "remainingStepBands" in copied or "replay" in copied:
+            if copied is None or "lossWeight" in copied or "origins" in copied or "remainingStepBands" in copied or "valueSelection" in copied or "replay" in copied:
                 return None
             origins[origin] = copied
         result["origins"] = origins
@@ -414,6 +504,11 @@ def _steps_to_goal_regression(value: Any) -> dict[str, Any] | None:
         if any(count is None for count in copied_bands.values()):
             return None
         result["remainingStepBands"] = copied_bands
+    if "valueSelection" in value:
+        selection = _steps_to_goal_value_selection(value.get("valueSelection"))
+        if selection is None:
+            return None
+        result["valueSelection"] = selection
     if "replay" in value:
         replay = _steps_to_goal_replay(value.get("replay"))
         if replay is None:
@@ -426,7 +521,7 @@ def _validate_steps_to_goal_regression(value: Any) -> None:
     if value is None:
         return
     required = {"stateCount", "trajectoryCount", *_STEPS_TO_GOAL_REGRESSION_NUMBER_FIELDS}
-    allowed = required | {"lossWeight", "origins", "remainingStepBands", "replay"}
+    allowed = required | {"lossWeight", "origins", "remainingStepBands", "valueSelection", "replay"}
     if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed or _steps_to_goal_regression(value) != value:
         raise ValueError("Invalid learning history stepsToGoalRegression")
 
@@ -520,6 +615,20 @@ def _fixed_validation_by_length(value: Any) -> dict[str, dict[str, Any]] | None:
     return result
 
 
+def _fixed_validation_bucket(value: Any) -> dict[str, Any] | None:
+    """Copy an optional aggregate held-out bucket such as the 40+ probe."""
+    if not isinstance(value, dict):
+        return None
+    count = _safe_optional_int(value.get("fixtureCount"))
+    state_count = _safe_optional_int(value.get("stateCount"))
+    if count is None or state_count is None:
+        return None
+    copied = {"fixtureCount": count, "stateCount": state_count}
+    for key in _FIXED_VALIDATION_NUMBERS:
+        copied[key] = _finite_number(value.get(key))
+    return copied
+
+
 def _fixed_validation_remaining_steps(value: Any) -> dict[str, dict[str, Any]] | None:
     """Copy optional calibrated-regression metrics by remaining-step band."""
     if not isinstance(value, dict) or len(value) == 0:
@@ -545,7 +654,7 @@ def _validate_fixed_validation(value: Any) -> None:
         "fixtureId", "fixtureLengths", "fixtureCount", "stateCount",
         *_FIXED_VALIDATION_NUMBERS,
     }
-    if not isinstance(value, dict) or set(value) - expected - {"byLength", "stepsToGoalByRemainingSteps"}:
+    if not isinstance(value, dict) or set(value) - expected - {"byLength", "long40Plus", "stepsToGoalByRemainingSteps"}:
         raise ValueError("Invalid learning history fixedValidation")
     if not isinstance(value["fixtureId"], str) or not value["fixtureId"]:
         raise ValueError("Invalid learning history fixedValidation fixture")
@@ -561,6 +670,10 @@ def _validate_fixed_validation(value: Any) -> None:
         _validate_optional_number(value[key])
     if "byLength" in value:
         _validate_fixed_validation_by_length(value["byLength"])
+    if "long40Plus" in value:
+        normalized = _fixed_validation_bucket(value["long40Plus"])
+        if normalized is None or normalized != value["long40Plus"]:
+            raise ValueError("Invalid learning history fixedValidation 40+ bucket")
     if "stepsToGoalByRemainingSteps" in value:
         normalized = _fixed_validation_remaining_steps(value["stepsToGoalByRemainingSteps"])
         if normalized is None or normalized != value["stepsToGoalByRemainingSteps"]:

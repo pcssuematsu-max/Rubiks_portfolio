@@ -7,7 +7,11 @@ from types import SimpleNamespace
 import numpy as np
 
 from ai.rubiks_ai import Rubiks_3_AI
-from core.learning_history import LearningHistoryStore, completed_learning_record
+from core.learning_history import (
+    LEARNING_HISTORY_RECORDS_PER_AI,
+    LearningHistoryStore,
+    completed_learning_record,
+)
 
 
 class _FakeAI:
@@ -72,6 +76,26 @@ class _FakeAI:
 
 
 class LearningHistoryTests(unittest.TestCase):
+    def test_compacts_history_per_ai_without_mixing_the_recent_windows(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'learning.json'
+            records = []
+            for index in range(LEARNING_HISTORY_RECORDS_PER_AI + 4):
+                record = completed_learning_record(3, _FakeAI(), 1.0)
+                record['timestamp'] = f'2026-01-01T00:00:{index:04d}+00:00'
+                records.append(record)
+            for index in range(2):
+                record = completed_learning_record(4, _FakeAI(), 1.0)
+                record['timestamp'] = f'2026-01-02T00:00:{index:04d}+00:00'
+                records.append(record)
+
+            LearningHistoryStore(path).append_many(records)
+
+            retained = LearningHistoryStore(path).records()
+            self.assertEqual(len(retained), LEARNING_HISTORY_RECORDS_PER_AI + 2)
+            self.assertEqual(sum(record['aiIndex'] == 3 for record in retained), LEARNING_HISTORY_RECORDS_PER_AI)
+            self.assertEqual(sum(record['aiIndex'] == 4 for record in retained), 2)
+
     def test_writes_a_learning_record_with_loss_settings_and_update_count(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / 'learning.json'
@@ -127,6 +151,13 @@ class LearningHistoryTests(unittest.TestCase):
                 'predictionMin': -3.0, 'predictionMean': -1.0, 'predictionMax': 1.0,
                 'signedErrorMean': 3.0, 'maePerState': 3.2, 'huberPerState': 2.7,
                 'lossWeight': 1.0,
+                'valueSelection': {
+                    'candidateRouteCount': 6, 'selectedRouteCount': 4,
+                    'sourceExcludedRouteCount': 1, 'detourExcludedRouteCount': 1,
+                    'longerDuplicateExcludedRouteCount': 0, 'oversampledStateCount': 3,
+                    'candidateStateBands': {'0-10': 5, '11-30': 4, '31+': 3},
+                    'selectedStateBands': {'0-10': 4, '11-30': 4, '31+': 4},
+                },
                 'origins': {
                     'direct_search': {
                         'stateCount': 12, 'trajectoryCount': 2,
@@ -143,6 +174,7 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['trajectoryCount'], 2)
             self.assertEqual(saved['signedErrorMean'], 3.0)
             self.assertEqual(saved['lossWeight'], 1.0)
+            self.assertEqual(saved['valueSelection']['detourExcludedRouteCount'], 1)
             self.assertEqual(saved['origins']['direct_search']['stateCount'], 12)
 
     def test_writes_steps_to_goal_replay_diagnostics_when_available(self):

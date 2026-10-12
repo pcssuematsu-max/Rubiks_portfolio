@@ -57,10 +57,29 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(node.select_node(C = 0.2), 0)
         self.assertEqual(node.select_node(C = 2.0), 1)
 
+    def test_node_progressive_widening_restricts_new_node_to_top_policy_actions(self):
+        node = Node(np.array([0.40, 0.30, 0.20, 0.10], dtype = 'f'), value = 0.0)
+
+        self.assertEqual(node.select_node(action_limit = 2), 0)
+        self.assertEqual(node.select_node({0}, action_limit = 2), 1)
+
+    def test_widening_limit_grows_with_node_visits_and_can_be_disabled(self):
+        engine = Search3Engine.__new__(Search3Engine)
+        node = SimpleNamespace(P = np.zeros(18), S = 100)
+        engine.ai = SimpleNamespace(
+            search3_widening_initial_actions = 5,
+            search3_widening_visit_growth = 0.40,
+        )
+        self.assertEqual(engine._widening_action_limit(node), 9)
+
+        engine.ai = SimpleNamespace(search3_widening_initial_actions = 0)
+        self.assertEqual(engine._widening_action_limit(node), 0)
+
     def test_search_diagnostics_report_actual_depth_and_coefficient_use(self):
         diagnostics = Search3Engine._search_diagnostics(
             [1, 12, 20, 30],
             [2.0, 2.5, 3.0, 4.0],
+            [5, 6, 7, 8],
         )
 
         self.assertEqual(diagnostics['playoutDepthMedian'], 16.0)
@@ -68,6 +87,9 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(diagnostics['playoutDepthAtLeast20Rate'], 0.5)
         self.assertEqual(diagnostics['selectionCMean'], 2.875)
         self.assertEqual(diagnostics['selectionCMax'], 4.0)
+        self.assertEqual(diagnostics['wideningSelectionCount'], 4)
+        self.assertEqual(diagnostics['wideningActionLimitMean'], 6.5)
+        self.assertEqual(diagnostics['wideningActionLimitMax'], 8)
 
     def test_frame_config_validates_per_ai_depth_schedule(self):
         config = FrameConfig(
@@ -76,6 +98,8 @@ class Search3DepthScheduleTests(unittest.TestCase):
             search3_c_depth_maxes = (4.0,),
             search3_c_depth_start_depths = (3,),
             search3_c_depth_ramp_depths = (12,),
+            search3_widening_initial_actions = (5,),
+            search3_widening_visit_growths = (0.4,),
             search3_budget_modes = ('progressive',),
             search3_budget_stage_playouts = ((100, 300, 600),),
             search3_budget_confidence_visit_shares = (0.7,),
@@ -95,6 +119,8 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(config.search3_c_depth_maxes, (4.0,))
         self.assertEqual(config.search3_c_depth_start_depths, (3,))
         self.assertEqual(config.search3_c_depth_ramp_depths, (12,))
+        self.assertEqual(config.search3_widening_initial_actions, (5,))
+        self.assertEqual(config.search3_widening_visit_growths, (0.4,))
         self.assertEqual(config.search3_budget_modes, ('progressive',))
         self.assertEqual(config.search3_budget_stage_playouts, ((100, 300, 600),))
         self.assertEqual(config.search3_max_node_caches, (10000,))
@@ -122,6 +148,8 @@ class Search3DepthScheduleTests(unittest.TestCase):
             search3_c_depth_maxes = (4.0,),
             search3_c_depth_start_depths = (3,),
             search3_c_depth_ramp_depths = (12,),
+            search3_widening_initial_actions = (5,),
+            search3_widening_visit_growths = (0.4,),
             search3_budget_modes = ('progressive',),
             search3_budget_stage_playouts = ((100, 300, 600),),
             search3_budget_confidence_visit_shares = (0.7,),
@@ -142,6 +170,8 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(ai.search3_C_depth_max, 4.0)
         self.assertEqual(ai.search3_C_depth_start_depth, 3)
         self.assertEqual(ai.search3_C_depth_ramp_depth, 12)
+        self.assertEqual(ai.search3_widening_initial_actions, 5)
+        self.assertEqual(ai.search3_widening_visit_growth, 0.4)
         self.assertEqual(ai.search3_budget_mode, 'progressive')
         self.assertEqual(ai.search3_budget_stage_playouts, (100, 300, 600))
         self.assertEqual(ai.search3_budget_confidence_visit_share, 0.7)
@@ -169,6 +199,14 @@ class Search3DepthScheduleTests(unittest.TestCase):
             [0.02, 0.02, 0.02],
         )
         self.assertEqual(config.search3_budget_min_improvements[2], 0.05)
+        self.assertEqual(
+            [config.search3_budget_min_improvements[index] for index in (10, 18)],
+            [0.02, 0.02],
+        )
+        self.assertEqual(
+            [config.search3_budget_min_improvements[index] for index in (11, 19)],
+            [0.05, 0.05],
+        )
         self.assertEqual(config.original_train_medium_sequence_min_steps[10], 20)
         self.assertEqual(config.original_train_medium_sequence_max_steps[10], 29)
         self.assertEqual(config.original_train_short_sequence_max_steps[10], 19)
@@ -179,13 +217,18 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(config.search3_rank_loss_mixes[11], 0.10)
         self.assertEqual(config.search3_rank_loss_mixes[18], 0.0)
         self.assertEqual(config.search3_rank_loss_mixes[19], 0.0)
-        self.assertEqual([config.search3_cs[index] for index in (2,3,4,5,6,7)], [0.5,0.5,1.0,1.0,5.0,5.0])
-        self.assertEqual([config.search3_c_depth_maxes[index] for index in (2,3,4,5,6,7)], [0.5,0.5,5.0,5.0,5.0,5.0])
-        self.assertEqual([config.search3_cs[index] for index in (10,11,18,19)], [1.0,1.0,1.0,1.0])
+        self.assertEqual([config.search3_cs[index] for index in (2,3,4,5,6,7)], [0.5,0.5,1.0,0.5,5.0,0.5])
+        self.assertEqual([config.search3_c_depth_maxes[index] for index in (2,3,4,5,6,7)], [0.5,0.5,5.0,0.5,5.0,0.5])
+        self.assertEqual([config.search3_widening_initial_actions[index] for index in (2,3,4,5,6,7)], [0,5,0,5,0,5])
+        self.assertEqual([config.search3_widening_visit_growths[index] for index in (2,3,4,5,6,7)], [0.0,0.4,0.0,0.4,0.0,0.4])
+        self.assertEqual([config.search3_cs[index] for index in (10,11,18,19)], [0.5,1.0,0.5,1.0])
         self.assertEqual([config.search3_c_depth_start_depths[index] for index in (10,11,18,19)], [4,4,4,4])
-        self.assertEqual([config.search3_c_depth_maxes[index] for index in (10,11,18,19)], [2.0,2.0,2.0,2.0])
+        self.assertEqual([config.search3_c_depth_maxes[index] for index in (10,11,18,19)], [0.5,2.0,0.5,2.0])
         self.assertEqual([config.search3_c_depth_ramp_depths[index] for index in (10,11,18,19)], [6,6,6,6])
-        self.assertEqual([config.update_scales[index][2] for index in (12,13,14,15,16,17,20,21,22,23,24)], [1.0,1.0,1.0,1.0,1.0,1.0,20.0,20.0,1.0,1.0,1.0])
+        self.assertEqual([config.search3_widening_initial_actions[index] for index in (10,11,18,19)], [5,0,5,0])
+        self.assertEqual([config.search3_widening_visit_growths[index] for index in (10,11,18,19)], [0.4,0.0,0.4,0.0])
+        self.assertEqual(config.lrs[22], 2.0e-6)
+        self.assertEqual([config.update_scales[index][2] for index in (0,1,8,9,12,13,14,15,16,17,20,21,22,23,24)], [3.0,3.0,3.0,3.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0])
         self.assertEqual(config.steps_to_goal_value_loss_weights[20:25], [5.0,5.0,1.0,1.0,1.0])
         self.assertEqual(config.steps_to_goal_replay_stratified_ratios[20:25], [0.0,0.0,0.75,0.75,0.75])
         self.assertEqual(len(config.ai_search_modes), 25)

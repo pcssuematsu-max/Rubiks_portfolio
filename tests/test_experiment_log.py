@@ -6,6 +6,7 @@ import unittest
 
 from core.experiment_log import (
     CSV_FIELDS,
+    EXPERIMENT_RECORDS_PER_AI_MODE,
     ExperimentLogStore,
     completed_experiment_record,
     experiment_outcome,
@@ -36,13 +37,14 @@ class ExperimentLogStoreTests(unittest.TestCase):
             ExperimentLogStore(jsonl_path, csv_path).append(record)
 
             payload = json.loads(jsonl_path.read_text(encoding = "utf-8"))
-            self.assertEqual(payload["schemaVersion"], 4)
+            self.assertEqual(payload["schemaVersion"], 5)
             self.assertEqual(payload["puzzle"], "rubiks-7x7")
             self.assertEqual(payload["searchMode"], "search3")
             self.assertEqual(payload["elapsedSeconds"], 1.234568)
             self.assertEqual(payload["moveCount"], 1)
             self.assertEqual(payload["score"], 0.75)
-            self.assertEqual(payload["setup"], ["R", "U"])
+            self.assertEqual(payload["setup"], [])
+            self.assertEqual(payload["setupEffect"], None)
             self.assertTrue(payload["searchSucceeded"])
             self.assertFalse(payload["fallbackUsed"])
             self.assertEqual(payload["outcome"], "search_success")
@@ -54,11 +56,38 @@ class ExperimentLogStoreTests(unittest.TestCase):
                 rows = list(csv.DictReader(stream))
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["puzzle"], "rubiks-7x7")
-            self.assertEqual(rows[0]["moves"], "[\"R'\"]")
+            self.assertEqual(rows[0]["moves"], "[]")
             self.assertEqual(
                 json.loads(rows[0]['directSearch'])['attemptCount'],
                 1,
             )
+
+    def test_records_orientation_normalized_cube_effect_metrics(self):
+        record = completed_experiment_record(
+            puzzle_type = "cube", cube_size = 3, search_mode = "search2",
+            ai_index = 0, solve_index = 1, stage = 0, succeeded = False,
+            search_succeeded = False, fallback_used = False, elapsed_seconds = 0.0,
+            setup = ("x",), moves = (), root_score = None, best_score = None,
+            end_reason = "budget",
+        )
+
+        self.assertEqual(record.setup_effect["movedPieceCount"], 0)
+        self.assertEqual(record.setup_effect["orientationCount"], 0)
+        self.assertEqual(record.setup_effect["orientationNormalizationMoveCount"], 1)
+
+    def test_compact_bounds_each_ai_search_mode_window(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            store = ExperimentLogStore(
+                output_directory / "runs.jsonl", output_directory / "runs.csv",
+            )
+            for index in range(EXPERIMENT_RECORDS_PER_AI_MODE + 5):
+                store.append(self._record("search2", index + 1, 1.0, True, False))
+
+            original, retained = store.compact()
+            self.assertEqual(original, EXPERIMENT_RECORDS_PER_AI_MODE + 5)
+            self.assertEqual(retained, EXPERIMENT_RECORDS_PER_AI_MODE)
+            self.assertEqual(store.summarize()["totalRuns"], EXPERIMENT_RECORDS_PER_AI_MODE)
 
     def test_classifies_greedy_fallback_separately_from_search_success(self):
         self.assertEqual(

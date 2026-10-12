@@ -153,6 +153,8 @@ class Frame(Tk.Frame):
             search3_c_depth_maxes = config.search3_c_depth_maxes,
             search3_c_depth_start_depths = config.search3_c_depth_start_depths,
             search3_c_depth_ramp_depths = config.search3_c_depth_ramp_depths,
+            search3_widening_initial_actions = config.search3_widening_initial_actions,
+            search3_widening_visit_growths = config.search3_widening_visit_growths,
             search3_budget_modes = config.search3_budget_modes,
             search3_budget_stage_playouts = config.search3_budget_stage_playouts,
             search3_budget_confidence_visit_shares = config.search3_budget_confidence_visit_shares,
@@ -173,6 +175,7 @@ class Frame(Tk.Frame):
             steps_to_goal_value_loss_weights = config.steps_to_goal_value_loss_weights,
             steps_to_goal_states_per_bands = config.steps_to_goal_states_per_bands,
             steps_to_goal_replay_stratified_ratios = config.steps_to_goal_replay_stratified_ratios,
+            steps_to_goal_long_route_min_ratios = config.steps_to_goal_long_route_min_ratios,
             steps_to_goal_value_max_route_efficiencies = config.steps_to_goal_value_max_route_efficiencies,
             steps_to_goal_value_batch_band_max_copies = config.steps_to_goal_value_batch_band_max_copies,
             pairwise_fallback_max_ratios = config.pairwise_fallback_max_ratios,
@@ -572,6 +575,8 @@ class Frame(Tk.Frame):
                                    search3_c_depth_maxes = None,
                                    search3_c_depth_start_depths = None,
                                    search3_c_depth_ramp_depths = None,
+                                   search3_widening_initial_actions = None,
+                                   search3_widening_visit_growths = None,
                                    search3_budget_modes = None,
                                    search3_budget_stage_playouts = None,
                                    search3_budget_confidence_visit_shares = None,
@@ -592,6 +597,7 @@ class Frame(Tk.Frame):
                                    steps_to_goal_value_loss_weights = None,
                                    steps_to_goal_states_per_bands = None,
                                    steps_to_goal_replay_stratified_ratios = None,
+                                   steps_to_goal_long_route_min_ratios = None,
                                    steps_to_goal_value_max_route_efficiencies = None,
                                    steps_to_goal_value_batch_band_max_copies = None,
                                    pairwise_fallback_max_ratios = None,
@@ -649,6 +655,14 @@ class Frame(Tk.Frame):
                 self.AIs[i].search3_C_depth_ramp_depth = max(0,int(search3_c_depth_ramp_depths[i]))
             else:
                 self.AIs[i].search3_C_depth_ramp_depth = 0
+            if search3_widening_initial_actions is not None:
+                self.AIs[i].search3_widening_initial_actions = max(
+                    0, int(search3_widening_initial_actions[i])
+                )
+            if search3_widening_visit_growths is not None:
+                self.AIs[i].search3_widening_visit_growth = max(
+                    0.0, float(search3_widening_visit_growths[i])
+                )
             if search3_budget_modes is not None:
                 self.AIs[i].search3_budget_mode = str(search3_budget_modes[i])
             if search3_budget_stage_playouts is not None:
@@ -706,6 +720,10 @@ class Frame(Tk.Frame):
             if steps_to_goal_replay_stratified_ratios is not None:
                 self.AIs[i].set_steps_to_goal_replay_stratified_ratio(
                     steps_to_goal_replay_stratified_ratios[i]
+                )
+            if steps_to_goal_long_route_min_ratios is not None:
+                self.AIs[i].set_steps_to_goal_long_route_min_ratio(
+                    steps_to_goal_long_route_min_ratios[i]
                 )
             if steps_to_goal_value_max_route_efficiencies is not None:
                 self.AIs[i].set_steps_to_goal_value_max_route_efficiency(
