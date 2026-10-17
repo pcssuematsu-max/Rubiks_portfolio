@@ -995,6 +995,8 @@ class DebugAnalysisManager:
     @staticmethod
     def _is_normalization_weight_key(key):
         """通常AffineとTransformerのQ/K/V重みだけを正規化対象にする。"""
+        if key == 'WSkip1':
+            return True
         if key.startswith('W') and key[1:].isdigit():
             return True
         return any(
@@ -1007,13 +1009,17 @@ class DebugAnalysisManager:
         """Return layer-specific variance targets for the piece-token Transformer."""
         if not bool(getattr(ai,'use_transformer_attention',False)):
             return NORMALIZATION_TARGET_VARIANCE
-        return transformer_parameter_target_variance(key)
+        return transformer_parameter_target_variance(
+            key,getattr(ai,'transformer_linear_skip_variance',0.125),
+        )
 
     def _normalize_weight_rows(self, ai, key, target_variance):
         """有限で非ゼロの行だけを正規化し、0除算を避ける。"""
         weights = ai.params[key]
         if weights.ndim != 2 or weights.shape[1] == 0:
             return 0, int(weights.shape[0]) if weights.ndim > 0 else 0
+        if target_variance is None or target_variance <= 0:
+            return 0, int(weights.shape[0])
 
         scale = np.sqrt(np.var(weights,axis = 1)) * np.sqrt(
             weights.shape[1] / target_variance

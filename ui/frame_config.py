@@ -70,6 +70,9 @@ class FrameConfig:
     search3_budget_rescue_playouts: Optional[Sequence[int]] = None
     search3_budget_rescue_min_visit_share_gains: Optional[Sequence[float]] = None
     search3_budget_rescue_min_improvements: Optional[Sequence[float]] = None
+    search3_budget_shallow_depth_thresholds: Optional[Sequence[float]] = None
+    search3_budget_shallow_widening_initial_actions: Optional[Sequence[int]] = None
+    search3_budget_shallow_widening_options: Optional[Sequence[Sequence[int]]] = None
     search3_max_node_caches: Optional[Sequence[int]] = None
     search3_max_prediction_caches: Optional[Sequence[int]] = None
     search2_max_frontiers: Optional[Sequence[int]] = None
@@ -82,6 +85,8 @@ class FrameConfig:
     steps_to_goal_states_per_bands: Optional[Sequence[int]] = None
     steps_to_goal_replay_stratified_ratios: Optional[Sequence[float]] = None
     steps_to_goal_long_route_min_ratios: Optional[Sequence[float]] = None
+    original_long_direct_min_ratios: Optional[Sequence[float]] = None
+    hard_effect_direct_min_ratios: Optional[Sequence[float]] = None
     steps_to_goal_value_max_route_efficiencies: Optional[Sequence[float]] = None
     steps_to_goal_value_batch_band_max_copies: Optional[Sequence[int]] = None
     pairwise_fallback_max_ratios: Optional[Sequence[float]] = None
@@ -96,12 +101,15 @@ class FrameConfig:
     residuals: Optional[Sequence[bool]] = None
     original_transformer_attention: Optional[Sequence[bool]] = None
     original_transformer_attention_dims: Optional[Sequence[int]] = None
+    original_transformer_linear_skips: Optional[Sequence[bool]] = None
+    original_transformer_linear_skip_variances: Optional[Sequence[float]] = None
     original_transformer_attention_token_modes: Optional[Sequence[str]] = None
     original_piece_attention_backward_chunk_sizes: Optional[Sequence[int]] = None
     original_train_batch_sizes: Optional[Sequence[int]] = None
     original_train_state_batch_sizes: Optional[Sequence[int]] = None
     original_train_max_batches: Optional[Sequence[int]] = None
     original_train_recent_ratios: Optional[Sequence[float]] = None
+    original_train_batch_mix_modes: Optional[Sequence[str]] = None
     original_train_short_sequence_max_steps: Optional[Sequence[int]] = None
     original_train_short_sequence_min_ratios: Optional[Sequence[float]] = None
     original_train_medium_sequence_min_steps: Optional[Sequence[int]] = None
@@ -155,6 +163,9 @@ class FrameConfig:
         self._validate_ai_sequence_length('search3_budget_rescue_playouts', self.search3_budget_rescue_playouts, ai_count)
         self._validate_ai_sequence_length('search3_budget_rescue_min_visit_share_gains', self.search3_budget_rescue_min_visit_share_gains, ai_count)
         self._validate_ai_sequence_length('search3_budget_rescue_min_improvements', self.search3_budget_rescue_min_improvements, ai_count)
+        self._validate_ai_sequence_length('search3_budget_shallow_depth_thresholds', self.search3_budget_shallow_depth_thresholds, ai_count)
+        self._validate_ai_sequence_length('search3_budget_shallow_widening_initial_actions', self.search3_budget_shallow_widening_initial_actions, ai_count)
+        self._validate_ai_sequence_length('search3_budget_shallow_widening_options', self.search3_budget_shallow_widening_options, ai_count)
         self._validate_ai_sequence_length('search3_max_node_caches', self.search3_max_node_caches, ai_count)
         self._validate_ai_sequence_length('search3_max_prediction_caches', self.search3_max_prediction_caches, ai_count)
         self._validate_ai_sequence_length('search2_max_frontiers', self.search2_max_frontiers, ai_count)
@@ -167,6 +178,8 @@ class FrameConfig:
         self._validate_ai_sequence_length('steps_to_goal_states_per_bands', self.steps_to_goal_states_per_bands, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_replay_stratified_ratios', self.steps_to_goal_replay_stratified_ratios, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_long_route_min_ratios', self.steps_to_goal_long_route_min_ratios, ai_count)
+        self._validate_ai_sequence_length('original_long_direct_min_ratios', self.original_long_direct_min_ratios, ai_count)
+        self._validate_ai_sequence_length('hard_effect_direct_min_ratios', self.hard_effect_direct_min_ratios, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_value_max_route_efficiencies', self.steps_to_goal_value_max_route_efficiencies, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_value_batch_band_max_copies', self.steps_to_goal_value_batch_band_max_copies, ai_count)
         self._validate_ai_sequence_length('pairwise_fallback_max_ratios', self.pairwise_fallback_max_ratios, ai_count)
@@ -181,12 +194,19 @@ class FrameConfig:
         self._validate_ai_sequence_length('residuals', self.residuals, ai_count)
         self._validate_ai_sequence_length('original_transformer_attention', self.original_transformer_attention, ai_count)
         self._validate_ai_sequence_length('original_transformer_attention_dims', self.original_transformer_attention_dims, ai_count)
+        self._validate_ai_sequence_length('original_transformer_linear_skips', self.original_transformer_linear_skips, ai_count)
+        self._validate_ai_sequence_length('original_transformer_linear_skip_variances', self.original_transformer_linear_skip_variances, ai_count)
         self._validate_ai_sequence_length('original_transformer_attention_token_modes', self.original_transformer_attention_token_modes, ai_count)
         self._validate_ai_sequence_length('original_piece_attention_backward_chunk_sizes', self.original_piece_attention_backward_chunk_sizes, ai_count)
         self._validate_ai_sequence_length('original_train_batch_sizes', self.original_train_batch_sizes, ai_count)
         self._validate_ai_sequence_length('original_train_state_batch_sizes', self.original_train_state_batch_sizes, ai_count)
         self._validate_ai_sequence_length('original_train_max_batches', self.original_train_max_batches, ai_count)
         self._validate_ai_sequence_length('original_train_recent_ratios', self.original_train_recent_ratios, ai_count)
+        self._validate_ai_sequence_length('original_train_batch_mix_modes', self.original_train_batch_mix_modes, ai_count)
+        if self.original_train_batch_mix_modes is not None and any(
+            mode not in ('ordered', 'mixed') for mode in self.original_train_batch_mix_modes
+        ):
+            raise ValueError('original_train_batch_mix_modes must be ordered or mixed')
         self._validate_ai_sequence_length('original_train_short_sequence_max_steps', self.original_train_short_sequence_max_steps, ai_count)
         self._validate_ai_sequence_length('original_train_short_sequence_min_ratios', self.original_train_short_sequence_min_ratios, ai_count)
         self._validate_ai_sequence_length('original_train_medium_sequence_min_steps', self.original_train_medium_sequence_min_steps, ai_count)

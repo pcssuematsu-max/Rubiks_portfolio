@@ -11,6 +11,7 @@ from core.experiment_log import (
     completed_experiment_record,
     experiment_outcome,
     rank_ai_metric_differences,
+    _setup_effect_bands,
 )
 
 
@@ -88,6 +89,70 @@ class ExperimentLogStoreTests(unittest.TestCase):
             self.assertEqual(original, EXPERIMENT_RECORDS_PER_AI_MODE + 5)
             self.assertEqual(retained, EXPERIMENT_RECORDS_PER_AI_MODE)
             self.assertEqual(store.summarize()["totalRuns"], EXPERIMENT_RECORDS_PER_AI_MODE)
+
+    def test_compaction_keeps_fallback_policy_rank_without_stage_arrays(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            store = ExperimentLogStore(
+                output_directory / "runs.jsonl", output_directory / "runs.csv",
+            )
+            record = completed_experiment_record(
+                puzzle_type="rubiks",cube_size=7,search_mode="search3",
+                ai_index=10,solve_index=1,stage=0,succeeded=True,
+                search_succeeded=False,fallback_used=True,elapsed_seconds=1.0,
+                setup=(),moves=(),root_score=0.0,best_score=1.0,
+                end_reason="greedy",direct_search={
+                    "attemptCount":1,"terminalEndReason":"budget",
+                    "totals":{"playoutCount":10000},
+                    "finalAttempt":{
+                        "fallbackFirstMovePolicyRank":4,
+                        "fallbackFirstMovePolicyProbability":0.08,
+                        "fallbackRootPolicyEntropy":2.1,
+                        "fallbackRootPolicyTop1Probability":0.2,
+                        "fallbackFirstMoveVisitShare":0.12,
+                        "returnedFirstMoveVisitShare":0.45,
+                        "returnedFirstMoveValueDelta":0.3,
+                        "budgetStages":[{"stageIndex":1}],
+                    },
+                },
+            )
+            store.append(record)
+            store.compact()
+
+            saved = json.loads(store.path.read_text(encoding="utf-8").strip())
+            final = saved["directSearch"]["finalAttempt"]
+            self.assertEqual(final["fallbackFirstMovePolicyRank"],4)
+            self.assertEqual(final["fallbackRootPolicyEntropy"],2.1)
+            self.assertEqual(final["fallbackFirstMoveVisitShare"],0.12)
+            self.assertEqual(final["returnedFirstMoveVisitShare"],0.45)
+            self.assertEqual(final["returnedFirstMoveValueDelta"],0.3)
+            self.assertNotIn("budgetStages",final)
+
+    def test_effect_bands_separate_success_and_failed_root_visit_shares(self):
+        effect = {'movedPieceCount':8,'orientationCount':2,'reducedMoveCount':12}
+        rows = [
+            {'setupEffect':effect,'outcome':'search_success','searchSucceeded':True,
+             'searchMode':'search3','directSearch':{'finalAttempt':{
+                 'returnedFirstMoveVisitShare':0.8,'returnedFirstMoveValueDelta':0.4,
+             }}},
+            {'setupEffect':effect,'outcome':'greedy_fallback_success','searchSucceeded':False,
+             'searchMode':'search3','directSearch':{'finalAttempt':{
+                 'returnedFirstMoveVisitShare':0.3,'fallbackFirstMoveVisitShare':0.1,
+                 'returnedFirstMoveValueDelta':-0.2,
+                 'fallbackFirstMovePolicyRank':4,
+             }}},
+        ]
+
+        band = next(item for item in _setup_effect_bands(rows) if item['label']=='8-13')
+        self.assertEqual(band['directFirstMoveVisitShare'],0.8)
+        self.assertEqual(band['directFirstMoveVisitCount'],1)
+        self.assertEqual(band['failedFirstMoveVisitShare'],0.3)
+        self.assertEqual(band['failedFirstMoveVisitCount'],1)
+        self.assertEqual(band['fallbackFirstMoveVisitShare'],0.1)
+        self.assertEqual(band['fallbackFirstMoveVisitCount'],1)
+        self.assertEqual(band['fallbackFirstMovePolicyRank'],4.0)
+        self.assertEqual(band['directFirstMoveValueIncreaseRate'],1.0)
+        self.assertEqual(band['failedFirstMoveValueIncreaseRate'],0.0)
 
     def test_classifies_greedy_fallback_separately_from_search_success(self):
         self.assertEqual(

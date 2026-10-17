@@ -205,7 +205,7 @@ class Search3DepthScheduleTests(unittest.TestCase):
         )
         self.assertEqual(
             [config.search3_budget_min_improvements[index] for index in (11, 19)],
-            [0.05, 0.05],
+            [0.02, 0.02],
         )
         self.assertEqual(config.original_train_medium_sequence_min_steps[10], 20)
         self.assertEqual(config.original_train_medium_sequence_max_steps[10], 29)
@@ -221,15 +221,15 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual([config.search3_c_depth_maxes[index] for index in (2,3,4,5,6,7)], [0.5,0.5,5.0,0.5,5.0,0.5])
         self.assertEqual([config.search3_widening_initial_actions[index] for index in (2,3,4,5,6,7)], [0,5,0,5,0,5])
         self.assertEqual([config.search3_widening_visit_growths[index] for index in (2,3,4,5,6,7)], [0.0,0.4,0.0,0.4,0.0,0.4])
-        self.assertEqual([config.search3_cs[index] for index in (10,11,18,19)], [0.5,1.0,0.5,1.0])
+        self.assertEqual([config.search3_cs[index] for index in (10,11,18,19)], [0.5] * 4)
         self.assertEqual([config.search3_c_depth_start_depths[index] for index in (10,11,18,19)], [4,4,4,4])
-        self.assertEqual([config.search3_c_depth_maxes[index] for index in (10,11,18,19)], [0.5,2.0,0.5,2.0])
+        self.assertEqual([config.search3_c_depth_maxes[index] for index in (10,11,18,19)], [0.5] * 4)
         self.assertEqual([config.search3_c_depth_ramp_depths[index] for index in (10,11,18,19)], [6,6,6,6])
-        self.assertEqual([config.search3_widening_initial_actions[index] for index in (10,11,18,19)], [5,0,5,0])
-        self.assertEqual([config.search3_widening_visit_growths[index] for index in (10,11,18,19)], [0.4,0.0,0.4,0.0])
+        self.assertEqual([config.search3_widening_initial_actions[index] for index in (10,11,18,19)], [5] * 4)
+        self.assertEqual([config.search3_widening_visit_growths[index] for index in (10,11,18,19)], [0.4] * 4)
         self.assertEqual(config.lrs[22], 2.0e-6)
         self.assertEqual([config.update_scales[index][2] for index in (0,1,8,9,12,13,14,15,16,17,20,21,22,23,24)], [3.0,3.0,3.0,3.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0])
-        self.assertEqual(config.steps_to_goal_value_loss_weights[20:25], [5.0,5.0,1.0,1.0,1.0])
+        self.assertEqual(config.steps_to_goal_value_loss_weights[20:25], [5.0,5.0,3.0,1.0,1.0])
         self.assertEqual(config.steps_to_goal_replay_stratified_ratios[20:25], [0.0,0.0,0.75,0.75,0.75])
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(
@@ -238,7 +238,15 @@ class Search3DepthScheduleTests(unittest.TestCase):
         )
         self.assertEqual(config.search2_rank_loss_mixes[20:25], [0.0] * 5)
         self.assertEqual(config.search2_rank_loss_apply_types[20:25], ['none'] * 5)
-        self.assertEqual(config.search2_value_loss_margins[20:25], [0.0] * 5)
+        self.assertEqual(
+            [config.search2_value_loss_margins[index] for index in (0,1,8,9,12,13,14,15,16,17)],
+            [1.0] * 10,
+        )
+        self.assertEqual(
+            [config.search2_value_loss_margins[index] for index in (2,3,4,5,6,7,10,11,18,19)],
+            [0.0] * 10,
+        )
+        self.assertEqual(config.search2_value_loss_margins[20:25], [0.0,1.0,0.0,1.0,1.0])
         self.assertEqual(config.search2_value_target_scales[20:25], [1.0] * 5)
         self.assertEqual(config.original_transformer_attention[20:25], [False, False, True, True, True])
         self.assertEqual(config.transform_idx[20:25], [0] * 5)

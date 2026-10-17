@@ -6,6 +6,66 @@ from ai.rubiks_ai import Rubiks_3_AI
 
 
 class LongSequenceReplayTests(unittest.TestCase):
+    def test_mixed_batches_preserve_items_and_put_both_ages_in_every_batch(self):
+        batches = [[8, 9, 10, 11], [12, 13, 14, 15], [0, 1, 2, 3], [4, 5, 6, 7]]
+        mixed = Rubiks_3_AI._mix_recent_old_batches(batches, recent_window_floor=8)
+        self.assertEqual([len(batch) for batch in mixed], [4] * 4)
+        self.assertEqual(sorted(index for batch in mixed for index in batch), list(range(16)))
+        self.assertTrue(all(sum(index >= 8 for index in batch) == 2 for batch in mixed))
+
+    def test_recent_and_old_mixing_is_logged_after_sampling(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.train_max_batches = 4
+        ai.train_recent_ratio = 0.5
+        ai.train_batch_mix_mode = 'mixed'
+        data = [SimpleNamespace(moves = ('R',)) for _ in range(12)]
+        random.seed(9)
+        batches, _ = ai._build_sampled_training_batches(
+            list(range(len(data))),data,
+            batch_size=2,state_batch_size=0,
+            state_count_fn=lambda item: len(item.moves) + 1,
+        )
+        ordered_ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ordered_ai.train_max_batches = 4
+        ordered_ai.train_recent_ratio = 0.5
+        ordered_ai.train_batch_mix_mode = 'ordered'
+        random.seed(9)
+        ordered_batches, _ = ordered_ai._build_sampled_training_batches(
+            list(range(len(data))),data,
+            batch_size=2,state_batch_size=0,
+            state_count_fn=lambda item: len(item.moves) + 1,
+        )
+        self.assertEqual(
+            sorted(index for batch in batches for index in batch),
+            sorted(index for batch in ordered_batches for index in batch),
+        )
+        summary = ai._last_training_sample_summary
+        self.assertEqual(len(batches), 4)
+        self.assertEqual(summary['mixed_batches'], 4)
+        self.assertEqual(summary['recent_window_selected_items'], 4)
+        self.assertEqual(summary['selected_unique_items'], 8)
+        history = ai._training_sample_history_metrics()
+        self.assertEqual(history['batchMixMode'], 'mixed')
+        self.assertEqual(history['recentReplayRatio'], 0.5)
+        self.assertEqual(history['mixedBatchCount'], 4)
+
+    def test_reservations_never_exceed_the_batch_cap(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.train_max_batches = 4
+        ai.train_recent_ratio = 0.75
+        ai.train_medium_sequence_min_steps = 20
+        ai.train_medium_sequence_max_steps = 29
+        ai.train_medium_sequence_ratio = 0.25
+        ai.train_long_sequence_min_steps = 30
+        ai.train_long_sequence_ratio = 0.25
+        data = [SimpleNamespace(moves=tuple(range(length))) for length in ([24] * 8 + [40] * 8)]
+        batches, _ = ai._build_sampled_training_batches(
+            list(range(len(data))),data,
+            batch_size=1,state_batch_size=0,
+            state_count_fn=lambda item: len(item.moves) + 1,
+        )
+        self.assertLessEqual(len(batches), 4)
+
     def test_reserved_batches_include_old_long_trajectories(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         ai.train_max_batches = 4
@@ -278,6 +338,31 @@ class LongSequenceReplayTests(unittest.TestCase):
         history = ai._training_sample_history_metrics()
         self.assertEqual(history['stepsToGoalLongRouteMinRatio'], 0.5)
         self.assertEqual(history['stepsToGoalLongRouteSelectedItemCount'], 5)
+
+    def test_original_transformer_reserves_quality_long_direct_routes_with_repeat_cap(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search2_value_loss_type = 'myloss'
+        ai.use_transformer_attention = True
+        ai.original_long_direct_min_ratio = 0.5
+        data = [
+            SimpleNamespace(scramble = tuple(range(20)), moves = tuple(range(8)), trajectory_origin = 'direct_search')
+            for _ in range(7)
+        ] + [
+            SimpleNamespace(scramble = tuple(range(20)), moves = tuple(range(35)), trajectory_origin = 'direct_search'),
+            SimpleNamespace(scramble = tuple(range(10)), moves = tuple(range(35)), trajectory_origin = 'direct_search'),
+            SimpleNamespace(scramble = tuple(range(20)), moves = tuple(range(35)), trajectory_origin = 'fallback'),
+        ]
+        batches = [[index] for index in range(len(data))]
+
+        summary = ai._enforce_original_long_direct_minimum(batches,list(range(len(data))),data)
+
+        selected = [index for batch in batches for index in batch]
+        self.assertEqual(summary['eligible_item_count'],1)
+        self.assertEqual(summary['required_item_count'],5)
+        self.assertEqual(summary['selected_item_count'],2)
+        self.assertEqual(selected.count(7),2)
+        self.assertEqual(selected.count(8),1)
+        self.assertEqual(selected.count(9),1)
 
     def test_steps_to_goal_replay_diagnostics_detect_conflicting_start_targets(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)

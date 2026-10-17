@@ -168,7 +168,8 @@ class Softmax_Cross_Entropy:
         return dO
 
 class Myloss:
-    def __init__(self):
+    def __init__(self, margin = 0.0):
+        self.margin = float(margin)
         self.x = np.zeros(0,dtype = 'f')
         self.y = np.zeros(0,dtype = 'f')
         self.t = np.zeros(0,dtype = 'f')
@@ -179,7 +180,13 @@ class Myloss:
         self.y = np.zeros((1,Indices[-1]),dtype = 'f')
         self.t = np.zeros((1,Indices[-1]),dtype = 'f')
         for i in range(len(Indices) - 1):
-            self.y[:,Indices[i]:Indices[i+1]] = softmax_H(x[:,Indices[i]:Indices[i+1]])
+            start,end = Indices[i],Indices[i+1]
+            logits = x[:,start:end].copy()
+            # Compare every preceding state with the sequence endpoint.
+            # Shifting only nonterminal logits makes a margin of zero exactly
+            # equivalent to the original endpoint-softmax objective.
+            logits[:,:-1] += self.margin
+            self.y[:,start:end] = softmax_H(logits)
             self.t[0,Indices[i+1]-1] = 1.0
         
         return cross_entropy(self.y,self.t)

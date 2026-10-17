@@ -164,6 +164,9 @@ class Frame(Tk.Frame):
             search3_budget_rescue_playouts = config.search3_budget_rescue_playouts,
             search3_budget_rescue_min_visit_share_gains = config.search3_budget_rescue_min_visit_share_gains,
             search3_budget_rescue_min_improvements = config.search3_budget_rescue_min_improvements,
+            search3_budget_shallow_depth_thresholds = config.search3_budget_shallow_depth_thresholds,
+            search3_budget_shallow_widening_initial_actions = config.search3_budget_shallow_widening_initial_actions,
+            search3_budget_shallow_widening_options = config.search3_budget_shallow_widening_options,
             search3_max_node_caches = config.search3_max_node_caches,
             search3_max_prediction_caches = config.search3_max_prediction_caches,
             search2_max_frontiers = config.search2_max_frontiers,
@@ -176,6 +179,8 @@ class Frame(Tk.Frame):
             steps_to_goal_states_per_bands = config.steps_to_goal_states_per_bands,
             steps_to_goal_replay_stratified_ratios = config.steps_to_goal_replay_stratified_ratios,
             steps_to_goal_long_route_min_ratios = config.steps_to_goal_long_route_min_ratios,
+            original_long_direct_min_ratios = config.original_long_direct_min_ratios,
+            hard_effect_direct_min_ratios = config.hard_effect_direct_min_ratios,
             steps_to_goal_value_max_route_efficiencies = config.steps_to_goal_value_max_route_efficiencies,
             steps_to_goal_value_batch_band_max_copies = config.steps_to_goal_value_batch_band_max_copies,
             pairwise_fallback_max_ratios = config.pairwise_fallback_max_ratios,
@@ -307,12 +312,15 @@ class Frame(Tk.Frame):
                 residual = self._ai_residual_enabled(ai_index, search_mode),
                 use_transformer_attention = self._ai_original_transformer_attention_enabled(ai_index),
                 transformer_attention_dim = self._ai_original_transformer_attention_dim(ai_index),
+                transformer_linear_skip = self._ai_original_transformer_linear_skip_enabled(ai_index),
+                transformer_linear_skip_variance = self._ai_original_transformer_linear_skip_variance(ai_index),
                 transformer_attention_token_mode = self._ai_original_transformer_attention_token_mode(ai_index),
                 piece_attention_backward_chunk_size = self._ai_original_piece_attention_backward_chunk_size(ai_index),
                 train_batch_size = self._ai_original_train_batch_size(ai_index),
                 train_state_batch_size = self._ai_original_train_state_batch_size(ai_index),
                 train_max_batches = self._ai_original_train_max_batches(ai_index),
                 train_recent_ratio = self._ai_original_train_recent_ratio(ai_index),
+                train_batch_mix_mode = self._ai_original_train_batch_mix_mode(ai_index),
                 train_short_sequence_max_steps = self._ai_original_train_short_sequence_max_steps(ai_index),
                 train_short_sequence_min_ratio = self._ai_original_train_short_sequence_min_ratio(ai_index),
                 train_medium_sequence_min_steps = self._ai_original_train_medium_sequence_min_steps(ai_index),
@@ -385,6 +393,18 @@ class Frame(Tk.Frame):
             return 64
         return int(dims[ai_index])
 
+    def _ai_original_transformer_linear_skip_enabled(self, ai_index):
+        flags = getattr(self.config, 'original_transformer_linear_skips', None)
+        if flags is None:
+            return False
+        return bool(flags[ai_index])
+
+    def _ai_original_transformer_linear_skip_variance(self, ai_index):
+        variances = getattr(self.config, 'original_transformer_linear_skip_variances', None)
+        if variances is None:
+            return 0.125
+        return float(variances[ai_index])
+
     def _ai_original_transformer_attention_token_mode(self, ai_index):
         modes = getattr(self.config, 'original_transformer_attention_token_modes', None)
         if modes is None:
@@ -420,6 +440,12 @@ class Frame(Tk.Frame):
         if ratios is None:
             return None
         return float(ratios[ai_index])
+
+    def _ai_original_train_batch_mix_mode(self, ai_index):
+        modes = getattr(self.config, 'original_train_batch_mix_modes', None)
+        if modes is None:
+            return 'ordered'
+        return str(modes[ai_index])
 
     def _ai_original_train_short_sequence_max_steps(self, ai_index):
         maximums = getattr(self.config, 'original_train_short_sequence_max_steps', None)
@@ -586,6 +612,9 @@ class Frame(Tk.Frame):
                                    search3_budget_rescue_playouts = None,
                                    search3_budget_rescue_min_visit_share_gains = None,
                                    search3_budget_rescue_min_improvements = None,
+                                   search3_budget_shallow_depth_thresholds = None,
+                                   search3_budget_shallow_widening_initial_actions = None,
+                                   search3_budget_shallow_widening_options = None,
                                    search3_max_node_caches = None,
                                    search3_max_prediction_caches = None,
                                    search2_max_frontiers = None,
@@ -598,6 +627,8 @@ class Frame(Tk.Frame):
                                    steps_to_goal_states_per_bands = None,
                                    steps_to_goal_replay_stratified_ratios = None,
                                    steps_to_goal_long_route_min_ratios = None,
+                                   original_long_direct_min_ratios = None,
+                                   hard_effect_direct_min_ratios = None,
                                    steps_to_goal_value_max_route_efficiencies = None,
                                    steps_to_goal_value_batch_band_max_copies = None,
                                    pairwise_fallback_max_ratios = None,
@@ -695,6 +726,18 @@ class Frame(Tk.Frame):
                 self.AIs[i].search3_budget_rescue_min_improvement = float(
                     search3_budget_rescue_min_improvements[i]
                 )
+            if search3_budget_shallow_depth_thresholds is not None:
+                self.AIs[i].search3_budget_shallow_depth_threshold = max(
+                    0.0,float(search3_budget_shallow_depth_thresholds[i])
+                )
+            if search3_budget_shallow_widening_initial_actions is not None:
+                self.AIs[i].search3_budget_shallow_widening_initial_actions = max(
+                    0,int(search3_budget_shallow_widening_initial_actions[i])
+                )
+            if search3_budget_shallow_widening_options is not None:
+                self.AIs[i].search3_budget_shallow_widening_options = tuple(
+                    max(1,int(width)) for width in search3_budget_shallow_widening_options[i]
+                )
             if search3_max_node_caches is not None:
                 self.AIs[i].search3_max_node_cache = max(0,int(search3_max_node_caches[i]))
             if search3_max_prediction_caches is not None:
@@ -724,6 +767,14 @@ class Frame(Tk.Frame):
             if steps_to_goal_long_route_min_ratios is not None:
                 self.AIs[i].set_steps_to_goal_long_route_min_ratio(
                     steps_to_goal_long_route_min_ratios[i]
+                )
+            if original_long_direct_min_ratios is not None:
+                self.AIs[i].set_original_long_direct_min_ratio(
+                    original_long_direct_min_ratios[i]
+                )
+            if hard_effect_direct_min_ratios is not None:
+                self.AIs[i].set_hard_effect_direct_min_ratio(
+                    hard_effect_direct_min_ratios[i]
                 )
             if steps_to_goal_value_max_route_efficiencies is not None:
                 self.AIs[i].set_steps_to_goal_value_max_route_efficiency(

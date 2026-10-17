@@ -24,6 +24,26 @@ python3 -m ruff check .
 
 同じチェックはGitHub Actionsでも実行されます。
 
+## 同一局面の独立比較（実験用）
+
+保存済みの実験用AIを、全員同じ固定3×3局面から直接解かせる比較です。通常の1周200試行、学習データ、GUIの成功カウンタには追加しません。Effect数別に各2局面（うち2局面は reducedMoveCount 40以上）を固定し、Search2は複数回の探索を連結して完成まで判定します。Search3は通常の探索予算・progressive設定を使い、greedy fallbackが必要になった時点で直接失敗とします。
+
+```bash
+python3.14 tools/compare_ai_same_positions.py --list-fixtures
+python3.14 tools/compare_ai_same_positions.py --ai-indices 0,3,10,11,12,18,19,20,21,22,23,24
+python3.14 tools/compare_ai_same_positions.py --fixture-set palms --ai-indices 0,3,10,11,12,18,19,20,21,22,23,24
+```
+
+`--fixture-set palms` は、ユーザー提供のTパーム（Effect 4・14手）とYパーム（Effect 4・17手）だけを同一局面として比較します。`--fixture-set all` なら元の固定10局面と合わせて比較できます。`--ai-indices` を省略すると実験用25体すべてを比較します。結果は通常の実験ログと別の `exports/ai-paired-benchmark.jsonl` に追記され、各AI・各局面の直接成功、探索量、深さ、保存済みパラメータの識別子を残します。比較前にGUIのパラメータを保存し、保存処理中の実行は避けてください。GUIで交互に使うSearch3の浅い探索幅は、この比較では設定値側に固定します。局面は再現可能な固定サンプルであり、通常の200試行の出題分布そのものを代表するわけではありません。
+
+Transformer Search3 の replay 比較では、探索条件（C=0.5、progressive、幅と予算）を AI10/11/18/19 で揃えています。各ペア内ではデータ変換と優先順も揃えます。AI10/11 は同じ rank loss 0.1 と recent 比率 0.5 のまま、従来の「recent→old の順に別バッチ」対「各バッチで新旧を混合」を比較します。AI18/19 は rank loss なし・混合バッチのまま、recent 比率 0.5 対 0.25 を比較します。後者の 0.25 設定では、中手数・長手数の予約枠を保ち、残りをランダムな旧データへ渡します。学習履歴の `trainingSample` に設定比率、実際に選ばれたrecent件数、混合バッチ数、ユニーク件数を記録します。バッチ数上限は変わりません。
+
+```bash
+python3.14 tools/compare_ai_same_positions.py --fixture-set all --ai-indices 10,11,18,19
+```
+
+既存のパラメータは自動初期化しません。4体の過去の重み・学習履歴は異なるため、現在の成功率の絶対値だけでサンプラーの因果効果を判断せず、設定変更前後の同一AIの推移も確認してください。厳密な同一初期値実験には、別途チェックポイントを複製して学習を開始する必要があります。
+
 ## AI discoveries のデータ形式
 
 AIが見つけた解法は `exports/ai-discoveries.json` に保存します。rootの `schemaVersion` は現在 `1` で、各成果について `puzzle`、`setup`、`moves`、`moveCount`、`foundAt`、`updatedAt` を検証します。効果解析できる成果には `effectName`、`effectClass`、`effectLabel`、`effectCount`、`orientationCount` も保存します。保存時には `myperms_point` が最大になる対称変換を選び、setupとmovesの両方を同じ向きへ正規化します。

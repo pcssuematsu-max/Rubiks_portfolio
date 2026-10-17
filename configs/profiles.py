@@ -172,13 +172,39 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 (" U "," R2"," x "," F "," D'"," B2"," U'"," F2"," D2"," L "," R'"," z "," U'"," F2"," R'"),
                 (" U'"," R2"," y "," F "," D'"," B2"," U'"," F2"," D2"," L "," R'"," z "," U'"," F2"," R'"),
                 (" U'"," R2"," x "," F "," D'"," B2"," U'"," F'"," D2"," L "," R'"," y "," U'"," F2"," R'"),
+                (" U "," R2"," x2"," F "," D'"," B'"," U'"," F2"," D2"," L "," R'"," z "," U'"," F2"," R'"),
                 (" F "," R'"," F'"," D'"," F "," D "," F2"," U "," B2"," U'"," F2"," U "," B2"," U'"," R "),
+                (" M'"," F "," R'"," F'"," D'"," F "," D "," F2"," U "," B2"," U'"," F2"," U "," B2"," U'"," R "," M "),
+                (" U'", ' R2', " F'", ' R ', ' F ', ' R ', " U'", ' R2', ' F ', ' R ', ' F ', " R'", " F'", ' R ', ' U ', ' R ', ' U '),
+                (" E2"," U2"," B "," U2"," E2"," B'"," L2"," B "," L2"," F'"," L2"," F "," L2"),
+                (" R2"," B'"," R2"," U "," R'"," U'"," B'"," R'"," B "," R'"," B "," R2"),
                 (" F'"," D "," F'"," D'"," F2"," D "," U "," F'"," D'"," F "," U'"," F'"," R "," B "," L'"," B'"," R'"," B "," L "," B'"),
                 (" B2"," R "," B "," R'"," B'"," D'"," R "," D "," B "," U'"," B "," U "," L "," B'"," R "," B "," L'"," B'"," R'"," B "),
                 (" R "," B "," R'"," B'"," D'"," R "," D "," B "," U'"," B "," U "," L "," B'"," R "," B "," L'"," B'"," R'"," B'"),
                 (" E "," B "," E "," B'"," E2"," B'"," E'"," B2"," E "," B2"," E'"," B "," E "," M2"," F'"," E "," F2"," E'"," F'"," M2"),
+                (" D "," R "," U'"," R'"," D'"," M2"," D "," S'"," D2"," S "," D "," M2"," L "," D "," L'"," U'"," L "," D'"," L'"," U "),
                 (" R "," F ") * 7,
                 (" R "," F'") * 7,
+                (" B2"," U2"," L "," U "," L'"," U "," B2"," D'"," R "," D "),
+                (" L2", " F2", " U2", " L'", " U2", " L2", " F2", " L'", " U2", " L2", " U2", " F2", " L'", " F2"),
+                (" D "," F "," R'"," F'"," D'"," F "," D "," R "," D'"),
+                (" R'"," F "," R'"," F'"," D'"," F "," D "," R2"),
+                (" R'"," F'"," R'"," F "," R "," U "," F "," U'"," R "),
+                (" D'"," F "," U "," L "," F "," L'"," F'"," U'"," D "),
+                (" F2"," U'"," F "," U "," R "," U'"," R'"," F "),
+                (" F "," D'"," L'"," F "," L "," D "," R "," F'"," R'"),
+                (" B2"," U "," F'"," U'"," R'"," F'"," R "," F "," B2"),
+                (" L2"," B2"," U2"," L "," U "," L'"," U "," B2"," D'"," R "," D "," L2"),
+                (' B2', ' R ', " D'", " R'", ' B2', ' F2', ' D ', ' F2', " D'", ' F2', ' L2', " U'", " L'", ' U ', " L'"),
+                (" R'", ' F ', " D'", ' B2', " U'", ' L ', ' U ', ' B2', ' F2', " L'", ' F2', ' L ', ' F2', ' D2', ' R ', ' D ', " R'", ' D2', " F'", ' R '),
+                (' U2', ' F ', ' D2', " B'", ' L ', ' B ', ' D2', ' U2', " L'", ' U2', ' L ', ' U2', ' F2', ' R ', ' F ', " R'", ' U2'),
+                (" U'", " L'", ' D2', ' R ', " F'", " R'", ' D2', ' U2', ' F ', ' U2', " F'", ' U2', ' L2', " B'", " L'", ' B ', ' U '),
+                (" L'", ' D2', ' R ', " F'", " R'", ' D2', ' U2', ' F ', ' U2', " F'", ' U2', ' L2', " B'", " L'", ' B '),
+                (" F'", ' U ', ' B2', " D'", ' R ', ' D ', ' B2', ' F2', " R'", ' F2', ' R ', ' F2', ' U2', ' L ', ' U ', " L'", ' F '),
+                (' B2', ' L2', " F'", ' D ', ' F ', ' L2', ' R2', " D'", ' R2', ' D ', ' R2', ' B2', ' U ', ' B ', " U'", " B'"),
+                (' R ', ' F ', " D'", ' B2', " U'", ' L ', ' U ', ' B2', ' F2', " L'", ' F2', ' L ', ' F2', ' D2', ' R ', ' D ', " R'", ' D2', " F'", " R'"),
+
+
             ],
             [
             ],
@@ -304,12 +330,21 @@ def build_experiment_frame_config():
         'steps_to_goal', 'myloss2_pairwise', 'steps_to_goal',
         'myloss2_pairwise', 'myloss2_pairwise',
     ]
-    search2_value_loss_margins = [0.0] * ai_count
+    # Original Search2 compares every state on a segment with its endpoint.
+    # Pairwise Search2 applies the same one-point margin to adjacent states.
+    search2_value_loss_margins = [
+        1.0 if is_search2_ai[index] and search2_value_loss_types[index] in ('myloss', 'myloss2_pairwise')
+        else 0.0
+        for index in range(ai_count)
+    ]
     # The calibrated regression group uses only its direct Huber objective.
     search2_value_target_scales = [1.0] * ai_count
     # Keep the target at -n.  This coefficient only balances the regression
     # loss after route-wise normalization.
-    steps_to_goal_value_loss_weights = [0.0] * 20 + [5.0,5.0,1.0,1.0,1.0]
+    # AI22's long-route replay is populated, but its Value gradient share
+    # fell to roughly 2%.  Increase only this treatment; AI20 remains the
+    # calibrated Linear reference and the target stays at -remaining_steps.
+    steps_to_goal_value_loss_weights = [0.0] * 20 + [5.0,5.0,3.0,1.0,1.0]
     # Keep at most twelve Value states from each near/mid/far remaining-step
     # band in one route.  Policy training still sees the complete route.
     steps_to_goal_states_per_bands = [0] * 20 + [12] * 5
@@ -323,6 +358,21 @@ def build_experiment_frame_config():
     # AI20 is Linear and consumes the complete buffer, so a sampling quota
     # would not change it.  Apply the reservation to Transformer AI22 only.
     steps_to_goal_long_route_min_ratios = [0.0] * 22 + [0.25,0.0,0.0]
+    # Reserve a modest share of Original Transformer replay for complete,
+    # directly solved 31+ routes.  The sampler rejects strong detours and
+    # limits repeats of a single route to avoid teaching one long anecdote.
+    original_long_direct_min_ratios = [
+        0.10 if ai_index in (12,13,14,15,16,17) else 0.0
+        for ai_index in range(ai_count)
+    ]
+    # Reserve a modest part of the existing, diverse direct-route replay
+    # for difficult *starting states*.  This does not add held-out fixtures
+    # to training or change fallback cross-objective routing.  Other AIs
+    # remain controls while the low-success Transformer pair is evaluated.
+    hard_effect_direct_min_ratios = [
+        0.40 if ai_index in (10,11,18,19,22) else 0.0
+        for ai_index in range(ai_count)
+    ]
     # A direct solve that takes over three times its initial scramble length
     # is useful Policy data but a poor absolute remaining-step calibration
     # target.  Keep its policy/pairwise training while excluding it only from
@@ -348,24 +398,18 @@ def build_experiment_frame_config():
         0.10 if ai_index in (10,11) else 0.0
         for ai_index in range(ai_count)
     ]
-    # Search3 budget allocation.  Linear Search3 also exercises the staged
-    # allocator (AI 3/5/7).  AI 10/11 share the rank-loss setting, and AI
-    # 18/19 are its no-rank-loss counterpart; use the first member of each
-    # Transformer pair as the progressive condition.
+    # Hold Search3 search settings constant within the Transformer replay
+    # comparisons; only the sampling recipe changes inside each pair.
     search3_budget_modes = ['fixed'] * ai_count
-    for ai_index in (3,5,7,10,18):
+    for ai_index in (3,5,7,10,11,18,19):
         search3_budget_modes[ai_index] = 'progressive'
     search3_budget_stage_playouts = [(1000,3000,6000)] * ai_count
     search3_budget_confidence_visit_shares = [0.70] * ai_count
-    # The Linear progressive variants otherwise abandon 30+ move cases at
-    # tier 2 too often.  Let a smaller, still positive value improvement
-    # justify the final tier; fixed peers remain the comparison baseline.
+    # The progressive variants otherwise abandon 30+ move cases at tier 2
+    # too often.  Use one threshold across the replay comparison cohort.
     search3_budget_min_improvements = [
-        # Transformer progressive Search3 frequently stopped at tier two as
-        # ``fallback_unpromising`` despite reaching usable depth.  Match the
-        # proven Linear threshold so a modest Value improvement can reach the
-        # final tier; fixed peers remain the same C=1 control.
-        0.02 if ai_index in (3,5,7,10,18) else 0.05
+        # A modest Value improvement may justify spending the final tier.
+        0.02 if ai_index in (3,5,7,10,11,18,19) else 0.05
         for ai_index in range(ai_count)
     ]
     search3_budget_min_playout_depths = [3.0] * ai_count
@@ -377,18 +421,30 @@ def build_experiment_frame_config():
     # the otherwise unresolved deep branches without assuming that a large
     # scramble necessarily needs more work.
     search3_budget_rescue_playouts = [
-        10000 if ai_index in (3,5,7,10,18) else 0
+        10000 if ai_index in (3,5,7,10,11,18,19) else 0
         for ai_index in range(ai_count)
     ]
     search3_budget_rescue_min_visit_share_gains = [
-        0.10 if ai_index in (3,5,7,10,18) else 1.0
+        0.10 if ai_index in (3,5,7,10,11,18,19) else 1.0
         for ai_index in range(ai_count)
     ]
     # Root concentration alone produced many unsuccessful rescue tiers.
     # Require the final tier's Value estimate not to regress as well.
     search3_budget_rescue_min_improvements = [
-        0.0 if ai_index in (3,5,7,10,18) else 1.0
+        0.0 if ai_index in (3,5,7,10,11,18,19) else 1.0
         for ai_index in range(ai_count)
+    ]
+    # Keep the same depth-triggered final tier for all four Transformer
+    # Search3 replay arms; the pre-rescue budget remains 10000.
+    search3_budget_shallow_depth_thresholds = [
+        9.0 if ai_index in (10,11,18,19) else 0.0 for ai_index in range(ai_count)
+    ]
+    search3_budget_shallow_widening_initial_actions = [
+        3 if ai_index in (10,11,18,19) else 0 for ai_index in range(ai_count)
+    ]
+    # Retain the same alternating final-tier widths for each replay arm.
+    search3_budget_shallow_widening_options = [
+        (3,5) if ai_index in (10,11,18,19) else () for ai_index in range(ai_count)
     ]
     # Retain enough of the tree and evaluator cache to make the fixed 10k
     # allocation comparable to a continuous 10k-playout PUCT call.
@@ -431,6 +487,12 @@ def build_experiment_frame_config():
     else:
         transform_idx = ([0,1,2,3,4,5,6,7,24,25] * 2) + [0] * 5
         flip_inside_idx = [False] * ai_count
+
+    if cube_size == 3:
+        # Match the augmentation inside each replay comparison pair.  Other
+        # AIs keep their distinct transforms for the shared data pool.
+        transform_idx[11] = transform_idx[10]
+        transform_idx[19] = transform_idx[18]
 
 
     if puzzle_type == 'megaminx':
@@ -484,6 +546,10 @@ def build_experiment_frame_config():
         bootstrap_datas = build_default_bootstrap_datas(cube_size = cube_size)
         bootstrap_search3_datas = None
 
+    if puzzle_type == 'cube' and cube_size == 3:
+        priority_list[11] = list(priority_list[10])
+        priority_list[19] = list(priority_list[18])
+
     return FrameConfig(
         control_panel_mode="advanced",
         puzzle_type = puzzle_type,
@@ -502,19 +568,18 @@ def build_experiment_frame_config():
         lr_hs = [0.99] * ai_count,
         out_cs = [1.0] * ai_count,
         # C=0.05 consistently left trees shallow while consuming budget.
-        # Progressive Linear runs (3/5/7) and Transformer runs (10/18) now
-        # share the low-C, widening treatment.  Their fixed counterparts
-        # retain the historical C schedule as controls.
-        search3_cs = [0,0,0.5,0.5,1.0,0.5,5,0.5,0,0] + [0.5,1.0] + [1.0] * 6 + [0.5,1.0] + [0.0] * 5,
-        search3_c_depth_maxes = [0,0,0.5,0.5,5.0,0.5,5,0.5,0,0] + [0.5,2.0] + [2.0] * 6 + [0.5,2.0] + [0.0] * 5,
+        # Search3 replay arms 10/11/18/19 share the same C schedule so it
+        # does not confound their sampler comparisons.
+        search3_cs = [0,0,0.5,0.5,1.0,0.5,5,0.5,0,0] + [0.5,0.5] + [1.0] * 6 + [0.5,0.5] + [0.0] * 5,
+        search3_c_depth_maxes = [0,0,0.5,0.5,5.0,0.5,5,0.5,0,0] + [0.5,0.5] + [2.0] * 6 + [0.5,0.5] + [0.0] * 5,
         search3_c_depth_start_depths = [0] * 10 + [4] * 10 + [0] * 5,
         search3_c_depth_ramp_depths = [8] * 10 + [6] * 10 + [0] * 5,
         # Newly reached nodes used to fan out across almost every action, so
         # their visit counts rarely reached a deep child.  Progressive Linear
         # and Transformer variants start from the top five policy moves and
-        # widen gradually; fixed peers remain the all-action control.
-        search3_widening_initial_actions = [0,0,0,5,0,5,0,5,0,0] + [5,0] + [0] * 6 + [5,0] + [0] * 5,
-        search3_widening_visit_growths = [0.0,0.0,0.0,0.40,0.0,0.40,0.0,0.40,0.0,0.0] + [0.40,0.0] + [0.0] * 6 + [0.40,0.0] + [0.0] * 5,
+        # widen gradually; all four replay arms use the same setting.
+        search3_widening_initial_actions = [0,0,0,5,0,5,0,5,0,0] + [5,5] + [0] * 6 + [5,5] + [0] * 5,
+        search3_widening_visit_growths = [0.0,0.0,0.0,0.40,0.0,0.40,0.0,0.40,0.0,0.0] + [0.40,0.40] + [0.0] * 6 + [0.40,0.40] + [0.0] * 5,
         search3_budget_modes = search3_budget_modes,
         search3_budget_stage_playouts = search3_budget_stage_playouts,
         search3_budget_confidence_visit_shares = search3_budget_confidence_visit_shares,
@@ -524,16 +589,18 @@ def build_experiment_frame_config():
         search3_budget_rescue_playouts = search3_budget_rescue_playouts,
         search3_budget_rescue_min_visit_share_gains = search3_budget_rescue_min_visit_share_gains,
         search3_budget_rescue_min_improvements = search3_budget_rescue_min_improvements,
+        search3_budget_shallow_depth_thresholds = search3_budget_shallow_depth_thresholds,
+        search3_budget_shallow_widening_initial_actions = search3_budget_shallow_widening_initial_actions,
+        search3_budget_shallow_widening_options = search3_budget_shallow_widening_options,
         search3_max_node_caches = search3_max_node_caches,
         search3_max_prediction_caches = search3_max_prediction_caches,
         search2_max_frontiers = [30000] * ai_count,
         # One correct calibrated steps_to_goal move should increase Value by
         # roughly one.  A 0.75 margin accepts that progress despite ordinary
         # prediction noise; rank-based objectives retain the proven 1.0 gate.
-        # AI24's pairwise run is materially stronger with a permissive skip
-        # gate.  Give its otherwise matching AI23 peer the same gate, while
-        # retaining the Linear AI21 comparison at 1.0.
-        search2_skip_differences = [1.0,5.0] + [1.0] * 6 + [10.0,1000.0] + [1.0,1.0,1.0,1.0,10.0,10.0,1000.0,1000.0,1.0,1.0] + [1.0,1.0,1.0,1000.0,1000.0],
+        # Compare the pairwise skip gate within the Transformer group:
+        # AI23 uses a one-point gate; AI24 keeps the permissive 1000 control.
+        search2_skip_differences = [1.0,10.0] + [1.0] * 6 + [100.0,1000.0] + [1.0,1.0,1.0,1.0,10.0,10.0,1000.0,1000.0,1.0,1.0] + [1.0,1.0,1.0,1.0,1000.0],
         search2_torch_batch_sizes = [
             64 if original_transformer_attention[ai_index] else 100
             for ai_index in range(ai_count)
@@ -545,6 +612,8 @@ def build_experiment_frame_config():
         steps_to_goal_states_per_bands = steps_to_goal_states_per_bands,
         steps_to_goal_replay_stratified_ratios = steps_to_goal_replay_stratified_ratios,
         steps_to_goal_long_route_min_ratios = steps_to_goal_long_route_min_ratios,
+        original_long_direct_min_ratios = original_long_direct_min_ratios,
+        hard_effect_direct_min_ratios = hard_effect_direct_min_ratios,
         steps_to_goal_value_max_route_efficiencies = steps_to_goal_value_max_route_efficiencies,
         steps_to_goal_value_batch_band_max_copies = steps_to_goal_value_batch_band_max_copies,
         pairwise_fallback_max_ratios = pairwise_fallback_max_ratios,
@@ -581,6 +650,13 @@ def build_experiment_frame_config():
         ],
         original_transformer_attention = original_transformer_attention,
         original_transformer_attention_dims = [64] * ai_count,
+        original_transformer_linear_skips = list(original_transformer_attention),
+        # C in Var(WSkip1) = C / input_width.  C=0.125 makes the direct
+        # branch roughly twice the attention branch on initial cube states;
+        # C=0.04 is a useful approximately equal-output-range comparison.
+        original_transformer_linear_skip_variances = [
+            0.125 if enabled else 0.0 for enabled in original_transformer_attention
+        ],
         original_transformer_attention_token_modes = ['piece'] * ai_count,
         original_piece_attention_backward_chunk_sizes = [32] * ai_count,
         original_train_batch_sizes = [
@@ -596,8 +672,12 @@ def build_experiment_frame_config():
             for ai_index in range(ai_count)
         ],
         original_train_recent_ratios = [
-            (0.25 if ai_index in (22,23,24)
+            (0.25 if ai_index in (19,22,23,24)
              else (0.5 if original_transformer_attention[ai_index] else 0.0))
+            for ai_index in range(ai_count)
+        ],
+        original_train_batch_mix_modes = [
+            'mixed' if ai_index in (11,18,19) else 'ordered'
             for ai_index in range(ai_count)
         ],
         # Keep a small base of reliable local trajectories while replaying

@@ -973,6 +973,8 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"steps_to_goal: {self._steps_to_goal_regression_text(latest)}\n"
                 f"勾配: {self._gradient_metrics_text(latest)}\n"
                 f"固定検証: {self._fixed_validation_text(latest)}\n"
+                f"固定局面Effect: {self._fixed_validation_effect_text(latest)}\n"
+                f"Transformer経路: {self._transformer_branch_text(latest)}\n"
                 f"Search3 深さ別: {self._search3_depth_summary_text(depth_bands)}\n"
                 f"局面Effect別: {self._setup_effect_summary_text(effect_bands)}\n"
                 f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
@@ -1003,6 +1005,12 @@ class LearningHistoryDialog(Tk.Toplevel):
             if record.get('fixedValidation') is not None:
                 lines.append(f"  固定検証: {self._fixed_validation_text(record)}")
                 lines.append(f"    Value分布: {self._fixed_validation_calibration_text(record)}")
+                if (record['fixedValidation'] or {}).get('byEffect'):
+                    lines.append(f"    固定局面Effect: {self._fixed_validation_effect_text(record)}")
+                if (record['fixedValidation'] or {}).get('byEffectChoices'):
+                    lines.append(f"    正解手vs他候補: {self._fixed_validation_effect_choices_text(record)}")
+                if (record['fixedValidation'] or {}).get('transformerBranches'):
+                    lines.append(f"    Transformer経路: {self._transformer_branch_text(record)}")
             lines.append(
                 f"  lr={self._number(lr['base'])} lr_C={self._number(lr['lrC'])} "
                 f"momentum={self._number(lr['momentumV'])}/{self._number(lr['momentumH'])}  "
@@ -1283,6 +1291,22 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"{sample.get('stepsToGoalLongRouteRequiredItemCount', '--')}/"
                 f"{sample.get('stepsToGoalLongRouteEligibleItemCount', '--')}"
             )
+        if sample.get('originalLongDirectMinRatio', 0.0):
+            long_route_text += (
+                f"  Original直接長経路={self._rate(sample.get('originalLongDirectMinRatio'))}"
+                f" selected/required/eligible="
+                f"{sample.get('originalLongDirectSelectedItemCount', '--')}/"
+                f"{sample.get('originalLongDirectRequiredItemCount', '--')}/"
+                f"{sample.get('originalLongDirectEligibleItemCount', '--')}"
+            )
+        if sample.get('hardEffectDirectMinRatio', 0.0):
+            long_route_text += (
+                f"  高Effect直接経路={self._rate(sample.get('hardEffectDirectMinRatio'))}"
+                f" selected/before/required="
+                f"{sample.get('hardEffectDirectSelectedItemCount', '--')}/"
+                f"{sample.get('hardEffectDirectSelectedBeforeItemCount', '--')}/"
+                f"{sample.get('hardEffectDirectRequiredItemCount', '--')}"
+            )
         minimum = sample.get('longSequenceMinSteps', 0)
         if not minimum:
             return prefix + stratified_text + long_route_text + '  長手数replay=off'
@@ -1484,6 +1508,8 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"drop[src/detour/dup]={selection.get('sourceExcludedRouteCount', '--')}/"
             f"{selection.get('detourExcludedRouteCount', '--')}/"
             f"{selection.get('longerDuplicateExcludedRouteCount', '--')} "
+            f"中間局面衝突/除外={selection.get('conflictingIntermediateStateCount', '--')}/"
+            f"{selection.get('discardedNonshortestStateCount', '--')} "
             f"state={self._steps_to_goal_band_text(selection.get('selectedStateBands'))}"
         )
 
@@ -1503,18 +1529,37 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"Value順位相関={self._number(validation.get('valueRankCorrelation'))}",
         ]
         if validation.get('valueMae') is not None:
-            value_parts.append(f"Value MAE={self._number(validation.get('valueMae'))}")
+            label = '逆経路MAE' if record.get('search2ValueLossType') == 'steps_to_goal' else 'Value MAE'
+            value_parts.append(f"{label}={self._number(validation.get('valueMae'))}")
+        if validation.get('valueSignedError') is not None:
+            label = '逆経路偏り' if record.get('search2ValueLossType') == 'steps_to_goal' else 'Value偏り'
+            value_parts.append(f"{label}={self._number(validation.get('valueSignedError'))}")
         if validation.get('valuePathCrossEntropy') is not None:
             value_parts.append(f"Value path CE={self._number(validation.get('valuePathCrossEntropy'))}")
         steps_bands = validation.get('stepsToGoalByRemainingSteps') or {}
+        exact = validation.get('stepsToGoalExactDistance') or {}
+        if exact:
+            value_parts.append(
+                '確定距離MAE=' +
+                f"完成:{self._number(exact.get('goalValueMae'))}/" +
+                f"1手:{self._number(exact.get('oneMoveValueMae'))}"
+            )
         if steps_bands:
             value_parts.append(
-                'steps MAE=' + ', '.join(
+                '逆経路帯MAE=' + ', '.join(
                     f'{label}:{self._number((steps_bands.get(label) or {}).get("valueMae"))}'
                     for label in ('0-10','11-30','31+')
                     if label in steps_bands
                 )
             )
+            if any((steps_bands.get(label) or {}).get('valueSignedError') is not None for label in steps_bands):
+                value_parts.append(
+                    '逆経路帯偏り=' + ', '.join(
+                        f'{label}:{self._number((steps_bands.get(label) or {}).get("valueSignedError"))}'
+                        for label in ('0-10','11-30','31+')
+                        if label in steps_bands
+                    )
+                )
         long_bucket = validation.get('long40Plus') or {}
         if isinstance(long_bucket, dict):
             value_parts.append(
@@ -1553,6 +1598,49 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"Pearson={self._number(validation.get('valuePearsonCorrelation'))}"
         )
 
+    def _fixed_validation_effect_text(self, record):
+        bands = (record.get('fixedValidation') or {}).get('byEffect') or {}
+        if not bands:
+            return '（次回の学習から記録）'
+        return '  '.join(
+            f"E{label}: n[Policy/Value]={bands[label].get('stateCount', 0)}/"
+            f"{bands[label].get('valueStepCount', 0)} "
+            f"正解手順位={self._number(bands[label].get('policyTargetRankMean'))} "
+            f"Value上昇={self._rate(bands[label].get('valueImprovementRate'))} "
+            f"生ValueΔ={self._number(bands[label].get('valueDeltaMean'))}"
+            for label in ('0-7','8-13','14-19','20+') if label in bands
+        )
+
+    def _fixed_validation_effect_choices_text(self, record):
+        bands = (record.get('fixedValidation') or {}).get('byEffectChoices') or {}
+        return '  '.join(
+            f"E{label}: n={bands[label].get('sampleCount', 0)} "
+            f"Value正解手順位={self._number(bands[label].get('valueTargetRankMean'))} "
+            f"Value1位={self._rate(bands[label].get('valueTop1Accuracy'))} "
+            f"正解-最良他候補={self._number(bands[label].get('valueCorrectVsBestOtherDeltaMean'))}"
+            for label in ('0-7','8-13','14-19','20+') if label in bands
+        )
+
+    def _transformer_branch_text(self, record):
+        probe = (record.get('fixedValidation') or {}).get('transformerBranches') or {}
+        if not probe:
+            return '（Linear単独、または次回の学習から記録）'
+        full = probe.get('full') or {}
+        no_attention = probe.get('withoutAttention') or {}
+        no_linear = probe.get('withoutLinear') or {}
+        return (
+            f"n={probe.get('sampleCount', '--')} "
+            f"RMS[attention/Linear]={self._number(probe.get('attentionRms'))}/"
+            f"{self._number(probe.get('linearRms'))} "
+            f"正解手順位[両方/attention無/Linear無]="
+            f"{self._number(full.get('policyTargetRankMean'))}/"
+            f"{self._number(no_attention.get('policyTargetRankMean'))}/"
+            f"{self._number(no_linear.get('policyTargetRankMean'))} "
+            f"Value順位={self._number(full.get('valueRankCorrelation'))}/"
+            f"{self._number(no_attention.get('valueRankCorrelation'))}/"
+            f"{self._number(no_linear.get('valueRankCorrelation'))}"
+        )
+
     def _search3_depth_summary_text(self, bands):
         active = [band for band in bands if band.get('runCount', 0) > 0]
         if not active:
@@ -1576,13 +1664,37 @@ class LearningHistoryDialog(Tk.Toplevel):
         return '  '.join(self._setup_effect_band_text(band) for band in active)
 
     def _setup_effect_band_text(self, band):
-        return (
+        text = (
             f"E{band.get('label', '?')}: direct="
             f"{band.get('directSearchSuccessCount', 0)}/{band.get('classifiedRunCount', 0)}"
             f"({self._rate(band.get('directSearchSuccessRate'))}) "
             f"orient={self._number(band.get('averageOrientationCount'))} "
             f"reduced={self._number(band.get('averageReducedMoveCount'))}"
         )
+        if band.get('directFirstMoveVisitShare') is not None or band.get('failedFirstMoveVisitShare') is not None:
+            text += (
+                f"  最終段初手訪問比[直接成功/失敗]="
+                f"{self._rate(band.get('directFirstMoveVisitShare'))}/"
+                f"{self._rate(band.get('failedFirstMoveVisitShare'))}"
+                f"(n={band.get('directFirstMoveVisitCount', 0)}/"
+                f"{band.get('failedFirstMoveVisitCount', 0)})"
+            )
+        if band.get('directFirstMoveValueDelta') is not None or band.get('failedFirstMoveValueDelta') is not None:
+            text += (
+                f"  初手Value上昇率[成功/失敗]="
+                f"{self._rate(band.get('directFirstMoveValueIncreaseRate'))}/"
+                f"{self._rate(band.get('failedFirstMoveValueIncreaseRate'))}"
+                f"  生ValueΔ={self._number(band.get('directFirstMoveValueDelta'))}/"
+                f"{self._number(band.get('failedFirstMoveValueDelta'))}"
+            )
+        if band.get('fallbackFirstMovePolicyRank') is not None:
+            text += (
+                f"  fallback初手[Policy順位/累積訪問比]="
+                f"{self._number(band.get('fallbackFirstMovePolicyRank'))}/"
+                f"{self._rate(band.get('fallbackFirstMoveVisitShare'))}"
+                f"(n={band.get('fallbackFirstMoveVisitCount', 0)})"
+            )
+        return text
 
     @staticmethod
     def _latest_fixed_validation_fixture_id(records):

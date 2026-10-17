@@ -183,6 +183,8 @@ class Search3Engine:
         keeps a small policy-prior set first and grows it with ``sqrt(visits)``.
         A zero initial count preserves the legacy all-actions behavior.
         """
+        if node is getattr(self, 'root_node', None) and getattr(self.ai, 'search3_widening_root_all_actions', False):
+            return 0
         initial = max(0, int(getattr(self.ai, 'search3_widening_initial_actions', 0)))
         if initial == 0:
             return 0

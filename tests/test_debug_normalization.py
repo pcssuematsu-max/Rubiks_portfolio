@@ -100,6 +100,32 @@ class DebugNormalizationTests(unittest.TestCase):
         self.assertEqual(summary['target_variances']['W1'], 1.0)
         self.assertEqual(summary['target_variances']['WQ1'], 0.0004)
 
+    def test_transformer_linear_branch_uses_its_configured_variance(self):
+        transformer = _TransformerNormalizeAI()
+        transformer.transformer_linear_skip_variance = 0.125
+        transformer.params['WSkip1'] = np.asarray(((-2.0, 2.0),), dtype='f')
+        transformer.params['BSkip1'] = np.asarray((4.0,), dtype='f')
+        transformer.v['WSkip1'] = np.ones((1, 2), dtype='f')
+        transformer.v['BSkip1'] = np.ones((1,), dtype='f')
+
+        summary = DebugAnalysisManager(_NormalizeFrame(transformer)).normalize(0)
+
+        self.assertEqual(summary['target_variances']['WSkip1'], 0.125)
+        self.assertAlmostEqual(float(np.var(transformer.params['WSkip1']) * 2), 0.125)
+        self.assertTrue(np.all(transformer.v['WSkip1'] == 0))
+
+    def test_zero_variance_mode_skips_linear_branch_normalization(self):
+        transformer = _TransformerNormalizeAI()
+        transformer.transformer_linear_skip_variance = 0.0
+        transformer.params['WSkip1'] = np.asarray(((-2.0, 2.0),), dtype='f')
+        transformer.params['BSkip1'] = np.asarray((4.0,), dtype='f')
+        transformer.v['WSkip1'] = np.ones((1, 2), dtype='f')
+
+        summary = DebugAnalysisManager(_NormalizeFrame(transformer)).normalize(0)
+
+        np.testing.assert_array_equal(transformer.params['WSkip1'], [[-2.0, 2.0]])
+        self.assertEqual(summary['skipped_rows']['WSkip1'], 1)
+
 
 if __name__ == '__main__':
     unittest.main()

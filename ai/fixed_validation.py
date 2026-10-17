@@ -13,8 +13,10 @@ import random
 
 import numpy as np
 
+from core.experiment_log import SETUP_EFFECT_BANDS, setup_effect_metrics
 
-FIXTURE_ID = "canonical-inverse-v2"
+
+FIXTURE_ID = "canonical-inverse-v3"
 # Keep the original short and medium probes, then add two long held-out
 # trajectories.  They are reported separately so a gain on easy positions
 # cannot conceal a plateau at 40+ moves.
@@ -29,7 +31,8 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
     Policy labels are the next moves of one canonical inverse solution.  A
     Rubik's state can have multiple equally valid moves, so top-k is a stable
     proxy rather than a literal solve-rate.  Value quality is compared against
-    the known remaining distance.  Standard Search2 values are ordinal within
+    the canonical inverse-route length, not necessarily the shortest distance.
+    Standard Search2 values are ordinal within
     a path, while ``steps_to_goal`` is calibrated directly in move units and
     Search3 values are sigmoid probabilities; their calibration metrics are
     kept separate.
@@ -37,8 +40,14 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
     cube = ai.cube
     original_state = cube.state.copy()
     try:
-        states, policy_targets, value_targets, remaining_steps, path_slices, length_slices = _fixture_tensors(ai)
+        states, policy_targets, value_targets, remaining_steps, path_slices, length_slices, effects, snapshots = _fixture_tensors(ai)
         outputs = ai.predict(states, policy = True, value = True, loss = False, retain_cache = False)
+        branch_probe = _transformer_branch_probe(ai, states, outputs, policy_targets, value_targets, path_slices)
+        choice_probe = _effect_choice_metrics(ai, snapshots, policy_targets, effects)
+        exact_distance = (
+            _exact_distance_anchor_metrics(ai)
+            if getattr(ai, "search2_value_loss_type", "") == "steps_to_goal" else None
+        )
     finally:
         cube.state[:] = original_state
 
@@ -92,11 +101,46 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
             _relative_path_slices(path_slices, long_slice),
         ),
     }
+    if effects is not None:
+        metrics["byEffect"] = _effect_decision_metrics(
+            policy_logits, raw_values, policy_targets, path_slices, effects,
+        )
+    if choice_probe is not None:
+        metrics["byEffectChoices"] = choice_probe
+    if branch_probe is not None:
+        metrics["transformerBranches"] = branch_probe
     if getattr(ai, "search2_value_loss_type", "") == "steps_to_goal":
+        metrics["stepsToGoalExactDistance"] = exact_distance
         metrics["stepsToGoalByRemainingSteps"] = _steps_to_goal_remaining_step_metrics(
             ai, policy_logits, raw_values, policy_targets, value_targets, remaining_steps,
         )
     return metrics
+
+
+def _exact_distance_anchor_metrics(ai):
+    """Evaluate states with provable distance zero or one from the goal."""
+    cube = ai.cube
+    cube.reset()
+    columns = [cube.makedata()]
+    for move in cube.move_keys:
+        cube.reset()
+        cube.make_move(move)
+        if not cube.is_perfect():
+            columns.append(cube.makedata())
+    outputs = ai.predict(
+        np.asarray(columns,dtype = "f").T,
+        policy = False,value = True,loss = False,retain_cache = False,
+    )
+    predicted = np.asarray(outputs[-1],dtype = "f").reshape(-1)
+    scale = float(getattr(ai,"search2_value_target_scale",1.0))
+    one_move_error = predicted[1:] + scale
+    return {
+        "stateCount": int(predicted.size),
+        "goalValueError": float(predicted[0]),
+        "goalValueMae": float(abs(predicted[0])),
+        "oneMoveValueBias": float(np.mean(one_move_error)),
+        "oneMoveValueMae": float(np.mean(np.abs(one_move_error))),
+    }
 
 
 def _steps_to_goal_remaining_step_metrics(ai, policy_logits, raw_values, policy_targets, value_targets, remaining_steps):
@@ -145,7 +189,10 @@ def _quality_metrics(ai, policy_logits, raw_values, policy_targets, value_target
         metrics["valueMae"] = float(np.mean(np.abs(predicted_probability - value_targets)))
         metrics["valueBce"] = _binary_cross_entropy(predicted_probability, value_targets)
     elif getattr(ai, "search2_value_loss_type", "") == "steps_to_goal":
-        metrics["valueMae"] = float(np.mean(np.abs(raw_values - value_targets)))
+        errors = raw_values - value_targets
+        metrics["valueMae"] = float(np.mean(np.abs(errors)))
+        metrics["valueSignedError"] = float(np.mean(errors))
+        metrics["valueRmse"] = float(np.sqrt(np.mean(errors ** 2)))
         metrics["valuePathCrossEntropy"] = None
     else:
         metrics["valuePathCrossEntropy"] = _search2_path_cross_entropy(
@@ -163,6 +210,8 @@ def _fixture_tensors(ai):
     policy_targets = []
     value_targets = []
     remaining_steps_list = []
+    effect_counts = []
+    snapshots = []
     path_slices = []
     length_slices = {}
     gamma = float(getattr(ai, "value_target_gamma", (1 / 2) ** (1 / 20)))
@@ -179,7 +228,15 @@ def _fixture_tensors(ai):
             cube.scramble(0, scramble)
             for move_index, move in enumerate(solution):
                 state_columns.append(cube.makedata())
+                snapshots.append(cube.state.copy())
                 policy_targets.append(cube.key_to_num[move])
+                # The inverse of the remaining solution reconstructs this
+                # state from the goal; it never enters replay or training.
+                effect = setup_effect_metrics(
+                    "cube-3x3", getattr(ai, "cube_size", 3),
+                    cube.invert_moves(solution[move_index:]),
+                )
+                effect_counts.append(None if effect is None else effect["movedPieceCount"])
                 remaining_steps = len(solution) - move_index
                 remaining_steps_list.append(remaining_steps)
                 value_targets.append(
@@ -197,7 +254,134 @@ def _fixture_tensors(ai):
         np.asarray(remaining_steps_list, dtype = int),
         tuple(path_slices),
         length_slices,
+        None if any(effect is None for effect in effect_counts) else np.asarray(effect_counts, dtype = int),
+        tuple(snapshots),
     )
+
+
+def _effect_decision_metrics(policy_logits, raw_values, policy_targets, path_slices, effects):
+    """Measure nonterminal raw-Value progress, grouped by net piece effect."""
+    columns = np.arange(policy_targets.size)
+    ranks = np.argsort(np.argsort(-policy_logits, axis = 0), axis = 0)
+    target_ranks = ranks[policy_targets, columns] + 1
+    next_values = np.empty_like(raw_values)
+    nonterminal = np.zeros(raw_values.size,dtype = bool)
+    for path_slice in path_slices:
+        next_values[path_slice.start:path_slice.stop - 1] = raw_values[path_slice.start + 1:path_slice.stop]
+        nonterminal[path_slice.start:path_slice.stop - 1] = True
+    deltas = next_values - raw_values
+    result = {}
+    for minimum, maximum, label in SETUP_EFFECT_BANDS:
+        mask = effects >= minimum
+        if maximum is not None:
+            mask &= effects <= maximum
+        count = int(np.count_nonzero(mask))
+        if count:
+            value_mask = mask & nonterminal
+            value_count = int(np.count_nonzero(value_mask))
+            result[label] = {
+                "stateCount": count,
+                "valueStepCount": value_count,
+                "policyTargetRankMean": float(np.mean(target_ranks[mask])),
+                "policyTop1Accuracy": float(np.mean(target_ranks[mask] == 1)),
+                "valueDeltaMean": float(np.mean(deltas[value_mask])) if value_count else None,
+                "valueImprovementRate": float(np.mean(deltas[value_mask] > 0.0)) if value_count else None,
+            }
+    return result
+
+
+def _effect_choice_metrics(ai, snapshots, policy_targets, effects):
+    """Check whether Value prefers the held-out correct successor to siblings.
+
+    Four deterministic positions per Effect band keep this much cheaper than
+    expanding all 540 fixture states.  No successor enters replay or training.
+    """
+    if effects is None or getattr(ai, 'cube_size', 3) != 3:
+        return None
+    selected = {}
+    for minimum, maximum, label in SETUP_EFFECT_BANDS:
+        mask = effects >= minimum
+        if maximum is not None:
+            mask &= effects <= maximum
+        candidates = np.flatnonzero(mask)
+        if candidates.size:
+            positions = np.linspace(0,candidates.size - 1,min(4,candidates.size),dtype=int)
+            selected[label] = [int(candidates[position]) for position in positions]
+    if not selected:
+        return None
+    cube = ai.cube
+    move_keys = tuple(cube.move_keys)
+    columns = []
+    targets = []
+    labels = []
+    for label, indices in selected.items():
+        for index in indices:
+            snapshot = snapshots[index]
+            for move in move_keys:
+                cube.state[:] = snapshot
+                cube.make_move(move)
+                columns.append(cube.makedata())
+            targets.append(int(policy_targets[index]))
+            labels.append(label)
+    raw = []
+    for start in range(0,len(columns),64):
+        batch = np.asarray(columns[start:start + 64],dtype='f').T
+        raw.extend(np.asarray(ai.predict(
+            batch,policy=False,value=True,loss=False,retain_cache=False,
+        ),dtype='f').reshape(-1).tolist())
+    values = np.asarray(raw,dtype='f').reshape(len(targets),len(move_keys))
+    result = {}
+    for label in selected:
+        ranks = []
+        margins = []
+        for row_index, row_label in enumerate(labels):
+            if row_label != label:
+                continue
+            target = targets[row_index]
+            correct = values[row_index,target]
+            other = np.delete(values[row_index],target)
+            ranks.append(int(np.count_nonzero(other > correct) + 1))
+            margins.append(float(correct - np.max(other)))
+        result[label] = {
+            'sampleCount': len(ranks),
+            'valueTargetRankMean': float(np.mean(ranks)),
+            'valueTop1Accuracy': float(np.mean(np.asarray(ranks) == 1)),
+            'valueCorrectVsBestOtherDeltaMean': float(np.mean(margins)),
+        }
+    return result
+
+
+def _transformer_branch_probe(ai, states, full_outputs, policy_targets, value_targets, path_slices):
+    """Small, read-only ablations of the attention and direct Linear branches."""
+    evaluator = getattr(ai, "diagnose_first_layer_branches", None)
+    if not callable(evaluator):
+        return None
+    selected = sorted({index for path in path_slices for index in (
+        path.start, (path.start + path.stop - 1) // 2, path.stop - 1,
+    )})
+    indices = np.asarray(selected, dtype = int)
+    probe = evaluator(states[:, indices])
+    if probe is None:
+        return None
+    result = {key: probe[key] for key in (
+        "attentionRms", "linearRms", "linearToAttentionRms", "preactivationCosine",
+    )}
+    result["sampleCount"] = len(selected)
+    for label, outputs in (
+        ("full", np.asarray(full_outputs)[:, indices]),
+        ("withoutAttention", probe["withoutAttention"]),
+        ("withoutLinear", probe["withoutLinear"]),
+    ):
+        logits = np.asarray(outputs[:-1], dtype = "f")
+        values = np.asarray(outputs[-1], dtype = "f").reshape(-1)
+        ranks = np.argsort(np.argsort(-logits, axis = 0), axis = 0)
+        target_ranks = ranks[policy_targets[indices], np.arange(len(indices))] + 1
+        result[label] = {
+            "policyTargetRankMean": float(np.mean(target_ranks)),
+            "policyTop1Accuracy": float(np.mean(target_ranks == 1)),
+            "valueRankCorrelation": _spearman(values, value_targets[indices]),
+        }
+    return result
 
 
 def _relative_path_slices(path_slices, outer_slice):

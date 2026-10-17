@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 from ai.rubiks_ai import Rubiks_3_AI
+from cube.search3_engine import Search3Engine
 from ai.transformer_variance import (
     RESIDUAL_BRANCH_TARGET_VARIANCE,
     TRANSFORMER_INPUT_TARGET_VARIANCE,
@@ -12,6 +13,25 @@ from ai.transformer_variance import (
 
 
 class TransformerInitializationTests(unittest.TestCase):
+    def test_model_type_follows_transformer_attention_configuration(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.use_transformer_attention = False
+        self.assertFalse(ai.is_transformer)
+        ai.use_transformer_attention = True
+        self.assertTrue(ai.is_transformer)
+
+    def test_transformer_budget_result_uses_value_bounded_prefix(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.use_transformer_attention = True
+        engine = Search3Engine.__new__(Search3Engine)
+        engine.ai = ai
+        engine._value_trace_for_moves = lambda root, moves: [root, 0.1, 0.4, 0.3]
+        moves = ('R', 'U', 'F')
+
+        self.assertEqual(engine._bounded_budget_moves(0.2, moves), ('R', 'U'))
+        ai.use_transformer_attention = False
+        self.assertEqual(engine._bounded_budget_moves(0.2, moves), moves)
+
     def test_piece_transformer_initialization_matches_normalization_targets(self):
         random_state = np.random.get_state()
         np.random.seed(12345)

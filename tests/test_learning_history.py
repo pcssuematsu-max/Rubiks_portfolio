@@ -43,6 +43,11 @@ class _FakeAI:
             'originalBatchCount': 50,
             'selectedBatchCount': 10,
             'recentBatchCount': 5,
+            'batchMixMode': 'mixed',
+            'recentReplayRatio': 0.5,
+            'recentWindowSelectedItemCount': 8,
+            'mixedBatchCount': 10,
+            'selectedUniqueItemCount': 20,
             'shortSequenceMaxSteps': 11,
             'shortEligibleItemCount': 31,
             'shortSelectedItemCount': 4,
@@ -71,6 +76,19 @@ class _FakeAI:
             'longSelectedRatio': 0.35,
             'directSearchSelectedItemCount': 9,
             'fallbackSelectedItemCount': 11,
+            'fallbackSelectedRatio': 0.55,
+            'pairwiseFallbackMaxRatio': 0.25,
+            'originalLongDirectEligibleItemCount': 17,
+            'originalLongDirectRequiredItemCount': 3,
+            'originalLongDirectSelectedItemCount': 4,
+            'originalLongDirectOversampledItemCount': 1,
+            'originalLongDirectMinRatio': 0.1,
+            'hardEffectDirectMinRatio': 0.25,
+            'hardEffectDirectEligibleItemCount': 5,
+            'hardEffectDirectRequiredItemCount': 5,
+            'hardEffectDirectSelectedBeforeItemCount': 3,
+            'hardEffectDirectSelectedItemCount': 5,
+            'hardEffectDirectOversampledItemCount': 2,
         },
     }
 
@@ -117,6 +135,8 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['learningRate']['base'], 0.001)
             self.assertEqual(saved['updateScales']['value'], 2.0)
             self.assertEqual(saved['trainingSample']['longReservedItemCount'], 6)
+            self.assertEqual(saved['trainingSample']['batchMixMode'], 'mixed')
+            self.assertEqual(saved['trainingSample']['mixedBatchCount'], 10)
             self.assertEqual(saved['trainingSample']['longSelectedStepMean'], 29.5)
             self.assertEqual(saved['trainingSample']['longReplayRatio'], 0.25)
             self.assertEqual(saved['trainingSample']['mediumSelectedItemCount'], 5)
@@ -126,6 +146,13 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['trainingSample']['longSelectedRatio'], 0.35)
             self.assertEqual(saved['trainingSample']['directSearchSelectedItemCount'], 9)
             self.assertEqual(saved['trainingSample']['fallbackSelectedItemCount'], 11)
+            self.assertEqual(saved['trainingSample']['fallbackSelectedRatio'], 0.55)
+            self.assertEqual(saved['trainingSample']['pairwiseFallbackMaxRatio'], 0.25)
+            self.assertEqual(saved['trainingSample']['originalLongDirectEligibleItemCount'], 17)
+            self.assertEqual(saved['trainingSample']['originalLongDirectRequiredItemCount'], 3)
+            self.assertEqual(saved['trainingSample']['originalLongDirectSelectedItemCount'], 4)
+            self.assertEqual(saved['trainingSample']['originalLongDirectOversampledItemCount'], 1)
+            self.assertEqual(saved['trainingSample']['originalLongDirectMinRatio'], 0.1)
             self.assertEqual(saved['search3RankLossMix'], 0.05)
 
     def test_writes_multiple_records_with_one_history_operation(self):
@@ -155,6 +182,8 @@ class LearningHistoryTests(unittest.TestCase):
                     'candidateRouteCount': 6, 'selectedRouteCount': 4,
                     'sourceExcludedRouteCount': 1, 'detourExcludedRouteCount': 1,
                     'longerDuplicateExcludedRouteCount': 0, 'oversampledStateCount': 3,
+                    'conflictingIntermediateStateCount': 2,
+                    'discardedNonshortestStateCount': 1,
                     'candidateStateBands': {'0-10': 5, '11-30': 4, '31+': 3},
                     'selectedStateBands': {'0-10': 4, '11-30': 4, '31+': 4},
                 },
@@ -175,6 +204,8 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['signedErrorMean'], 3.0)
             self.assertEqual(saved['lossWeight'], 1.0)
             self.assertEqual(saved['valueSelection']['detourExcludedRouteCount'], 1)
+            self.assertEqual(saved['valueSelection']['conflictingIntermediateStateCount'], 2)
+            self.assertEqual(saved['valueSelection']['discardedNonshortestStateCount'], 1)
             self.assertEqual(saved['origins']['direct_search']['stateCount'], 12)
 
     def test_writes_steps_to_goal_replay_diagnostics_when_available(self):
@@ -271,6 +302,8 @@ class LearningHistoryTests(unittest.TestCase):
                 'valueTargetMean': 0.3,
                 'valueTargetStd': 0.1,
                 'valueMae': 0.2,
+                'valueSignedError': -0.1,
+                'valueRmse': 0.3,
                 'valueBce': 0.7,
                 'valuePathCrossEntropy': None,
                 'byLength': {
@@ -288,6 +321,8 @@ class LearningHistoryTests(unittest.TestCase):
                         'valueTargetMean': 0.3,
                         'valueTargetStd': 0.1,
                         'valueMae': 0.2,
+                        'valueSignedError': -0.2,
+                        'valueRmse': 0.4,
                         'valueBce': 0.7,
                         'valuePathCrossEntropy': None,
                     },
@@ -298,6 +333,34 @@ class LearningHistoryTests(unittest.TestCase):
                 label: {**remaining_step_metrics, 'stateCount': state_count}
                 for label,state_count in (('0-10',36),('11-30',84),('31+',96))
             }
+            ai.last_training_metrics['fixedValidation']['byEffect'] = {
+                '8-13': {
+                    'stateCount': 36,
+                    'valueStepCount': 30,
+                    'policyTargetRankMean': 2.5,
+                    'policyTop1Accuracy': 0.25,
+                    'valueDeltaMean': 0.2,
+                    'valueImprovementRate': 0.75,
+                },
+            }
+            ai.last_training_metrics['fixedValidation']['byEffectChoices'] = {
+                '8-13': {
+                    'sampleCount': 4,
+                    'valueTargetRankMean': 2.0,
+                    'valueTop1Accuracy': 0.5,
+                    'valueCorrectVsBestOtherDeltaMean': -0.2,
+                },
+            }
+            ai.last_training_metrics['fixedValidation']['transformerBranches'] = {
+                'sampleCount': 45,
+                'attentionRms': 0.3,
+                'linearRms': 0.2,
+                'linearToAttentionRms': 0.666,
+                'preactivationCosine': 0.1,
+                'full': {'policyTargetRankMean': 2.0, 'policyTop1Accuracy': 0.4, 'valueRankCorrelation': 0.5},
+                'withoutAttention': {'policyTargetRankMean': 3.0, 'policyTop1Accuracy': 0.3, 'valueRankCorrelation': 0.4},
+                'withoutLinear': {'policyTargetRankMean': 4.0, 'policyTop1Accuracy': 0.2, 'valueRankCorrelation': 0.3},
+            }
             record = completed_learning_record(3, ai, 1.0)
             LearningHistoryStore(path).append(record)
 
@@ -307,7 +370,15 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['fixedValidation']['stateCount'], 216)
             self.assertAlmostEqual(saved['fixedValidation']['valueRankCorrelation'], 0.4)
             self.assertEqual(saved['fixedValidation']['byLength']['60']['stateCount'], 180)
+            self.assertEqual(saved['fixedValidation']['valueSignedError'], -0.1)
+            self.assertEqual(saved['fixedValidation']['valueRmse'], 0.3)
+            self.assertEqual(saved['fixedValidation']['byLength']['60']['valueRmse'], 0.4)
             self.assertEqual(saved['fixedValidation']['stepsToGoalByRemainingSteps']['31+']['stateCount'], 96)
+            self.assertEqual(saved['fixedValidation']['stepsToGoalByRemainingSteps']['31+']['valueSignedError'], -0.2)
+            self.assertEqual(saved['fixedValidation']['byEffect']['8-13']['valueImprovementRate'], 0.75)
+            self.assertEqual(saved['fixedValidation']['byEffect']['8-13']['valueStepCount'], 30)
+            self.assertEqual(saved['fixedValidation']['byEffectChoices']['8-13']['valueTargetRankMean'], 2.0)
+            self.assertEqual(saved['fixedValidation']['transformerBranches']['withoutLinear']['policyTargetRankMean'], 4.0)
 
     def test_ai_training_metrics_uses_processed_batch_count_as_update_count(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)

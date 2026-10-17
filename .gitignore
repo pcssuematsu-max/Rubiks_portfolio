@@ -32,5 +32,6 @@ exports/ai-experiments.csv
 exports/ai-experiment-summary.json
 exports/ai-experiment-summary.csv
 exports/ai-learning-history.json
+exports/ai-paired-benchmark.jsonl
 exports/ai-lifecycle-events.jsonl
 exports/ai-discoveries.pre-point-migration-*.json.gz

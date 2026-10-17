@@ -3,6 +3,7 @@ import unittest
 
 import numpy as np
 
+from ai.rubiks_ai import Rubiks_3_AI
 from managers.solve_session import SolveSessionManager, SolveSessionState
 from model.search_result import SearchResult
 
@@ -31,6 +32,23 @@ class DirectSearchDiagnosticsTests(unittest.TestCase):
         self.assertEqual(summary['totals']['evaluatedStateCount'], 20)
         self.assertEqual(summary['finalAttempt']['frontierPeak'], 31)
         self.assertEqual(summary['finalAttempt']['bestImprovement'], 1.0)
+
+    def test_pairwise_marks_high_value_peak_that_did_not_reach_goal(self):
+        ai = SimpleNamespace(
+            search_mode='search2', search2_value_loss_type='myloss2_pairwise',
+            search2_value_loss_margin=1.0,
+        )
+        result = SearchResult(
+            False,('R',),2.0,[2.0,3.5],3.5,np.array([3,20]),
+            search_mode='search2',end_reason='budget',
+        )
+
+        self.manager._record_direct_search_attempt(ai,result,0.1)
+        summary = self.manager._direct_search_summary()
+
+        self.assertTrue(summary['finalAttempt']['highValuePeakWithoutGoal'])
+        self.assertEqual(summary['totals']['highValuePeakAttemptCount'],1)
+        self.assertEqual(summary['totals']['highValuePeakWithoutGoalAttemptCount'],1)
 
     def test_search3_diagnostics_aggregate_playouts_and_reset_per_solve(self):
         ai = SimpleNamespace(
@@ -97,3 +115,69 @@ class DirectSearchDiagnosticsTests(unittest.TestCase):
         self.assertEqual(final['playoutCount'], 1000)
         self.assertEqual(final['budgetMode'], 'progressive')
         self.assertEqual(final['budgetStopReason'], 'budget_exhausted')
+
+    def test_search3_logs_returned_move_root_visits_without_extra_prediction(self):
+        self.manager.frame = SimpleNamespace(
+            solve_state=self.state,
+            cube=SimpleNamespace(move_keys=('R','U','F'),key_to_num={'R':0,'U':1,'F':2}),
+        )
+        ai = SimpleNamespace(
+            search_mode='search3',
+            search3_engine=SimpleNamespace(root_node=SimpleNamespace(P=np.array([0.2,0.7,0.1]))),
+        )
+        result = SearchResult(
+            True,('U',),0.2,[0.2,1.0],1.0,np.array([7,10]),
+            policy_target=np.array([2,7,1]),search_mode='search3',end_reason='solved',
+        )
+
+        self.manager._record_direct_search_attempt(ai,result,0.1)
+        attempt = self.state.direct_search_attempts[-1]
+        self.assertEqual(attempt['returnedFirstMovePolicyRank'],1)
+        self.assertAlmostEqual(attempt['returnedFirstMoveVisitShare'],0.7)
+        self.assertAlmostEqual(attempt['returnedFirstMoveValueDelta'],0.8)
+        self.assertAlmostEqual(attempt['rootVisitTopShare'],0.7)
+
+    def test_transformer_search3_records_fallback_first_move_policy_rank_once(self):
+        self.state.fallback_used = True
+        self.state.val_lis.append(0.0)
+        self.state.direct_search_attempts.append({'searchMode': 'search3'})
+        cube = SimpleNamespace(
+            move_keys=('R','U','F'),
+            key_to_num={'R': 0, 'U': 1, 'F': 2},
+            state=np.asarray(['A']),
+            makedata=lambda: np.asarray([0.0],dtype='f'),
+        )
+        self.manager.frame = SimpleNamespace(
+            solve_state=self.state, cube=cube, AI_idx=0, AInum=1,
+            myval_AI=SimpleNamespace(),
+        )
+        self.manager._supports_myperms_greedy = lambda: True
+        self.manager._set_status = lambda *args: None
+        self.manager._myperms_sort_weights = lambda ai: None
+        self.manager._current_search_scramble = lambda: ()
+        self.manager._choose_and_apply_myperms = lambda ai, weights: self.state.move_lis.append(('U',)) or True
+        self.manager._record_myval_history = lambda *args: None
+        prediction_count = []
+
+        def predict(x,policy,value):
+            prediction_count.append(1)
+            return np.asarray([[0.0],[1.0],[2.0]],dtype='f')
+
+        # Use the production model type: the old SimpleNamespace fixture hid
+        # a missing is_transformer attribute on Rubiks_3_AI.
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.use_transformer_attention = True
+        ai.search_mode = 'search3'
+        ai.search3_engine = SimpleNamespace(root_node=SimpleNamespace(
+            state_key='A',visited=np.asarray([1,3,1]),
+        ))
+        ai.predict = predict
+        self.assertTrue(self.manager._advance_greedy_step(ai))
+        self.assertTrue(self.manager._advance_greedy_step(ai))
+
+        attempt = self.state.direct_search_attempts[-1]
+        self.assertEqual(attempt['fallbackFirstMovePolicyRank'],2)
+        self.assertGreater(attempt['fallbackFirstMovePolicyProbability'],0.0)
+        self.assertGreater(attempt['fallbackRootPolicyEntropy'],0.0)
+        self.assertAlmostEqual(attempt['fallbackFirstMoveVisitShare'],0.6)
+        self.assertEqual(len(prediction_count),1)

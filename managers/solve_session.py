@@ -234,6 +234,7 @@ class SolveSessionManager:
     def _start_new_solve(self, AI):
         """新しいスクランブルを用意してsolveセッションを開始する。"""
         state = self.frame.solve_state
+        self._rotate_search3_shallow_widening(AI)
         self._set_status('スクランブル生成中')
         self.frame.cube.reset()
         self._reset_search_engine(AI)
@@ -247,6 +248,15 @@ class SolveSessionManager:
         state.start_solve_timer()
         state.active_search_mode = str(getattr(AI, 'search_mode', 'myval'))
         state.fallback_used = False
+
+    @staticmethod
+    def _rotate_search3_shallow_widening(AI):
+        """Alternate the narrow and ordinary final-tier width per AI solve."""
+        widths = getattr(AI, 'search3_budget_shallow_widening_options', ())
+        if widths and getattr(AI, 'search3_budget_mode', None) == 'progressive':
+            solve_count = int(getattr(AI, '_search3_shallow_width_solve_count', 0))
+            AI.search3_budget_shallow_widening_initial_actions = widths[solve_count % len(widths)]
+            AI._search3_shallow_width_solve_count = solve_count + 1
 
     def pause_active_solve_timer(self):
         """Stop the active-time clock while the GUI solve is stopped."""
@@ -435,6 +445,11 @@ class SolveSessionManager:
                 'frontierRemaining': self._optional_int(getattr(AI, '_last_search2_frontier_remaining', None)),
                 'uniqueStateCount': self._optional_int(getattr(AI, '_last_search2_value_count', None)),
             })
+            if getattr(AI,'search2_value_loss_type',None) == 'myloss2_pairwise':
+                threshold = max(1.0,float(getattr(AI,'search2_value_loss_margin',0.0) or 0.0))
+                high_value = attempt['bestImprovement'] is not None and attempt['bestImprovement'] >= threshold
+                attempt['highValuePeak'] = high_value
+                attempt['highValuePeakWithoutGoal'] = high_value and not bool(search_result.succeeded)
         elif search_mode in ('search3', 'transformer'):
             policy_target = getattr(search_result, 'policy_target', None)
             attempt.update({
@@ -446,12 +461,45 @@ class SolveSessionManager:
                 'predictionCacheCount': self._optional_len(getattr(getattr(AI, 'search3_engine', None), 'prediction_cache', None)),
             })
             attempt.update(self._search3_depth_diagnostics(search_result))
+            attempt.update(self._search3_root_move_diagnostics(AI,search_result))
             budget_playouts = attempt.get('budgetConsumedPlayoutCount')
             if budget_playouts is not None:
                 # A fixed Search3 result contains only its final 1,000-playout
                 # stage in ``stats``; use the summary to log the full call.
                 attempt['playoutCount'] = budget_playouts
         self.frame.solve_state.direct_search_attempts.append(attempt)
+
+    def _search3_root_move_diagnostics(self, AI, search_result):
+        """Compare the returned first move's prior with final-stage root visits."""
+        visits = getattr(search_result,'policy_target',None)
+        cube = getattr(self.frame,'cube',None)
+        if visits is None or cube is None:
+            return {}
+        visits = np.asarray(visits).reshape(-1)
+        if visits.size != len(cube.move_keys) or not np.all(np.isfinite(visits)):
+            return {}
+        total = float(np.sum(visits))
+        if total <= 0:
+            return {}
+        result = {'rootVisitTopShare': float(np.max(visits) / total)}
+        moves = getattr(search_result,'moves',()) or ()
+        if not moves:
+            return result
+        move_index = cube.key_to_num.get(moves[0])
+        if move_index is None:
+            return result
+        result['returnedFirstMoveVisitShare'] = float(visits[move_index] / total)
+        raw_trace = getattr(search_result,'value_trace_raw',None)
+        if raw_trace is not None and len(raw_trace) > 1:
+            delta = self._optional_float(raw_trace[1] - raw_trace[0])
+            if delta is not None:
+                result['returnedFirstMoveValueDelta'] = delta
+        root = getattr(getattr(AI,'search3_engine',None),'root_node',None)
+        prior = np.asarray(getattr(root,'P',[])).reshape(-1)
+        if prior.size == visits.size and np.all(np.isfinite(prior)):
+            result['returnedFirstMovePolicyRank'] = int(1 + np.sum(prior > prior[move_index]))
+            result['returnedFirstMovePolicyProbability'] = float(prior[move_index])
+        return result
 
     @classmethod
     def _search3_depth_diagnostics(cls, search_result):
@@ -504,6 +552,7 @@ class SolveSessionManager:
                             'stageIndex', 'playoutLimit', 'consumedPlayoutCount',
                             'rootVisitShare', 'rootVisitShareGain', 'bestImprovement',
                             'playoutDepthMean', 'decision',
+                            'wideningInitialActions',
                         )
                     }
                     for stage in stages if isinstance(stage, dict)
@@ -581,6 +630,11 @@ class SolveSessionManager:
             values = [attempt[key] for attempt in attempts if attempt.get(key) is not None]
             if values:
                 totals[key] = max(values)
+        if any('highValuePeak' in attempt for attempt in attempts):
+            totals['highValuePeakAttemptCount'] = sum(bool(attempt.get('highValuePeak')) for attempt in attempts)
+            totals['highValuePeakWithoutGoalAttemptCount'] = sum(
+                bool(attempt.get('highValuePeakWithoutGoal')) for attempt in attempts
+            )
         return {
             'attemptCount': len(attempts),
             'terminalEndReason': attempts[-1].get('endReason'),
@@ -920,6 +974,7 @@ class SolveSessionManager:
             state.end_solve = True
             return False
         self._set_status('フォールバック中', 'myval greedy')
+        fallback_policy = self._search3_fallback_policy_probe(AI)
         W = self._myperms_sort_weights(AI)
         if self.frame.AI_idx in list(range(self.frame.AInum)):
             AI = self.frame.myval_AI
@@ -929,9 +984,64 @@ class SolveSessionManager:
 
         current_scramble = self._current_search_scramble()
         root_value = state.val_lis[-1]
+        previous_move_count = len(state.move_lis)
         succeeded = self._choose_and_apply_myperms(AI,W)
+        if fallback_policy is not None:
+            self._record_search3_fallback_policy_rank(
+                fallback_policy,state.move_lis[previous_move_count:],
+            )
         self._record_myval_history(current_scramble, root_value, succeeded)
         return succeeded
+
+    def _search3_fallback_policy_probe(self, AI):
+        """Snapshot Policy and any retained root visits at first recovery."""
+        attempts = self.frame.solve_state.direct_search_attempts
+        if (
+            not self.frame.solve_state.fallback_used or not attempts
+            or getattr(AI,'search_mode',None) != 'search3'
+            or 'fallbackFirstMovePolicyRank' in attempts[-1]
+        ):
+            return None
+        try:
+            x = self.frame.cube.makedata().reshape(-1,1)
+            logits = np.asarray(AI.predict(x,policy = True,value = False)).reshape(-1)
+        except (AttributeError,RuntimeError,TypeError,ValueError):
+            # Diagnostics must never prevent the greedy recovery itself.
+            return None
+        if logits.size != len(self.frame.cube.move_keys) or not np.all(np.isfinite(logits)):
+            return None
+        root = getattr(getattr(AI,'search3_engine',None),'root_node',None)
+        root_state = getattr(root,'state_key',None)
+        cube_state = getattr(self.frame.cube,'state',None)
+        visits = None
+        if cube_state is not None and root_state == ''.join(cube_state):
+            candidate = np.asarray(getattr(root,'visited',[])).reshape(-1)
+            if candidate.size == logits.size and np.all(np.isfinite(candidate)):
+                visits = candidate.copy()
+        return (logits,visits)
+
+    def _record_search3_fallback_policy_rank(self, probe, move_rows):
+        """Log the rank of a viable fallback move without storing Policy vectors."""
+        if not move_rows or not move_rows[0]:
+            return
+        logits,visits = probe
+        move_index = self.frame.cube.key_to_num.get(move_rows[0][0])
+        if move_index is None or move_index < 0 or move_index >= len(logits):
+            return
+        probabilities = softmax(logits)
+        probability = float(probabilities[move_index])
+        entropy = float(-np.sum(probabilities * np.log(probabilities + 1.0e-12)))
+        self.frame.solve_state.direct_search_attempts[-1].update({
+            'fallbackFirstMovePolicyRank': int(1 + np.sum(logits > logits[move_index])),
+            'fallbackFirstMovePolicyProbability': probability,
+            'fallbackRootPolicyTop1Probability': float(np.max(probabilities)),
+            'fallbackRootPolicyEntropy': entropy,
+        })
+        # The retained root can include visits from preceding budget stages.
+        if visits is not None and np.sum(visits) > 0:
+            self.frame.solve_state.direct_search_attempts[-1]['fallbackFirstMoveVisitShare'] = (
+                float(visits[move_index] / np.sum(visits))
+            )
 
     def _myperms_sort_weights(self, AI):
         """myperm候補の並び替え用 move cost を返す。"""
@@ -1406,18 +1516,17 @@ class SolveSessionManager:
             return direct_success
 
         if direct_success:
-            # Normal successes may cross-teach: Search2 keeps its local
-            # policy/value segments, while calibrated Value receives one
-            # route to the final goal.
+            # Normal successes may cross-teach: calibrated and pairwise Value
+            # receive one route to the final goal.
             self._store_connected_steps_to_goal_training_sample()
             self._store_connected_myloss_training_sample()
-            # Pairwise Value and calibrated Value both consume the connected
-            # route above.  Keep local Search2 segments for the Original
-            # Search2 objective only, so the two shared objectives see the
-            # same direct-success data distribution.
-            self._store_search2_segment_training_samples(
-                self._myloss_search2_ai_indices()
-            )
+            # A pairwise solve already teaches Original Search2 with the
+            # connected route above.  Adding its local segments as well
+            # duplicates that route (even for a single-segment solve).
+            if not (source_mode == 'search2' and source_loss_type == 'myloss2_pairwise'):
+                self._store_search2_segment_training_samples(
+                    self._myloss_search2_ai_indices()
+                )
             return False
 
         if source_mode == 'search2':
@@ -1599,6 +1708,7 @@ class SolveSessionManager:
                 'stepsToGoalLongRouteMinRatio': getattr(
                     ai, 'steps_to_goal_long_route_min_ratio', None,
                 ),
+                'originalLongDirectMinRatio': getattr(ai, 'original_long_direct_min_ratio', None),
                 'stepsToGoalValueMaxRouteEfficiency': getattr(
                     ai, 'steps_to_goal_value_max_route_efficiency', None,
                 ),
@@ -1628,6 +1738,10 @@ class SolveSessionManager:
                 ),
                 'rescueMinImprovement': getattr(
                     ai, 'search3_budget_rescue_min_improvement', None,
+                ),
+                'shallowDepthThreshold': getattr(ai, 'search3_budget_shallow_depth_threshold', None),
+                'shallowWideningInitialActions': getattr(
+                    ai, 'search3_budget_shallow_widening_initial_actions', None,
                 ),
                 'maxNodeCache': getattr(ai, 'search3_max_node_cache', None),
                 'maxPredictionCache': getattr(ai, 'search3_max_prediction_cache', None),

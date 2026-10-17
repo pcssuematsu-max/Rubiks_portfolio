@@ -10,6 +10,41 @@ from managers.solve_session import SolveSessionManager
 
 
 class StepsToGoalValueTests(unittest.TestCase):
+    def test_only_absolute_value_objectives_train_the_output_bias(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search_mode = 'search2'
+        ai.search2_value_loss_type = 'steps_to_goal'
+        self.assertTrue(ai._is_value_output_bias_trainable())
+        self.assertFalse(ai._is_non_trainable_param('BO_V'))
+
+        ai.search2_value_loss_type = 'myloss'
+        self.assertFalse(ai._is_value_output_bias_trainable())
+        self.assertTrue(ai._is_non_trainable_param('BO_V'))
+
+        ai.search2_value_loss_type = 'myloss2_pairwise'
+        self.assertFalse(ai._is_value_output_bias_trainable())
+        ai.search_mode = 'search3'
+        self.assertTrue(ai._is_value_output_bias_trainable())
+
+    def test_steps_to_goal_bias_moves_toward_target_under_torch_grad_update(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search_mode = 'search2'
+        ai.search2_value_loss_type = 'steps_to_goal'
+        ai.params = {'BO_V': np.asarray([-10.0],dtype='f')}
+        ai.v = {'BO_V': np.zeros(1,dtype='f')}
+        ai.h = {'BO_V': np.zeros(1,dtype='f')}
+        ai.lr = 0.1
+        ai.lr_v = 0.0
+        ai.lr_h = 0.0
+        ai.adam = False
+        ai.weight_decay = False
+        ai.update_scale_value = 1.0
+        ai._mark_torch_params_dirty = lambda: None
+
+        ai._apply_torch_grad_updates({'BO_V': np.asarray([-1.0],dtype='f')})
+
+        self.assertAlmostEqual(float(ai.params['BO_V'][0]),-9.9,places=5)
+
     def test_huber_is_quadratic_near_target_and_clipped_for_large_errors(self):
         loss = Huber()
         prediction = np.asarray([[-3.0, 2.0]], dtype = 'f')
@@ -96,6 +131,65 @@ class StepsToGoalValueTests(unittest.TestCase):
         self.assertEqual(summary['selected_state_bands'], {'0-10': 22, '11-30': 22, '31+': 22})
         self.assertEqual(summary['oversampled_state_count'], 14)
 
+    def test_repeated_intermediate_state_keeps_shortest_value_label_only(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search2_value_loss_type = 'steps_to_goal'
+        ai.steps_to_goal_states_per_band = 0
+        ai.steps_to_goal_value_batch_band_max_copies = 1
+        ai.steps_to_goal_value_max_route_efficiency = 0.0
+        ai._steps_to_goal_shortest_target_by_start = None
+        routes = [
+            SimpleNamespace(moves = ('a','b','c'), steps_to_goal = (3,2,1,0), trajectory_origin = 'direct_search'),
+            SimpleNamespace(moves = ('d',), steps_to_goal = (1,0), trajectory_origin = 'direct_search'),
+        ]
+        states = np.asarray([[1,2,3,4,2,4]],dtype = 'f')
+
+        columns,indices,_ = ai._build_search2_value_loss_selection(
+            routes,[0,4,6],x = states,
+        )
+
+        self.assertNotIn(1,columns.tolist())
+        self.assertIn(4,columns.tolist())
+        self.assertEqual(indices[-1],len(columns))
+        self.assertEqual(ai._last_steps_to_goal_value_selection['conflicting_intermediate_state_count'],1)
+        self.assertEqual(ai._last_steps_to_goal_value_selection['discarded_nonshortest_state_count'],1)
+
+    def test_replay_wide_shortest_target_applies_across_batches_and_restores_cube(self):
+        ai = Rubiks_3_AI([8],cube_size = 3,search_mode = 'search2')
+        ai.set_search2_value_loss_type('steps_to_goal')
+        ai.steps_to_goal_states_per_band = 0
+        ai.steps_to_goal_value_batch_band_max_copies = 1
+        ai.steps_to_goal_value_max_route_efficiency = 0.0
+        up,down = ai.cube.move_keys[0],ai.cube.move_keys[3]
+        up_inverse = ai.cube.invert_moves((up,))[0]
+        down_inverse = ai.cube.invert_moves((down,))[0]
+        short = SimpleNamespace(
+            scramble = (up,),moves = (up_inverse,),
+            steps_to_goal = (1,0),trajectory_origin = 'direct_search',
+            source_search2_value_loss_type = 'steps_to_goal_regression',
+        )
+        long = SimpleNamespace(
+            scramble = (up,down),
+            moves = (down_inverse,down,down_inverse,up_inverse),
+            steps_to_goal = (4,3,2,1,0),trajectory_origin = 'direct_search',
+            source_search2_value_loss_type = 'steps_to_goal_regression',
+        )
+        ai.cube.scramble(2)
+        original_state = ai.cube.state.copy()
+
+        ai._prepare_steps_to_goal_shortest_targets([0,1],[short,long])
+
+        np.testing.assert_array_equal(ai.cube.state,original_state)
+        x = np.empty((ai.cube.makedata().size,5),dtype = 'f')
+        ai._fill_loss_tensors([long],0,False,np.empty(4,dtype = 'i'),x)
+        columns,_,_ = ai._build_search2_value_loss_selection([long],[0,5],x = x)
+
+        self.assertNotIn(1,columns.tolist())
+        self.assertIn(3,columns.tolist())
+        self.assertGreaterEqual(
+            ai._last_steps_to_goal_value_selection['discarded_nonshortest_state_count'],1,
+        )
+
     def test_steps_to_goal_direct_route_also_teaches_original_with_full_route(self):
         shared_data = []
         steps = SimpleNamespace(
@@ -153,6 +247,84 @@ class StepsToGoalValueTests(unittest.TestCase):
         self.assertEqual(shared_data[0].moves, ('A', 'B', 'C'))
         self.assertEqual(shared_data[0].source_search2_value_loss_type, 'myloss_connected')
         self.assertEqual(original.indices, [0])
+
+    def test_pairwise_direct_route_registers_only_one_connected_original_sample(self):
+        for segments in ((('A', 'B'),), (('A', 'B'), ('C',))):
+            with self.subTest(segments = segments):
+                shared_data = []
+                pairwise = SimpleNamespace(
+                    search_mode = 'search2', search2_value_loss_type = 'myloss2_pairwise',
+                    datas = shared_data, indices = [],
+                )
+                original = SimpleNamespace(
+                    search_mode = 'search2', search2_value_loss_type = 'myloss',
+                    datas = shared_data, indices = [],
+                )
+                steps = SimpleNamespace(
+                    search_mode = 'search2', search2_value_loss_type = 'steps_to_goal',
+                    datas = shared_data, indices = [],
+                )
+                state = SimpleNamespace(
+                    s = ('scramble',), move_lis = [()] + list(segments),
+                    search_TF = True, fallback_used = False,
+                    last_perfect_key = '', last_top_group = None,
+                )
+                frame = SimpleNamespace(
+                    solve_state = state,
+                    cube = SimpleNamespace(
+                        simplify = lambda moves: tuple(moves),
+                        make_transformations = lambda scramble, moves: (
+                            (tuple(scramble),), (tuple(moves),),
+                        ),
+                    ),
+                    AIs = [pairwise, original, steps], AI_idx = 0, AInum = 3,
+                )
+
+                self.assertFalse(SolveSessionManager(frame)._store_completed_training_samples())
+                connected_moves = tuple(move for segment in segments for move in segment)
+                self.assertEqual(len(shared_data), 2)
+                self.assertEqual([item.moves for item in shared_data], [connected_moves] * 2)
+                self.assertEqual([item.scramble for item in shared_data], [('scramble',)] * 2)
+                self.assertEqual(pairwise.indices, [0])
+                self.assertEqual(steps.indices, [0])
+                self.assertEqual(original.indices, [1])
+                self.assertEqual(shared_data[1].source_search2_value_loss_type, 'myloss_connected')
+                self.assertEqual(state.s, ('scramble',))
+
+    def test_pairwise_fallback_still_registers_only_for_pairwise(self):
+        shared_data = []
+        pairwise = SimpleNamespace(
+            search_mode = 'search2', search2_value_loss_type = 'myloss2_pairwise',
+            datas = shared_data, indices = [],
+        )
+        original = SimpleNamespace(
+            search_mode = 'search2', search2_value_loss_type = 'myloss',
+            datas = shared_data, indices = [],
+        )
+        steps = SimpleNamespace(
+            search_mode = 'search2', search2_value_loss_type = 'steps_to_goal',
+            datas = shared_data, indices = [],
+        )
+        frame = SimpleNamespace(
+            solve_state = SimpleNamespace(
+                s = ('scramble',), move_lis = [(), ('A',)],
+                search_TF = False, fallback_used = True,
+                last_perfect_key = '', last_top_group = None,
+            ),
+            cube = SimpleNamespace(
+                simplify = lambda moves: tuple(moves),
+                make_transformations = lambda scramble, moves: (
+                    (tuple(scramble),), (tuple(moves),),
+                ),
+            ),
+            AIs = [pairwise, original, steps], AI_idx = 0, AInum = 3,
+        )
+
+        self.assertFalse(SolveSessionManager(frame)._store_completed_training_samples())
+        self.assertEqual(len(shared_data), 1)
+        self.assertEqual(pairwise.indices, [0])
+        self.assertEqual(original.indices, [])
+        self.assertEqual(steps.indices, [])
 
     def test_connected_search2_route_has_distances_to_the_final_goal(self):
         shared_data = []

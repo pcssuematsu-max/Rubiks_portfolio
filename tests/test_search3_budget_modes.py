@@ -1,8 +1,10 @@
 import unittest
 
 import numpy as np
+from types import SimpleNamespace
 
 from ai.rubiks_ai import Rubiks_3_AI
+from managers.solve_session import SolveSessionManager
 from model.search_result import SearchResult
 
 
@@ -21,6 +23,17 @@ def _result(max_visits, playouts, root_value=0.20, best_value=0.30, depth=4.0):
 
 
 class Search3BudgetModeTests(unittest.TestCase):
+    def test_shallow_width_alternates_within_one_ai(self):
+        ai = SimpleNamespace(
+            search3_budget_mode = 'progressive',
+            search3_budget_shallow_widening_options = (3,5),
+        )
+        observed = []
+        for _ in range(4):
+            SolveSessionManager._rotate_search3_shallow_widening(ai)
+            observed.append(ai.search3_budget_shallow_widening_initial_actions)
+        self.assertEqual(observed,[3,5,3,5])
+
     def _ai(self, mode, results):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         ai.search3_budget_mode = mode
@@ -78,6 +91,48 @@ class Search3BudgetModeTests(unittest.TestCase):
             result.search_diagnostics['budgetSummary']['stopReason'],
             'fallback_unpromising',
         )
+
+    def test_shallow_middle_uses_narrower_final_tier_and_restores_widening(self):
+        ai, requested = self._ai('progressive', [
+            _result(20,100,best_value=0.22,depth=2.0),
+            _result(100,300,best_value=0.22,depth=7.0),
+            _result(100,600,best_value=0.22,depth=10.0),
+        ])
+        ai.search3_widening_initial_actions = 5
+        ai.search3_budget_shallow_depth_threshold = 9.0
+        ai.search3_budget_shallow_widening_initial_actions = 3
+        observed_widths = []
+        original_search = ai.search3
+        def search_with_width(playouts):
+            observed_widths.append(ai.search3_widening_initial_actions)
+            return original_search(playouts)
+        ai.search3 = search_with_width
+
+        result = ai._search3_with_repeats()
+
+        self.assertEqual(requested,[100,300,600])
+        self.assertEqual(observed_widths,[5,5,3])
+        self.assertEqual(ai.search3_widening_initial_actions,5)
+        stages = result.search_diagnostics['budgetSummary']['stages']
+        self.assertEqual(stages[1]['decision'],'escalate_shallow')
+        self.assertEqual(stages[2]['wideningInitialActions'],3)
+
+    def test_ordinary_width_still_reaches_shallow_final_tier(self):
+        ai,requested = self._ai('progressive',[
+            _result(20,100,best_value=0.22,depth=2.0),
+            _result(100,300,best_value=0.22,depth=7.0),
+            _result(100,600,best_value=0.22,depth=8.0),
+        ])
+        ai.search3_widening_initial_actions = 5
+        ai.search3_budget_shallow_depth_threshold = 9.0
+        ai.search3_budget_shallow_widening_initial_actions = 5
+
+        result = ai._search3_with_repeats()
+
+        self.assertEqual(requested,[100,300,600])
+        stages = result.search_diagnostics['budgetSummary']['stages']
+        self.assertEqual(stages[1]['decision'],'escalate_shallow')
+        self.assertEqual(stages[2]['wideningInitialActions'],5)
 
     def test_progressive_mode_spends_final_tier_for_a_promising_middle(self):
         ai, requested = self._ai('progressive', [

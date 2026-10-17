@@ -814,6 +814,30 @@ def _setup_effect_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             row["setupEffect"].get("reducedMoveCount") for row in band_rows
             if isinstance(row["setupEffect"].get("reducedMoveCount"), int)
         ]
+        attempts = [
+            (row, (row.get("directSearch") or {}).get("finalAttempt") or {})
+            for row in band_rows if row.get("searchMode") in ("search3", "transformer")
+        ]
+        direct_visits = [
+            _safe_float(attempt.get("returnedFirstMoveVisitShare"))
+            for row, attempt in attempts if row.get("searchSucceeded")
+        ]
+        failed_visits = [
+            _safe_float(attempt.get("returnedFirstMoveVisitShare"))
+            for row, attempt in attempts if not row.get("searchSucceeded")
+        ]
+        fallback_visits = [
+            _safe_float(attempt.get("fallbackFirstMoveVisitShare"))
+            for _, attempt in attempts
+        ]
+        direct_deltas = [
+            _safe_float(attempt.get("returnedFirstMoveValueDelta"))
+            for row, attempt in attempts if row.get("searchSucceeded")
+        ]
+        failed_deltas = [
+            _safe_float(attempt.get("returnedFirstMoveValueDelta"))
+            for row, attempt in attempts if not row.get("searchSucceeded")
+        ]
         result.append({
             "label": label,
             "minimum": minimum,
@@ -824,6 +848,24 @@ def _setup_effect_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "directSearchSuccessRate": _rate(len(direct), len(classified)),
             "averageOrientationCount": _mean_number(orientations),
             "averageReducedMoveCount": _mean_number(reduced),
+            "directFirstMoveVisitShare": _mean_number(direct_visits),
+            "directFirstMoveVisitCount": sum(value is not None for value in direct_visits),
+            "failedFirstMoveVisitShare": _mean_number(failed_visits),
+            "failedFirstMoveVisitCount": sum(value is not None for value in failed_visits),
+            "fallbackFirstMoveVisitShare": _mean_number(fallback_visits),
+            "fallbackFirstMoveVisitCount": sum(value is not None for value in fallback_visits),
+            "directFirstMoveValueDelta": _mean_number(direct_deltas),
+            "directFirstMoveValueIncreaseRate": _mean_number([
+                float(value > 0.0) for value in direct_deltas if value is not None
+            ]),
+            "failedFirstMoveValueDelta": _mean_number(failed_deltas),
+            "failedFirstMoveValueIncreaseRate": _mean_number([
+                float(value > 0.0) for value in failed_deltas if value is not None
+            ]),
+            "fallbackFirstMovePolicyRank": _mean_number([
+                _safe_float(attempt.get("fallbackFirstMovePolicyRank"))
+                for _, attempt in attempts
+            ]),
         })
     return result
 

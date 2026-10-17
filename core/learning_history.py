@@ -234,6 +234,9 @@ def _fixed_validation(value: Any) -> dict[str, Any] | None:
     }
     for key in _FIXED_VALIDATION_NUMBERS:
         result[key] = _finite_number(value.get(key))
+    for key in _FIXED_VALIDATION_OPTIONAL_NUMBERS:
+        if key in value:
+            result[key] = _finite_number(value[key])
     by_length = _fixed_validation_by_length(value.get("byLength"))
     if by_length is not None:
         result["byLength"] = by_length
@@ -243,6 +246,18 @@ def _fixed_validation(value: Any) -> dict[str, Any] | None:
     remaining_steps = _fixed_validation_remaining_steps(value.get("stepsToGoalByRemainingSteps"))
     if remaining_steps is not None:
         result["stepsToGoalByRemainingSteps"] = remaining_steps
+    exact_distance = _fixed_validation_exact_distance(value.get("stepsToGoalExactDistance"))
+    if exact_distance is not None:
+        result["stepsToGoalExactDistance"] = exact_distance
+    by_effect = _fixed_validation_by_effect(value.get("byEffect"))
+    if by_effect is not None:
+        result["byEffect"] = by_effect
+    by_effect_choices = _fixed_validation_by_effect_choices(value.get("byEffectChoices"))
+    if by_effect_choices is not None:
+        result["byEffectChoices"] = by_effect_choices
+    branches = _fixed_validation_transformer_branches(value.get("transformerBranches"))
+    if branches is not None:
+        result["transformerBranches"] = branches
     return result
 
 
@@ -251,6 +266,12 @@ _FIXED_VALIDATION_NUMBERS = frozenset({
     "policyCrossEntropy", "valueRankCorrelation", "valuePearsonCorrelation",
     "valuePredictionMean", "valuePredictionStd", "valueTargetMean",
     "valueTargetStd", "valueMae", "valueBce", "valuePathCrossEntropy",
+})
+
+# Regression-only metrics were added after the first fixed-validation records.
+# Keep them optional so older histories and non-regression AIs remain readable.
+_FIXED_VALIDATION_OPTIONAL_NUMBERS = frozenset({
+    "valueSignedError", "valueRmse",
 })
 
 
@@ -273,6 +294,12 @@ _TRAINING_SAMPLE_OPTIONAL_INT_FIELDS = frozenset({
     "stepsToGoalStratifiedBatchCount", "stepsToGoalStratifiedItemCount",
     "stepsToGoalLongRouteEligibleItemCount", "stepsToGoalLongRouteRequiredItemCount",
     "stepsToGoalLongRouteSelectedItemCount", "stepsToGoalLongRouteOversampledItemCount",
+    "originalLongDirectEligibleItemCount", "originalLongDirectRequiredItemCount",
+    "originalLongDirectSelectedItemCount", "originalLongDirectOversampledItemCount",
+    "hardEffectDirectEligibleItemCount", "hardEffectDirectRequiredItemCount",
+    "hardEffectDirectSelectedBeforeItemCount", "hardEffectDirectSelectedItemCount",
+    "hardEffectDirectOversampledItemCount",
+    "recentWindowSelectedItemCount", "mixedBatchCount", "selectedUniqueItemCount",
 })
 
 _TRAINING_SAMPLE_NUMBER_FIELDS = frozenset({
@@ -280,6 +307,9 @@ _TRAINING_SAMPLE_NUMBER_FIELDS = frozenset({
     "longReplayRatio", "longReplayMaxRatio", "longSelectedRatio",
     "stepsToGoalStratifiedRatio",
     "stepsToGoalLongRouteMinRatio",
+    "originalLongDirectMinRatio", "fallbackSelectedRatio", "pairwiseFallbackMaxRatio",
+    "hardEffectDirectMinRatio",
+    "recentReplayRatio",
 })
 
 
@@ -340,6 +370,10 @@ _STEPS_TO_GOAL_VALUE_SELECTION_INT_FIELDS = frozenset({
     "candidateRouteCount", "selectedRouteCount", "sourceExcludedRouteCount",
     "detourExcludedRouteCount", "longerDuplicateExcludedRouteCount",
     "oversampledStateCount",
+})
+
+_STEPS_TO_GOAL_VALUE_SELECTION_OPTIONAL_INT_FIELDS = frozenset({
+    "conflictingIntermediateStateCount", "discardedNonshortestStateCount",
 })
 
 
@@ -444,10 +478,20 @@ def _steps_to_goal_value_selection(value: Any) -> dict[str, Any] | None:
     required = set(_STEPS_TO_GOAL_VALUE_SELECTION_INT_FIELDS) | {
         "candidateStateBands", "selectedStateBands",
     }
-    if not isinstance(value, dict) or set(value) != required:
+    if (
+        not isinstance(value, dict) or not required.issubset(value)
+        or set(value) - required - _STEPS_TO_GOAL_VALUE_SELECTION_OPTIONAL_INT_FIELDS
+    ):
         return None
     result = {}
     for key in _STEPS_TO_GOAL_VALUE_SELECTION_INT_FIELDS:
+        count = _safe_optional_int(value.get(key))
+        if count is None or count < 0:
+            return None
+        result[key] = count
+    for key in _STEPS_TO_GOAL_VALUE_SELECTION_OPTIONAL_INT_FIELDS:
+        if key not in value:
+            continue
         count = _safe_optional_int(value.get(key))
         if count is None or count < 0:
             return None
@@ -558,6 +602,10 @@ def _training_sample(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
     result = {}
+    if "batchMixMode" in value:
+        if value["batchMixMode"] not in ("ordered", "mixed"):
+            return None
+        result["batchMixMode"] = value["batchMixMode"]
     for key in _TRAINING_SAMPLE_INT_FIELDS:
         number = _safe_optional_int(value.get(key))
         if number is None:
@@ -587,7 +635,7 @@ def _validate_training_sample(value: Any) -> None:
     if value is None:
         return
     required = set(_TRAINING_SAMPLE_INT_FIELDS) | {"longSelectedStepMean"}
-    allowed = required | set(_TRAINING_SAMPLE_OPTIONAL_INT_FIELDS) | set(_TRAINING_SAMPLE_NUMBER_FIELDS)
+    allowed = required | set(_TRAINING_SAMPLE_OPTIONAL_INT_FIELDS) | set(_TRAINING_SAMPLE_NUMBER_FIELDS) | {"batchMixMode"}
     if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
         raise ValueError("Invalid learning history trainingSample")
     if _training_sample(value) != value:
@@ -611,6 +659,9 @@ def _fixed_validation_by_length(value: Any) -> dict[str, dict[str, Any]] | None:
         copied = {"fixtureCount": count, "stateCount": state_count}
         for key in _FIXED_VALIDATION_NUMBERS:
             copied[key] = _finite_number(metrics.get(key))
+        for key in _FIXED_VALIDATION_OPTIONAL_NUMBERS:
+            if key in metrics:
+                copied[key] = _finite_number(metrics[key])
         result[length] = copied
     return result
 
@@ -626,6 +677,9 @@ def _fixed_validation_bucket(value: Any) -> dict[str, Any] | None:
     copied = {"fixtureCount": count, "stateCount": state_count}
     for key in _FIXED_VALIDATION_NUMBERS:
         copied[key] = _finite_number(value.get(key))
+    for key in _FIXED_VALIDATION_OPTIONAL_NUMBERS:
+        if key in value:
+            copied[key] = _finite_number(value[key])
     return copied
 
 
@@ -643,7 +697,82 @@ def _fixed_validation_remaining_steps(value: Any) -> dict[str, dict[str, Any]] |
         copied = {"stateCount": state_count}
         for key in _FIXED_VALIDATION_NUMBERS:
             copied[key] = _finite_number(metrics.get(key))
+        for key in _FIXED_VALIDATION_OPTIONAL_NUMBERS:
+            if key in metrics:
+                copied[key] = _finite_number(metrics[key])
         result[label] = copied
+    return result
+
+
+def _fixed_validation_exact_distance(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    count = _safe_optional_int(value.get("stateCount"))
+    if count is None or count < 2:
+        return None
+    result = {"stateCount": count}
+    for key in ("goalValueError", "goalValueMae", "oneMoveValueBias", "oneMoveValueMae"):
+        number = _finite_number(value.get(key))
+        if number is None:
+            return None
+        result[key] = number
+    return result
+
+
+def _fixed_validation_by_effect(value: Any) -> dict[str, dict[str, Any]] | None:
+    if not isinstance(value, dict):
+        return None
+    result = {}
+    for label, metrics in value.items():
+        if label not in {"0-7", "8-13", "14-19", "20+"} or not isinstance(metrics, dict):
+            return None
+        count = _safe_optional_int(metrics.get("stateCount"))
+        value_count = _safe_optional_int(metrics.get("valueStepCount"))
+        if count is None or value_count is None or value_count > count:
+            return None
+        result[label] = {"stateCount": count, "valueStepCount": value_count}
+        for key in ("policyTargetRankMean", "policyTop1Accuracy", "valueDeltaMean", "valueImprovementRate"):
+            result[label][key] = _finite_number(metrics.get(key))
+    return result
+
+
+def _fixed_validation_by_effect_choices(value: Any) -> dict[str, dict[str, Any]] | None:
+    if not isinstance(value, dict):
+        return None
+    result = {}
+    for label, metrics in value.items():
+        if label not in {"0-7", "8-13", "14-19", "20+"} or not isinstance(metrics, dict):
+            return None
+        count = _safe_optional_int(metrics.get("sampleCount"))
+        if count is None or count < 1 or count > 4:
+            return None
+        copied = {"sampleCount": count}
+        for key in ("valueTargetRankMean", "valueTop1Accuracy", "valueCorrectVsBestOtherDeltaMean"):
+            number = _finite_number(metrics.get(key))
+            if number is None:
+                return None
+            copied[key] = number
+        result[label] = copied
+    return result
+
+
+def _fixed_validation_transformer_branches(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    count = _safe_optional_int(value.get("sampleCount"))
+    if count is None:
+        return None
+    result = {"sampleCount": count}
+    for key in ("attentionRms", "linearRms", "linearToAttentionRms", "preactivationCosine"):
+        result[key] = _finite_number(value.get(key))
+    for label in ("full", "withoutAttention", "withoutLinear"):
+        metrics = value.get(label)
+        if not isinstance(metrics, dict):
+            return None
+        result[label] = {
+            key: _finite_number(metrics.get(key))
+            for key in ("policyTargetRankMean", "policyTop1Accuracy", "valueRankCorrelation")
+        }
     return result
 
 
@@ -654,7 +783,7 @@ def _validate_fixed_validation(value: Any) -> None:
         "fixtureId", "fixtureLengths", "fixtureCount", "stateCount",
         *_FIXED_VALIDATION_NUMBERS,
     }
-    if not isinstance(value, dict) or set(value) - expected - {"byLength", "long40Plus", "stepsToGoalByRemainingSteps"}:
+    if not isinstance(value, dict) or set(value) - expected - _FIXED_VALIDATION_OPTIONAL_NUMBERS - {"byLength", "long40Plus", "stepsToGoalByRemainingSteps", "stepsToGoalExactDistance", "byEffect", "byEffectChoices", "transformerBranches"}:
         raise ValueError("Invalid learning history fixedValidation")
     if not isinstance(value["fixtureId"], str) or not value["fixtureId"]:
         raise ValueError("Invalid learning history fixedValidation fixture")
@@ -668,6 +797,9 @@ def _validate_fixed_validation(value: Any) -> None:
             raise ValueError("Invalid learning history fixedValidation count")
     for key in _FIXED_VALIDATION_NUMBERS:
         _validate_optional_number(value[key])
+    for key in _FIXED_VALIDATION_OPTIONAL_NUMBERS:
+        if key in value:
+            _validate_optional_number(value[key])
     if "byLength" in value:
         _validate_fixed_validation_by_length(value["byLength"])
     if "long40Plus" in value:
@@ -678,6 +810,22 @@ def _validate_fixed_validation(value: Any) -> None:
         normalized = _fixed_validation_remaining_steps(value["stepsToGoalByRemainingSteps"])
         if normalized is None or normalized != value["stepsToGoalByRemainingSteps"]:
             raise ValueError("Invalid learning history fixedValidation remaining-step bands")
+    if "stepsToGoalExactDistance" in value:
+        normalized = _fixed_validation_exact_distance(value["stepsToGoalExactDistance"])
+        if normalized is None or normalized != value["stepsToGoalExactDistance"]:
+            raise ValueError("Invalid learning history fixedValidation exact-distance anchors")
+    if "byEffect" in value:
+        normalized = _fixed_validation_by_effect(value["byEffect"])
+        if normalized is None or normalized != value["byEffect"]:
+            raise ValueError("Invalid learning history fixedValidation effect bands")
+    if "byEffectChoices" in value:
+        normalized = _fixed_validation_by_effect_choices(value["byEffectChoices"])
+        if normalized is None or normalized != value["byEffectChoices"]:
+            raise ValueError("Invalid learning history fixedValidation Effect choices")
+    if "transformerBranches" in value:
+        normalized = _fixed_validation_transformer_branches(value["transformerBranches"])
+        if normalized is None or normalized != value["transformerBranches"]:
+            raise ValueError("Invalid learning history fixedValidation branches")
 
 
 def _validate_fixed_validation_by_length(value: Any) -> None:
