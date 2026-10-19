@@ -236,8 +236,8 @@ class Search3DepthScheduleTests(unittest.TestCase):
             [config.search2_value_loss_types[index] for index in range(20, 25)],
             ['steps_to_goal', 'myloss2_pairwise', 'steps_to_goal', 'myloss2_pairwise', 'myloss2_pairwise'],
         )
-        self.assertEqual(config.search2_rank_loss_mixes[20:25], [0.0] * 5)
-        self.assertEqual(config.search2_rank_loss_apply_types[20:25], ['none'] * 5)
+        self.assertEqual(config.search2_rank_loss_mixes[20:25], [0.0,0.0,1.0,0.0,0.0])
+        self.assertEqual(config.search2_rank_loss_apply_types[20:25], ['none','none','steps_pairwise','none','none'])
         self.assertEqual(
             [config.search2_value_loss_margins[index] for index in (0,1,8,9,12,13,14,15,16,17)],
             [1.0] * 10,
@@ -246,7 +246,7 @@ class Search3DepthScheduleTests(unittest.TestCase):
             [config.search2_value_loss_margins[index] for index in (2,3,4,5,6,7,10,11,18,19)],
             [0.0] * 10,
         )
-        self.assertEqual(config.search2_value_loss_margins[20:25], [0.0,1.0,0.0,1.0,1.0])
+        self.assertEqual(config.search2_value_loss_margins[20:25], [0.0,1.0,1.0,1.0,1.0])
         self.assertEqual(config.search2_value_target_scales[20:25], [1.0] * 5)
         self.assertEqual(config.original_transformer_attention[20:25], [False, False, True, True, True])
         self.assertEqual(config.transform_idx[20:25], [0] * 5)

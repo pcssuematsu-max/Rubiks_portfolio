@@ -203,10 +203,16 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 (" F'", ' U ', ' B2', " D'", ' R ', ' D ', ' B2', ' F2', " R'", ' F2', ' R ', ' F2', ' U2', ' L ', ' U ', " L'", ' F '),
                 (' B2', ' L2', " F'", ' D ', ' F ', ' L2', ' R2', " D'", ' R2', ' D ', ' R2', ' B2', ' U ', ' B ', " U'", " B'"),
                 (' R ', ' F ', " D'", ' B2', " U'", ' L ', ' U ', ' B2', ' F2', " L'", ' F2', ' L ', ' F2', ' D2', ' R ', ' D ', " R'", ' D2', " F'", " R'"),
+                (" L2"," E'"," L2"," E "," F "," L2"," F "," L2"," F'"),
+                (" E2"," F "," E2"," B'"," M "," F2"," B2"," M'"," B'"),
+                (" E2"," F "," E2"," B'"," M "," F2"," B2"," M'"," B'"," F "),
+                (" E2"," B "," E2"," F'"," M "," F2"," M2"," F2"," M "," F "),
+                (" D'"," F2"," D "," R2"," U'"," R'"," U "," R'"," F'"),
 
 
             ],
             [
+                (" F "," E "," F "," E "," F'"," E "," F "," E "," F'"," E "," F'"),
             ],
             [
             ],
@@ -305,8 +311,8 @@ def build_experiment_frame_config():
         else 'search2'
         for ai_index in range(25)
     ]
-    # AI20/21 compare the calibrated value target on Linear, while AI22-24
-    # use the same target with Transformer attention.
+    # AI20/21 are Linear steps-to-goal/pairwise controls; AI22-24 are their
+    # Transformer counterparts, with AI22's relative-loss treatment.
     original_transformer_attention = [False] * 10 + [True] * 10 + [False,False,True,True,True]
     ai_count = len(ai_search_modes)
     is_search2_ai = [mode.startswith('search2') for mode in ai_search_modes]
@@ -315,8 +321,9 @@ def build_experiment_frame_config():
         5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,
         2.0e-6,2.0e-6,2.0e-6,5.0e-6,5.0e-6,
     ]
+    # Match Transformer decay strength to the Linear AI with the same search mode.
     wdlrs = [
-        1.0e-4 if original_transformer_attention[ai_index] else (1.0e-7 if is_search2_ai[ai_index] else 1.0e-5)
+        1.0e-7 if is_search2_ai[ai_index] else 1.0e-5
         for ai_index in range(ai_count)
     ]
     skip_search = [is_search2_ai[ai_index] for ai_index in range(ai_count)]
@@ -333,7 +340,9 @@ def build_experiment_frame_config():
     # Original Search2 compares every state on a segment with its endpoint.
     # Pairwise Search2 applies the same one-point margin to adjacent states.
     search2_value_loss_margins = [
-        1.0 if is_search2_ai[index] and search2_value_loss_types[index] in ('myloss', 'myloss2_pairwise')
+        1.0 if is_search2_ai[index] and (
+            search2_value_loss_types[index] in ('myloss', 'myloss2_pairwise') or index == 22
+        )
         else 0.0
         for index in range(ai_count)
     ]
@@ -358,6 +367,11 @@ def build_experiment_frame_config():
     # AI20 is Linear and consumes the complete buffer, so a sampling quota
     # would not change it.  Apply the reservation to Transformer AI22 only.
     steps_to_goal_long_route_min_ratios = [0.0] * 22 + [0.25,0.0,0.0]
+    # AI22 alone rehearses successful recovery from a Search2 stall. Limit
+    # replay duplication and emphasize only the first three escape moves.
+    steps_to_goal_plateau_fallback_min_ratios = [0.05 if index == 22 else 0.0 for index in range(ai_count)]
+    steps_to_goal_plateau_escape_rank_mixes = [1.0 if index == 22 else 0.0 for index in range(ai_count)]
+    steps_to_goal_plateau_escape_prefix_steps = [3 if index == 22 else 0 for index in range(ai_count)]
     # Reserve a modest share of Original Transformer replay for complete,
     # directly solved 31+ routes.  The sampler rejects strong detours and
     # limits repeats of a single route to avoid teaching one long anecdote.
@@ -389,8 +403,10 @@ def build_experiment_frame_config():
     # Transformer pairwise buffers currently contain about one third fallback
     # routes.  Keep a direct-route majority in each sampled learning pass.
     pairwise_fallback_max_ratios = [1.0] * 23 + [0.25,0.25]
-    search2_rank_loss_mixes = [0.0] * ai_count
-    search2_rank_loss_apply_types = ['all'] * 20 + ['none'] * 5
+    # AI22 keeps its absolute -remaining-steps target, with an additional
+    # route-wise relative ordering objective. AI20 and pairwise AIs are controls.
+    search2_rank_loss_mixes = [1.0 if index == 22 else 0.0 for index in range(ai_count)]
+    search2_rank_loss_apply_types = ['all'] * 20 + ['none','none','steps_pairwise','none','none']
     # Transformer Search3: fixed validation shows the rank-loss pair (10/11)
     # orders value states more reliably than its no-rank baseline (18/19).
     # Raise only that treatment to 0.10 while retaining the latter as control.
@@ -612,6 +628,9 @@ def build_experiment_frame_config():
         steps_to_goal_states_per_bands = steps_to_goal_states_per_bands,
         steps_to_goal_replay_stratified_ratios = steps_to_goal_replay_stratified_ratios,
         steps_to_goal_long_route_min_ratios = steps_to_goal_long_route_min_ratios,
+        steps_to_goal_plateau_fallback_min_ratios = steps_to_goal_plateau_fallback_min_ratios,
+        steps_to_goal_plateau_escape_rank_mixes = steps_to_goal_plateau_escape_rank_mixes,
+        steps_to_goal_plateau_escape_prefix_steps = steps_to_goal_plateau_escape_prefix_steps,
         original_long_direct_min_ratios = original_long_direct_min_ratios,
         hard_effect_direct_min_ratios = hard_effect_direct_min_ratios,
         steps_to_goal_value_max_route_efficiencies = steps_to_goal_value_max_route_efficiencies,

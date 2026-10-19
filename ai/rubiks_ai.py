@@ -100,6 +100,9 @@ class Rubiks_3_AI:
         self.steps_to_goal_long_route_min_ratio = min(
             1.0,max(0.0,float(steps_to_goal_long_route_min_ratio)),
         )
+        self.steps_to_goal_plateau_fallback_min_ratio = 0.0
+        self.steps_to_goal_plateau_escape_rank_mix = 0.0
+        self.steps_to_goal_plateau_escape_prefix_steps = 0
         self.original_long_direct_min_ratio = 0.0
         self.hard_effect_direct_min_ratio = 0.0
         self.steps_to_goal_value_batch_band_max_copies = 1
@@ -286,7 +289,7 @@ class Rubiks_3_AI:
 
         self.losslayer = Softmax_Cross_Entropy()
         self.losslayer2 = self._create_search2_value_loss()
-        self.search2_rank_loss = Myloss()
+        self.search2_rank_loss = self._create_search2_rank_loss()
         self.losslayer3 = BCEWithLogits()
         self.search3_rank_loss = Myloss()
         self.losslayer4 = Soft_Target_Cross_Entropy()
@@ -356,6 +359,7 @@ class Rubiks_3_AI:
         """Set the Search2 value loss implementation used by NumPy and Torch training."""
         self.search2_value_loss_type = self._normalize_search2_value_loss_type(loss_type)
         self.losslayer2 = self._create_search2_value_loss()
+        self.search2_rank_loss = self._create_search2_rank_loss()
 
     def evaluate_fixed_validation(self):
         """Evaluate this checkpoint on the fixed held-out trajectory set."""
@@ -369,6 +373,7 @@ class Rubiks_3_AI:
         """Set the endpoint or adjacent-pair margin for Search2 Value."""
         self.search2_value_loss_margin = float(margin)
         self.losslayer2 = self._create_search2_value_loss()
+        self.search2_rank_loss = self._create_search2_rank_loss()
 
     def set_search2_value_target_scale(self, scale):
         self.search2_value_target_scale = max(0.0,float(scale))
@@ -422,6 +427,7 @@ class Rubiks_3_AI:
     def set_search2_rank_loss_apply_type(self, apply_type):
         """Set which Search2 value-loss modes receive the auxiliary rank loss."""
         self.search2_rank_loss_apply_type = self._normalize_search2_rank_loss_apply_type(apply_type)
+        self.search2_rank_loss = self._create_search2_rank_loss()
 
     def set_search3_rank_loss_mix(self, mix):
         """Set the auxiliary Search3 rank-loss coefficient."""
@@ -831,6 +837,8 @@ class Rubiks_3_AI:
             'pairwise': 'pairwise',
             'myloss2pairwise': 'pairwise',
             'margin': 'pairwise',
+            'stepspairwise': 'steps_pairwise',
+            'stepsrelative': 'steps_pairwise',
             'all': 'all',
             'both': 'all',
             'true': 'all',
@@ -851,6 +859,11 @@ class Rubiks_3_AI:
             # a batch contained many long solved routes.
             return Huber(reduction = 'trajectory_sum')
         return MyLoss2()
+
+    def _create_search2_rank_loss(self):
+        if self.search2_rank_loss_apply_type == 'steps_pairwise':
+            return MyLoss2Pairwise(self.search2_value_loss_margin,reduction = 'trajectory_mean')
+        return Myloss()
         
         
         
@@ -1240,6 +1253,7 @@ class Rubiks_3_AI:
             loss_inputs['value_indices'],
             loss_inputs['value_steps_to_goal'],
             loss_inputs['value_trajectory_origins'],
+            loss_inputs['plateau_escape_pairs'],
         )
 
     def _build_loss_inputs(self, d_lis, transformation = 0, flip_inside = False):
@@ -1252,6 +1266,7 @@ class Rubiks_3_AI:
             d_lis,indices,x = x,
         )
         value_steps_to_goal = self._build_search2_value_steps_to_goal(d_lis,indices,value_columns)
+        plateau_escape_pairs = self._plateau_escape_pairs(d_lis,indices)
         return {
             'indices': indices,
             'args': args,
@@ -1260,13 +1275,29 @@ class Rubiks_3_AI:
             'value_indices': value_indices,
             'value_steps_to_goal': value_steps_to_goal,
             'value_trajectory_origins': value_trajectory_origins,
+            'plateau_escape_pairs': plateau_escape_pairs,
         }
+
+    def _plateau_escape_pairs(self, data_items, indices):
+        """First successful recovery steps, independent of absolute labels."""
+        if self.search2_value_loss_type != 'steps_to_goal' or getattr(self,'steps_to_goal_plateau_escape_rank_mix',0.0) <= 0:
+            return []
+        prefix = max(0,int(getattr(self,'steps_to_goal_plateau_escape_prefix_steps',0)))
+        if prefix == 0:
+            return []
+        return [
+            [(indices[index] + offset, indices[index] + offset + 1) for offset in range(count)]
+            for index,item in enumerate(data_items)
+            if self._is_plateau_escape_item(item)
+            for count in (min(prefix,len(item.moves)),)
+            if count > 0
+        ]
 
     def _predict_loss_outputs(self, x):
         """loss 計算用に policy/value 出力をまとめて推論する。"""
         return self.predict(x,policy = True,value = True,loss = True,retain_cache = True)
 
-    def _compute_search2_losses(self, out, args, indices, value_columns = None, value_indices = None, value_steps_to_goal = None, value_trajectory_origins = None):
+    def _compute_search2_losses(self, out, args, indices, value_columns = None, value_indices = None, value_steps_to_goal = None, value_trajectory_origins = None, plateau_escape_pairs = None):
         """Search2 用の policy loss と value loss を計算する。"""
         self._last_steps_to_goal_regression_stats = None
         policy_loss = self.losslayer.forward(out[:-1],args,np.zeros(0),indices)
@@ -1275,10 +1306,11 @@ class Rubiks_3_AI:
             value_columns = np.arange(out.shape[1],dtype = 'i')
         self._search2_value_columns = np.asarray(value_columns,dtype = 'i')
         self._search2_value_has_rank_loss = False
+        plateau_loss = self._numpy_plateau_escape_loss(out[-1:],plateau_escape_pairs)
         if len(self._search2_value_columns) == 0:
             self._search2_value_indices = [0]
-            self._record_search2_value_loss_components('none',0.0,0.0,0.0,False)
-            return (policy_loss,0.0)
+            self._record_search2_value_loss_components('none',0.0,0.0,0.0,False,plateau_loss)
+            return (policy_loss,plateau_loss)
         if value_indices is None:
             value_indices = indices
         self._search2_value_indices = value_indices
@@ -1312,7 +1344,7 @@ class Rubiks_3_AI:
         else:
             base_loss = self.losslayer2.forward(out[-1:,self._search2_value_columns],value_indices)
             base_name = self.search2_value_loss_type
-        value_loss = base_loss
+        value_loss = base_loss + plateau_loss
         rank_loss = 0.0
         rank_scaled_loss = 0.0
         rank_applied = False
@@ -1325,10 +1357,31 @@ class Rubiks_3_AI:
             value_loss += rank_scaled_loss
             rank_applied = True
             self._search2_value_has_rank_loss = True
-        self._record_search2_value_loss_components(base_name,base_loss,rank_loss,rank_scaled_loss,rank_applied)
+        self._record_search2_value_loss_components(base_name,base_loss,rank_loss,rank_scaled_loss,rank_applied,plateau_loss)
         return (policy_loss,value_loss)
 
+    def _numpy_plateau_escape_loss(self, values, pair_groups):
+        mix = max(0.0,float(getattr(self,'steps_to_goal_plateau_escape_rank_mix',0.0)))
+        if not mix or not pair_groups:
+            self._plateau_escape_gradient = None
+            return 0.0
+        gradient = np.zeros_like(values)
+        margin = float(getattr(self,'search2_value_loss_margin',0.0))
+        loss = 0.0
+        for pairs in pair_groups or ():
+            scale = mix / len(pairs)
+            for start,end in pairs:
+                difference = float(values[0,end] - values[0,start])
+                loss += scale * float(np.logaddexp(0.0,margin - difference))
+                derivative = scale * (1.0 / (1.0 + np.exp(np.clip(margin - difference,-80,80))) - 1.0)
+                gradient[0,start] -= derivative
+                gradient[0,end] += derivative
+        self._plateau_escape_gradient = gradient
+        return loss
+
     def _uses_search2_rank_mix(self):
+        if self.search2_rank_loss_apply_type == 'steps_pairwise':
+            return self.search2_value_loss_type == 'steps_to_goal'
         if self.search2_rank_loss_apply_type == 'none':
             return False
         if self.search2_rank_loss_apply_type == 'all':
@@ -1344,6 +1397,7 @@ class Rubiks_3_AI:
             'base': 0.0,
             'rank_raw': 0.0,
             'rank_scaled': 0.0,
+            'plateau_escape_scaled': 0.0,
             'total': 0.0,
             'rank_mix': float(getattr(self,'search2_rank_loss_mix',0.0)),
             'rank_apply_type': getattr(self,'search2_rank_loss_apply_type',''),
@@ -1403,14 +1457,15 @@ class Rubiks_3_AI:
                 )
         return result
 
-    def _record_search2_value_loss_components(self, base_name, base_loss, rank_loss, rank_scaled_loss, rank_applied):
-        total = float(base_loss) + float(rank_scaled_loss)
+    def _record_search2_value_loss_components(self, base_name, base_loss, rank_loss, rank_scaled_loss, rank_applied, plateau_escape_loss = 0.0):
+        total = float(base_loss) + float(rank_scaled_loss) + float(plateau_escape_loss)
         self._last_search2_value_loss_components = {
             'loss_type': self.search2_value_loss_type,
             'base_name': str(base_name),
             'base': float(base_loss),
             'rank_raw': float(rank_loss),
             'rank_scaled': float(rank_scaled_loss),
+            'plateau_escape_scaled': float(plateau_escape_loss),
             'total': total,
             'rank_mix': float(self.search2_rank_loss_mix),
             'rank_apply_type': self.search2_rank_loss_apply_type,
@@ -1674,6 +1729,10 @@ class Rubiks_3_AI:
             return True
         source_loss_type = getattr(data_item,'source_search2_value_loss_type',None)
         if self.search2_value_loss_type == 'steps_to_goal':
+            if self._is_plateau_escape_item(data_item) and getattr(
+                self,'steps_to_goal_plateau_escape_rank_mix',0.0,
+            ) <= 0.0:
+                return False
             return (
                 source_loss_type in (None, 'bootstrap', 'steps_to_goal_regression')
                 and self._uses_steps_to_goal_value_route(data_item)
@@ -2442,6 +2501,8 @@ class Rubiks_3_AI:
         """Keep one compact learning summary for the GUI and JSON history."""
         updates = max(0,int(update_count))
         quality = search3_quality_metrics if updates > 0 else None
+        components = getattr(self,'_last_search2_value_loss_components',None)
+        component_items = max(1,int(components.get('items',0) or 0)) if isinstance(components,dict) else 1
         self.last_training_metrics = {
             'policyLoss': None if updates == 0 else float(policy_loss_sum) / updates,
             'valueLoss': None if updates == 0 else float(value_loss_sum) / updates,
@@ -2465,6 +2526,18 @@ class Rubiks_3_AI:
             'trainingDataSources': self._training_data_source_history_metrics(),
             'gradientMetrics': self._gradient_history_metrics(),
             'stepsToGoalRegression': self._steps_to_goal_history_metrics(),
+            'search2BaseLossPerItem': (
+                float(components.get('base',0.0)) / component_items
+                if getattr(self,'search_mode',None) == 'search2' and updates and isinstance(components,dict) else None
+            ),
+            'search2RankLossPerItem': (
+                float(components.get('rank_scaled',0.0)) / component_items
+                if getattr(self,'search_mode',None) == 'search2' and updates and isinstance(components,dict) else None
+            ),
+            'search2PlateauEscapeLossPerItem': (
+                float(components.get('plateau_escape_scaled',0.0)) / component_items
+                if getattr(self,'search_mode',None) == 'search2' and updates and isinstance(components,dict) else None
+            ),
         }
 
     def _steps_to_goal_history_metrics(self):
@@ -2721,6 +2794,10 @@ class Rubiks_3_AI:
             'hardEffectDirectSelectedBeforeItemCount': 'hard_effect_direct_selected_before_items',
             'hardEffectDirectSelectedItemCount': 'hard_effect_direct_selected_items',
             'hardEffectDirectOversampledItemCount': 'hard_effect_direct_oversampled_items',
+            'plateauFallbackEligibleItemCount': 'plateau_fallback_eligible_items',
+            'plateauFallbackRequiredItemCount': 'plateau_fallback_required_items',
+            'plateauFallbackSelectedItemCount': 'plateau_fallback_selected_items',
+            'plateauFallbackOversampledItemCount': 'plateau_fallback_oversampled_items',
         }
         result = {
             field: max(0,int(summary.get(source,0) or 0))
@@ -2998,8 +3075,9 @@ class Rubiks_3_AI:
             f'rank_apply={components.get("rank_apply_type","")} '
             f'rank_applied={bool(components.get("rank_applied",False))}\n'
             f'  {base_name}={float(components.get("base",0.0)) / denom:.6f} '
-            f'myloss_rank_raw={float(components.get("rank_raw",0.0)) / denom:.6f} '
-            f'myloss_rank_mix={float(components.get("rank_scaled",0.0)) / denom:.6f} '
+            f'rank_raw={float(components.get("rank_raw",0.0)) / denom:.6f} '
+            f'rank_scaled={float(components.get("rank_scaled",0.0)) / denom:.6f} '
+            f'plateau_escape={float(components.get("plateau_escape_scaled",0.0)) / denom:.6f} '
             f'total={float(components.get("total",0.0)) / denom:.6f}'
         )
 
@@ -3020,6 +3098,7 @@ class Rubiks_3_AI:
                 'base': 0.0,
                 'rank_raw': 0.0,
                 'rank_scaled': 0.0,
+                'plateau_escape_scaled': 0.0,
                 'total': 0.0,
                 'rank_mix': float(components.get('rank_mix',0.0)),
                 'rank_apply_type': components.get('rank_apply_type',''),
@@ -3031,7 +3110,7 @@ class Rubiks_3_AI:
                 'steps_to_goal_stats': None,
                 'steps_to_goal_value_selection': None,
             }
-        for key in ('base','rank_raw','rank_scaled','total'):
+        for key in ('base','rank_raw','rank_scaled','plateau_escape_scaled','total'):
             current[key] = float(current.get(key,0.0)) + float(components.get(key,0.0))
         current['items'] = int(current.get('items',0)) + int(item_count)
         current['loss_type'] = components.get('loss_type',current.get('loss_type',''))
@@ -3317,6 +3396,9 @@ class Rubiks_3_AI:
         hard_effect_direct_summary = self._enforce_hard_effect_direct_minimum(
             selected_batches,data_source,
         )
+        plateau_fallback_summary = self._enforce_steps_to_goal_plateau_fallback_minimum(
+            selected_batches,all_indices,data_source,
+        )
         recent_window_floor = min(recent_items) if recent_items else None
         if getattr(self,'train_batch_mix_mode','ordered') == 'mixed' and recent_window_floor is not None:
             selected_batches = self._mix_recent_old_batches(
@@ -3352,6 +3434,7 @@ class Rubiks_3_AI:
             steps_to_goal_long_route_summary = long_route_summary,
             original_long_direct_summary = original_long_direct_summary,
             hard_effect_direct_summary = hard_effect_direct_summary,
+            plateau_fallback_summary = plateau_fallback_summary,
             recent_window_floor = recent_window_floor,
             remainder_indices = remainder_indices,
             data_source = data_source,
@@ -3524,6 +3607,63 @@ class Rubiks_3_AI:
             counts[batch[item_index]] -= 1
             batch[item_index] = candidate
             counts[candidate] += 1
+            selected_count += 1
+        summary['selected_item_count'] = selected_count
+        summary['oversampled_item_count'] = selected_count - selected_before
+        return summary
+
+    @staticmethod
+    def _is_plateau_escape_item(data_item):
+        return (
+            bool(getattr(data_item, 'plateau_escape', False))
+            and Rubiks_3_AI._training_trajectory_origin(data_item) == 'fallback'
+            and len(getattr(data_item, 'moves', ())) > 0
+        )
+
+    def _enforce_steps_to_goal_plateau_fallback_minimum(self, batches, all_indices, data_source):
+        """Reserve a small, capped share for verified stall-to-goal recoveries."""
+        ratio = min(1.0,max(0.0,float(getattr(self,'steps_to_goal_plateau_fallback_min_ratio',0.0))))
+        if getattr(self,'search2_value_loss_type',None) != 'steps_to_goal':
+            ratio = 0.0
+        selected = self._flatten_batches(batches)
+        required = int(math.ceil(len(selected) * ratio))
+        copies = Counter(selected)
+        eligible = [index for index in all_indices if self._is_plateau_escape_item(data_source[index])]
+        selected_before = sum(self._is_plateau_escape_item(data_source[index]) for index in selected)
+        summary = {
+            'minimum_ratio': ratio,
+            'eligible_item_count': len(eligible),
+            'required_item_count': required,
+            'selected_before_item_count': selected_before,
+            'selected_item_count': selected_before,
+            'oversampled_item_count': 0,
+        }
+        if not required or selected_before >= required or not eligible:
+            return summary
+        random.shuffle(eligible)
+        replaceable = [
+            (batch,position) for batch in batches for position,index in enumerate(batch)
+            if not self._is_plateau_escape_item(data_source[index])
+            and self._training_trajectory_origin(data_source[index]) != 'direct_search'
+        ]
+        random.shuffle(replaceable)
+        selected_count = selected_before
+        next_candidate = 0
+        for batch,position in replaceable:
+            if selected_count >= required:
+                break
+            candidate = None
+            for _ in eligible:
+                possible = eligible[next_candidate % len(eligible)]
+                next_candidate += 1
+                if copies[possible] < 2 and possible not in batch:
+                    candidate = possible
+                    break
+            if candidate is None:
+                break
+            copies[batch[position]] -= 1
+            batch[position] = candidate
+            copies[candidate] += 1
             selected_count += 1
         summary['selected_item_count'] = selected_count
         summary['oversampled_item_count'] = selected_count - selected_before
@@ -3788,7 +3928,7 @@ class Rubiks_3_AI:
             items += batch
         return items
 
-    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, medium_batch_count, long_batch_count, reserved_medium_items, reserved_long_items, stratified_batch_count, stratified_items, random_batch_count, short_max_steps, short_min_ratio, medium_min_steps, medium_max_steps, long_min_steps, long_max_ratio, short_eligible_item_count, medium_eligible_item_count, long_eligible_item_count, steps_to_goal_long_route_summary, original_long_direct_summary, hard_effect_direct_summary, recent_window_floor, remainder_indices, data_source, state_count_fn):
+    def _training_sample_summary(self, original_batch_count, original_item_count, selected_batches, recent_batch_count, medium_batch_count, long_batch_count, reserved_medium_items, reserved_long_items, stratified_batch_count, stratified_items, random_batch_count, short_max_steps, short_min_ratio, medium_min_steps, medium_max_steps, long_min_steps, long_max_ratio, short_eligible_item_count, medium_eligible_item_count, long_eligible_item_count, steps_to_goal_long_route_summary, original_long_direct_summary, hard_effect_direct_summary, plateau_fallback_summary, recent_window_floor, remainder_indices, data_source, state_count_fn):
         selected_items = self._flatten_batches(selected_batches)
         recent_window_selected = sum(
             recent_window_floor is not None and data_index >= recent_window_floor
@@ -3927,6 +4067,10 @@ class Rubiks_3_AI:
             'hard_effect_direct_oversampled_items': int(
                 hard_effect_direct_summary.get('oversampled_item_count',0)
             ),
+            'plateau_fallback_eligible_items': int(plateau_fallback_summary.get('eligible_item_count',0)),
+            'plateau_fallback_required_items': int(plateau_fallback_summary.get('required_item_count',0)),
+            'plateau_fallback_selected_items': int(plateau_fallback_summary.get('selected_item_count',0)),
+            'plateau_fallback_oversampled_items': int(plateau_fallback_summary.get('oversampled_item_count',0)),
             'original_items': original_item_count,
             'selected_items': len(selected_items),
             'selected_states': selected_states,
@@ -4291,6 +4435,7 @@ class Rubiks_3_AI:
             loss_inputs['value_columns'],
             loss_inputs['value_steps_to_goal'],
             loss_inputs['value_trajectory_origins'],
+            loss_inputs['plateau_escape_pairs'],
         )
         total_loss = policy_loss + value_loss
         total_loss.backward()
@@ -4323,12 +4468,15 @@ class Rubiks_3_AI:
             return torch.zeros((), dtype = torch.float32, device = device)
         return total_loss
 
-    def _torch_search2_value_loss(self, values, indices, value_columns = None, value_steps_to_goal = None, value_trajectory_origins = None):
+    def _torch_search2_value_loss(self, values, indices, value_columns = None, value_steps_to_goal = None, value_trajectory_origins = None, plateau_escape_pairs = None):
         self._last_steps_to_goal_regression_stats = None
+        plateau_loss = self._torch_plateau_escape_loss(values,plateau_escape_pairs)
         if value_columns is not None:
             if len(value_columns) == 0:
-                self._record_search2_value_loss_components('none',0.0,0.0,0.0,False)
-                return torch.zeros((), dtype = values.dtype, device = values.device)
+                self._record_search2_value_loss_components(
+                    'none',0.0,0.0,0.0,False,self._torch_loss_float(plateau_loss),
+                )
+                return plateau_loss
             column_tensor = torch.as_tensor(value_columns, dtype = torch.long, device = values.device)
             values = values.index_select(0,column_tensor)
         if self.search2_value_loss_type == 'myloss':
@@ -4356,11 +4504,17 @@ class Rubiks_3_AI:
             value_loss = self._torch_search2_value_loss_distance(values,indices,value_steps_to_goal)
             base_name = 'myloss2_distance'
         base_loss = value_loss
+        value_loss = value_loss + plateau_loss
         rank_loss = torch.zeros((), dtype = values.dtype, device = values.device)
         rank_scaled_loss = torch.zeros((), dtype = values.dtype, device = values.device)
         rank_applied = False
         if self.search2_rank_loss_mix > 0.0 and self._uses_search2_rank_mix():
-            rank_loss = self._torch_search2_value_loss_softmax(values,indices)
+            if self.search2_rank_loss_apply_type == 'steps_pairwise':
+                rank_loss = self._torch_search2_value_loss_pairwise(
+                    values,indices,reduction = 'trajectory_mean',
+                )
+            else:
+                rank_loss = self._torch_search2_value_loss_softmax(values,indices)
             rank_scaled_loss = self.search2_rank_loss_mix * rank_loss
             value_loss = value_loss + rank_scaled_loss
             rank_applied = True
@@ -4370,8 +4524,22 @@ class Rubiks_3_AI:
             self._torch_loss_float(rank_loss),
             self._torch_loss_float(rank_scaled_loss),
             rank_applied,
+            self._torch_loss_float(plateau_loss),
         )
         return value_loss
+
+    def _torch_plateau_escape_loss(self, values, pair_groups):
+        mix = max(0.0,float(getattr(self,'steps_to_goal_plateau_escape_rank_mix',0.0)))
+        total = torch.zeros((),dtype=values.dtype,device=values.device)
+        if not mix or not pair_groups:
+            return total
+        margin = float(getattr(self,'search2_value_loss_margin',0.0))
+        for pairs in pair_groups:
+            starts = torch.as_tensor([pair[0] for pair in pairs],dtype=torch.long,device=values.device)
+            ends = torch.as_tensor([pair[1] for pair in pairs],dtype=torch.long,device=values.device)
+            differences = values.index_select(0,ends) - values.index_select(0,starts)
+            total = total + mix * F_torch.softplus(margin - differences).mean()
+        return total
 
     def _torch_loss_float(self, loss):
         return float(loss.detach().cpu().item())
@@ -4416,7 +4584,7 @@ class Rubiks_3_AI:
             return torch.zeros((), dtype = values.dtype, device = values.device)
         return total_loss
 
-    def _torch_search2_value_loss_pairwise(self, values, indices):
+    def _torch_search2_value_loss_pairwise(self, values, indices, reduction = 'sum'):
         total_loss = torch.zeros((), dtype = values.dtype, device = values.device)
         has_loss = False
         margin = torch.as_tensor(self.search2_value_loss_margin, dtype = values.dtype, device = values.device)
@@ -4426,7 +4594,11 @@ class Rubiks_3_AI:
             if end - start <= 1:
                 continue
             diffs = values[start + 1:end] - values[start:end - 1]
-            total_loss = total_loss + torch.sum(F_torch.softplus(margin - diffs))
+            pair_losses = F_torch.softplus(margin - diffs)
+            total_loss = total_loss + (
+                torch.mean(pair_losses) if reduction == 'trajectory_mean'
+                else torch.sum(pair_losses)
+            )
             has_loss = True
         if not has_loss:
             return torch.zeros((), dtype = values.dtype, device = values.device)
@@ -4501,7 +4673,9 @@ class Rubiks_3_AI:
         self._apply_param_updates()
 
     def _weight_decay_keys(self):
-        keys = ['WO_P','WO_V','WM_P']
+        # Match the NumPy training path: decay shared weights, not Policy or
+        # Value head weights.
+        keys = []
         for key in self.affines:
             keys.append('W' + key[-1])
         if self.transformer_linear_skip:
@@ -4563,17 +4737,17 @@ class Rubiks_3_AI:
         if columns is None:
             return self.losslayer2.backward()
         d_selected = self.losslayer2.backward() if len(columns) > 0 else np.zeros((1,0),dtype = 'f')
-        if (
-            len(columns) > 0
-            and self._uses_search2_rank_mix()
-            and self._search2_value_has_rank_loss
-        ):
-            d_selected = d_selected + self.search2_rank_loss_mix * self.search2_rank_loss.backward()
-        if self.search2_value_loss_type == 'steps_to_goal':
-            d_selected = d_selected * self.steps_to_goal_value_loss_weight
+        if len(columns) > 0:
+            if self.search2_value_loss_type == 'steps_to_goal':
+                d_selected = d_selected * self.steps_to_goal_value_loss_weight
+            if self._uses_search2_rank_mix() and self._search2_value_has_rank_loss:
+                d_selected = d_selected + self.search2_rank_loss_mix * self.search2_rank_loss.backward()
         d_full = np.zeros((1,output_size),dtype = d_selected.dtype if d_selected.size > 0 else 'f')
         if len(columns) > 0:
             d_full[:,columns] = d_selected
+        plateau_gradient = getattr(self,'_plateau_escape_gradient',None)
+        if plateau_gradient is not None and plateau_gradient.shape == d_full.shape:
+            d_full += plateau_gradient
         return d_full
 
     def _backprop_policy_search3(self):

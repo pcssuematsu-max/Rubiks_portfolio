@@ -134,11 +134,13 @@ class LearnManager:
             f" gradRMS={gradients['globalRmsMean']:.4g}"
             f" P/V={gradients['policyGradientShareMean']:.0%}/{gradients['valueGradientShareMean']:.0%}"
         )
+        rank_loss = record.get('search2RankLossPerItem')
+        rank_text = '' if not rank_loss else f' relativeV={rank_loss:.4g}/item'
         self.frame.append_log(
             f"学習履歴: AI {index} {record['searchMode']} "
             f"P={policy_loss if policy_loss is not None else '-'} "
             f"V={value_loss if value_loss is not None else '-'} "
-            f"updates={record['updatesDuringSolve']}{gradient_text} "
+            f"updates={record['updatesDuringSolve']}{gradient_text}{rank_text} "
             f"を{'保存待ちにしました' if deferred else '保存しました'}。"
         )
 

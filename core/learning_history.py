@@ -119,6 +119,9 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "trainingDataSources": _training_data_sources(metrics.get("trainingDataSources")),
         "gradientMetrics": _gradient_metrics(metrics.get("gradientMetrics")),
         "stepsToGoalRegression": _steps_to_goal_regression(metrics.get("stepsToGoalRegression")),
+        "search2BaseLossPerItem": _finite_number(metrics.get("search2BaseLossPerItem")),
+        "search2RankLossPerItem": _finite_number(metrics.get("search2RankLossPerItem")),
+        "search2PlateauEscapeLossPerItem": _finite_number(metrics.get("search2PlateauEscapeLossPerItem")),
         "updatesDuringSolve": int(metrics.get("updatesDuringSolve", 0) or 0),
         "trainingDataCount": int(metrics.get("trainingDataCount", 0) or 0),
         "retainedDataCount": int(metrics.get("retainedDataCount", 0) or 0),
@@ -135,6 +138,9 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
             "value": _finite_number(getattr(ai, "update_scale_value", None)),
         },
         "search2ValueLossType": str(getattr(ai, "search2_value_loss_type", "")),
+        "search2ValueLossMargin": _finite_number(getattr(ai, "search2_value_loss_margin", None)),
+        "search2RankLossMix": _finite_number(getattr(ai, "search2_rank_loss_mix", None)),
+        "search2RankLossApplyType": str(getattr(ai, "search2_rank_loss_apply_type", "")),
         "search3RankLossMix": _finite_number(getattr(ai, "search3_rank_loss_mix", None)),
     }
 
@@ -173,6 +179,7 @@ def _validate_record(record: Any) -> None:
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
         "valueSequenceCount", "fixedValidation", "trainingSample", "trainingDataSources", "gradientMetrics", "stepsToGoalRegression", "search3RankLossMix",
+        "search2BaseLossPerItem", "search2RankLossPerItem", "search2PlateauEscapeLossPerItem", "search2ValueLossMargin", "search2RankLossMix", "search2RankLossApplyType",
     }
     if not isinstance(record, dict) or not required.issubset(record) or set(record) - required - optional:
         raise ValueError("Invalid learning history record")
@@ -203,6 +210,10 @@ def _validate_record(record: Any) -> None:
     _validate_training_data_sources(record.get("trainingDataSources"))
     _validate_gradient_metrics(record.get("gradientMetrics"))
     _validate_steps_to_goal_regression(record.get("stepsToGoalRegression"))
+    for field in ("search2BaseLossPerItem", "search2RankLossPerItem", "search2PlateauEscapeLossPerItem", "search2ValueLossMargin", "search2RankLossMix"):
+        _validate_optional_number(record.get(field))
+    if "search2RankLossApplyType" in record and not isinstance(record["search2RankLossApplyType"], str):
+        raise ValueError("Invalid learning history search2RankLossApplyType")
     _validate_optional_number(record.get("search3RankLossMix"))
     _validate_optional_number(record["learningSeconds"])
     _validate_number_mapping(record["learningRate"], {"base", "lrC", "momentumV", "momentumH"})
@@ -299,6 +310,8 @@ _TRAINING_SAMPLE_OPTIONAL_INT_FIELDS = frozenset({
     "hardEffectDirectEligibleItemCount", "hardEffectDirectRequiredItemCount",
     "hardEffectDirectSelectedBeforeItemCount", "hardEffectDirectSelectedItemCount",
     "hardEffectDirectOversampledItemCount",
+    "plateauFallbackEligibleItemCount", "plateauFallbackRequiredItemCount",
+    "plateauFallbackSelectedItemCount", "plateauFallbackOversampledItemCount",
     "recentWindowSelectedItemCount", "mixedBatchCount", "selectedUniqueItemCount",
 })
 

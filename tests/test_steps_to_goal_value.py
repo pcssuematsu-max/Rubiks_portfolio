@@ -1,15 +1,195 @@
 from types import SimpleNamespace
 import unittest
+import tempfile
+from pathlib import Path
 
 import numpy as np
 
-from ai.losses import Huber
+from ai.losses import Huber, MyLoss2Pairwise
 from ai.rubiks_ai import Rubiks_3_AI
+from configs.profiles import build_experiment_frame_config
+from core.learning_history import LearningHistoryStore, completed_learning_record
 from managers.search_data import SearchDataManager
 from managers.solve_session import SolveSessionManager
+from model.search_result import data
 
 
 class StepsToGoalValueTests(unittest.TestCase):
+    def test_steps_pairwise_treatment_leaves_reference_ais_unchanged(self):
+        config = build_experiment_frame_config()
+        self.assertEqual(config.search2_value_loss_types[22], 'steps_to_goal')
+        self.assertEqual(config.search2_rank_loss_apply_types[22], 'steps_pairwise')
+        self.assertEqual(config.search2_rank_loss_mixes[22], 1.0)
+        self.assertEqual(config.search2_value_loss_margins[22], 1.0)
+        self.assertEqual(config.steps_to_goal_plateau_fallback_min_ratios[22], 0.05)
+        self.assertEqual(config.steps_to_goal_plateau_escape_rank_mixes[22], 1.0)
+        self.assertEqual(config.steps_to_goal_plateau_escape_prefix_steps[22], 3)
+        for index in (20,21,23,24):
+            self.assertEqual(config.search2_rank_loss_mixes[index], 0.0)
+            self.assertEqual(config.steps_to_goal_plateau_escape_rank_mixes[index], 0.0)
+
+    def test_relative_loss_is_route_normalized_and_has_correct_gradient(self):
+        loss = MyLoss2Pairwise(margin=1.0,reduction='trajectory_mean')
+        values = np.asarray([[0.0,0.0,0.0,0.0,0.0]],dtype='f')
+        result = loss.forward(values,[0,2,5])
+        self.assertAlmostEqual(result,2.0 * np.logaddexp(0.0,1.0),places=6)
+        gradient = loss.backward()
+        self.assertAlmostEqual(float(np.sum(gradient)),0.0,places=6)
+        self.assertLess(float(gradient[0,-1]),0.0)
+
+    def test_torch_relative_loss_matches_numpy_route_normalization(self):
+        from ai import rubiks_ai as module
+        if module.torch is None:
+            self.skipTest('Torch unavailable')
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search2_value_loss_margin = 1.0
+        values = module.torch.tensor([0.0,0.0,0.0,0.0,0.0],requires_grad=True)
+        result = ai._torch_search2_value_loss_pairwise(
+            values,[0,2,5],reduction='trajectory_mean',
+        )
+        result.backward()
+        numpy_loss = MyLoss2Pairwise(margin=1.0,reduction='trajectory_mean')
+        self.assertAlmostEqual(result.item(),numpy_loss.forward(
+            np.zeros((1,5),dtype='f'),[0,2,5],
+        ),places=6)
+        np.testing.assert_allclose(values.grad.numpy(),numpy_loss.backward().reshape(-1),atol=1e-6)
+
+    def test_steps_to_goal_keeps_absolute_target_and_adds_relative_loss(self):
+        from ai import rubiks_ai as module
+        if module.torch is None:
+            self.skipTest('Torch unavailable')
+        ai = Rubiks_3_AI([8],cube_size=3,search_mode='search2',
+                         search2_value_loss_type='steps_to_goal')
+        ai.set_search2_value_loss_margin(1.0)
+        ai.set_search2_rank_loss_apply_type('steps_pairwise')
+        ai.set_search2_rank_loss_mix(1.0)
+        values = module.torch.tensor([-2.0,-1.0,0.0],requires_grad=True)
+        result = ai._torch_search2_value_loss(
+            values,[0,3],value_steps_to_goal=[2,1,0],
+            value_trajectory_origins=['direct_search'],
+        )
+        result.backward()
+        components = ai._last_search2_value_loss_components
+        self.assertEqual(components['base_name'],'steps_to_goal_huber')
+        self.assertAlmostEqual(components['base'],0.0,places=6)
+        self.assertTrue(components['rank_applied'])
+        self.assertAlmostEqual(components['rank_raw'],np.log(2.0),places=6)
+        self.assertLess(float(values.grad[-1]),0.0)
+
+    def test_relative_treatment_and_loss_are_persisted_in_learning_history(self):
+        ai = SimpleNamespace(
+            search_mode='search2', search2_value_loss_type='steps_to_goal',
+            search2_value_loss_margin=1.0, search2_rank_loss_mix=1.0,
+            search2_rank_loss_apply_type='steps_pairwise',search3_rank_loss_mix=0.0,
+            last_training_metrics={
+                'updatesDuringSolve':1,'search2BaseLossPerItem':2.0,
+                'search2RankLossPerItem':0.5,
+                'search2PlateauEscapeLossPerItem':0.25,
+            },
+        )
+        record = completed_learning_record(22,ai,0.1)
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            store = LearningHistoryStore(Path(temporary_directory) / 'history.json')
+            store.append(record)
+            saved = store.records()[0]
+        self.assertEqual(saved['search2RankLossApplyType'],'steps_pairwise')
+        self.assertEqual(saved['search2RankLossMix'],1.0)
+        self.assertEqual(saved['search2RankLossPerItem'],0.5)
+        self.assertEqual(saved['search2PlateauEscapeLossPerItem'],0.25)
+
+    def test_plateau_escape_prefix_has_independent_relative_gradient(self):
+        from ai import rubiks_ai as module
+        if module.torch is None:
+            self.skipTest('Torch unavailable')
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search2_value_loss_type = 'steps_to_goal'
+        ai.steps_to_goal_plateau_escape_rank_mix = 1.0
+        ai.steps_to_goal_plateau_escape_prefix_steps = 3
+        ai.search2_value_loss_margin = 1.0
+        stalled = SimpleNamespace(
+            plateau_escape=True, trajectory_origin='fallback', moves=('A','B','C','D'),
+        )
+        ordinary = SimpleNamespace(
+            plateau_escape=False, trajectory_origin='direct_search', moves=('E',),
+        )
+        groups = ai._plateau_escape_pairs([stalled,ordinary],[0,5,7])
+        self.assertEqual(groups,[[(0,1),(1,2),(2,3)]])
+        values = module.torch.zeros(7,requires_grad=True)
+        loss = ai._torch_plateau_escape_loss(values,groups)
+        loss.backward()
+        self.assertAlmostEqual(loss.item(),np.logaddexp(0.0,1.0),places=6)
+        self.assertGreater(values.grad[0].item(),0.0)
+        self.assertLess(values.grad[3].item(),0.0)
+        self.assertEqual(values.grad[5].item(),0.0)
+
+    def test_plateau_escape_still_trains_when_absolute_route_is_filtered(self):
+        from ai import rubiks_ai as module
+        if module.torch is None:
+            self.skipTest('Torch unavailable')
+        ai = Rubiks_3_AI([8],cube_size=3,search_mode='search2',
+                         search2_value_loss_type='steps_to_goal')
+        ai.steps_to_goal_plateau_escape_rank_mix = 1.0
+        ai.search2_value_loss_margin = 1.0
+        values = module.torch.zeros(2,requires_grad=True)
+        loss = ai._torch_search2_value_loss(
+            values,[0],value_columns=[],plateau_escape_pairs=[[(0,1)]],
+        )
+        loss.backward()
+        self.assertGreater(loss.item(),0.0)
+        self.assertGreater(values.grad[0].item(),0.0)
+        self.assertLess(values.grad[1].item(),0.0)
+
+    def test_numpy_plateau_escape_gradient_matches_torch_direction(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.steps_to_goal_plateau_escape_rank_mix = 1.0
+        ai.search2_value_loss_margin = 1.0
+        values = np.zeros((1,2),dtype='f')
+        loss = ai._numpy_plateau_escape_loss(values,[[(0,1)]])
+        self.assertAlmostEqual(loss,np.logaddexp(0.0,1.0),places=6)
+        self.assertGreater(ai._plateau_escape_gradient[0,0],0.0)
+        self.assertLess(ai._plateau_escape_gradient[0,1],0.0)
+
+    def test_plateau_escape_runs_through_search2_torch_training_batch(self):
+        from ai import rubiks_ai as module
+        if module.torch is None:
+            self.skipTest('Torch unavailable')
+        ai = Rubiks_3_AI([8],cube_size=3,search_mode='search2',
+                         search2_value_loss_type='steps_to_goal')
+        ai.steps_to_goal_plateau_escape_rank_mix = 1.0
+        ai.steps_to_goal_plateau_escape_prefix_steps = 3
+        ai.search2_value_loss_margin = 1.0
+        scramble = (ai.cube.move_keys[0],ai.cube.move_keys[3])
+        moves = tuple(ai.cube.invert_moves(scramble))
+        sample = data(
+            scramble,moves,np.zeros(len(moves),dtype='f'),
+            source_search2_value_loss_type='steps_to_goal_regression',
+            trajectory_origin='fallback',plateau_escape=True,
+        )
+        inputs = ai._build_loss_inputs([sample])
+        self.assertEqual(len(inputs['plateau_escape_pairs']),1)
+        losses,gradients = ai._torch_search2_losses_and_grads(inputs)
+        self.assertTrue(all(np.isfinite(value) for value in losses))
+        self.assertTrue(gradients)
+        self.assertGreater(ai._last_search2_value_loss_components['plateau_escape_scaled'],0.0)
+
+    def test_plateau_fallback_replay_does_not_replace_direct_routes(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search2_value_loss_type = 'steps_to_goal'
+        ai.steps_to_goal_plateau_fallback_min_ratio = 0.25
+        ai.cube_size = 3
+        items = [
+            SimpleNamespace(plateau_escape=False,trajectory_origin='direct_search',moves=('A',)),
+            SimpleNamespace(plateau_escape=False,trajectory_origin='legacy',moves=('B',)),
+            SimpleNamespace(plateau_escape=True,trajectory_origin='fallback',moves=('C',)),
+        ]
+        batches = [[0,1],[0,1]]
+        summary = ai._enforce_steps_to_goal_plateau_fallback_minimum(
+            batches,list(range(len(items))),items,
+        )
+        self.assertEqual(summary['selected_item_count'],1)
+        self.assertEqual(sum(index == 0 for batch in batches for index in batch),2)
+        self.assertEqual(sum(index == 2 for batch in batches for index in batch),1)
+
     def test_only_absolute_value_objectives_train_the_output_bias(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         ai.search_mode = 'search2'
@@ -384,6 +564,40 @@ class StepsToGoalValueTests(unittest.TestCase):
         self.assertEqual(regression_one.indices, [0])
         self.assertEqual(regression_two.indices, [0])
         self.assertEqual(pairwise.indices, [0])
+
+    def test_stalled_steps_fallback_keeps_value_label_and_escape_marker(self):
+        shared = []
+        source = SimpleNamespace(
+            search_mode='search2',search2_value_loss_type='steps_to_goal',
+            steps_to_goal_plateau_escape_rank_mix=1.0,datas=shared,indices=[],
+        )
+        target = SimpleNamespace(
+            search_mode='search2',search2_value_loss_type='steps_to_goal',
+            datas=shared,indices=[],
+        )
+        cube = SimpleNamespace(
+            simplify=lambda moves: tuple(moves),
+            make_transformations=lambda scramble,moves: ((tuple(scramble),),(tuple(moves),)),
+        )
+        state = SimpleNamespace(
+            s=('stalled',),move_lis=[('escape','goal')],search_TF=False,
+            fallback_used=True,direct_search_attempts=[{'returnedMoveCount':0}],
+            last_perfect_key='',last_top_group=None,
+        )
+        frame = SimpleNamespace(solve_state=state,cube=cube,AIs=[source,target],AI_idx=0,AInum=2)
+
+        self.assertTrue(SolveSessionManager(frame)._store_connected_steps_to_goal_training_sample([1]))
+        self.assertEqual(shared[0].trajectory_origin,'fallback')
+        self.assertEqual(shared[0].source_search2_value_loss_type,'steps_to_goal_regression')
+        self.assertTrue(shared[0].plateau_escape)
+        self.assertEqual(target.indices,[0])
+        control = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        control.search2_value_loss_type = 'steps_to_goal'
+        control.steps_to_goal_plateau_escape_rank_mix = 0.0
+        self.assertFalse(control._uses_search2_value_loss_for_sample(shared[0]))
+        control.steps_to_goal_plateau_escape_rank_mix = 1.0
+        control.steps_to_goal_value_max_route_efficiency = 0.0
+        self.assertTrue(control._uses_search2_value_loss_for_sample(shared[0]))
 
     def test_direct_steps_to_goal_route_creates_one_connected_sample_per_target_kind(self):
         source = SimpleNamespace(search_mode = 'search2', search2_value_loss_type = 'steps_to_goal')

@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 
 from ai.rubiks_ai import Rubiks_3_AI
+from cube.rubiks_cube import Rubiks_3
 from managers.solve_session import SolveSessionManager, SolveSessionState
 from model.search_result import SearchResult
 
@@ -12,6 +13,21 @@ class DirectSearchDiagnosticsTests(unittest.TestCase):
     def setUp(self):
         self.state = SolveSessionState()
         self.manager = SolveSessionManager(SimpleNamespace(solve_state=self.state))
+
+    def test_terminal_probe_records_compact_value_counts_and_restores_cube(self):
+        cube = Rubiks_3(size=3,RegisterMyperms=False,PointReindex=False)
+        cube.make_move(cube.move_keys[0])
+        before = cube.state.copy()
+        self.state.direct_search_attempts.append({'endReason':'budget'})
+        self.manager.frame = SimpleNamespace(solve_state=self.state,cube=cube,cube_size=3)
+        ai = SimpleNamespace(predict=lambda x,**kwargs: np.arange(x.shape[1],dtype='f').reshape(1,-1))
+
+        self.manager._record_terminal_value_neighborhood(ai)
+
+        attempt = self.state.direct_search_attempts[-1]
+        self.assertEqual(attempt['terminalImprovingSuccessorCount'],len(cube.move_keys)-1)
+        self.assertEqual(attempt['terminalBestSuccessorDelta'],len(cube.move_keys)-1)
+        np.testing.assert_array_equal(cube.state,before)
 
     def test_search2_diagnostics_keep_the_direct_budget_reason(self):
         ai = SimpleNamespace(

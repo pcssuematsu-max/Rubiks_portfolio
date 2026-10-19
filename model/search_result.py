@@ -18,6 +18,7 @@ class data:
         trajectory_origin = 'legacy',
         source_objective = 'legacy',
         training_target = 'unknown',
+        plateau_escape = False,
     ):
         self.scramble = scramble
         self.moves = moves
@@ -32,6 +33,9 @@ class data:
         # it.  A direct Search3 route, for example, can teach steps_to_goal.
         self.source_objective = str(source_objective or 'legacy')
         self.training_target = str(training_target or 'unknown')
+        # A successful fallback that starts where direct Search2 stopped.
+        # Older saved replay items simply lack this optional attribute.
+        self.plateau_escape = bool(plateau_escape)
         if steps_to_goal is None:
             steps_to_goal = tuple(range(len(moves),-1,-1))
         self.steps_to_goal = tuple(steps_to_goal)

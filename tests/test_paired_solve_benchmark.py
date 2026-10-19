@@ -6,9 +6,10 @@ import numpy as np
 
 from ai.paired_solve_benchmark import (
     EFFECT_BANDS, fixture_set_id, make_paired_fixtures, make_palm_fixtures,
-    run_direct_solve_case, summarize_direct_cases,
+    probe_position_neighborhood, run_direct_solve_case, summarize_direct_cases,
 )
 from cube.rubiks_cube import Rubiks_3
+from ai.rubiks_ai import Rubiks_3_AI
 from model.search_result import SearchResult
 from tools.compare_ai_same_positions import _indices, _paired_summary
 
@@ -48,6 +49,24 @@ def _fixture(scramble, cube):
 
 
 class PairedSolveBenchmarkTests(unittest.TestCase):
+    def test_neighborhood_probe_restores_cube_and_reports_ranks(self):
+        ai = Rubiks_3_AI([8],cube_size=3,search_mode='search2')
+        ai.cube.scramble(2)
+        original = ai.cube.state.copy()
+        weights = {key: value.copy() for key,value in ai.params.items()}
+        reference = ai.cube.move_keys[0]
+        result = probe_position_neighborhood(ai,reference)
+        self.assertGreaterEqual(result['referencePolicyRank'],1)
+        self.assertGreaterEqual(result['referenceValueRank'],1)
+        self.assertEqual(result['referencePolicyRank'],result['policyRankByMove'][reference])
+        self.assertEqual(result['referenceValueRank'],result['valueRankByMove'][reference])
+        self.assertEqual(len(result['topPolicyMoves']),3)
+        self.assertEqual(len(result['topValueMoves']),3)
+        self.assertLessEqual(result['improvingSuccessorCount'],len(ai.cube.move_keys))
+        np.testing.assert_array_equal(ai.cube.state,original)
+        for key,value in weights.items():
+            np.testing.assert_array_equal(ai.params[key],value)
+
     def test_fixtures_are_balanced_unique_and_deterministic(self):
         before = random.getstate()
         fixtures = make_paired_fixtures(per_band=1)
@@ -128,6 +147,28 @@ class PairedSolveBenchmarkTests(unittest.TestCase):
         records[1]['cases'][0]['initialStateHash'] = 'different'
         with self.assertRaises(ValueError):
             _paired_summary(records, fixtures)
+
+    def test_paired_summary_compares_successful_linear_move_ranks(self):
+        fixtures = [{'fixtureId':'1-1','band':'0-7','initialStateHash':'same'}]
+        records = [
+            {'aiIndex':20,'settings':{'model':'linear'},'cases':[{
+                'fixtureId':'1-1','initialStateHash':'same','directSolved':True,
+                'firstMove':' R ',
+                'initialNeighborhood':{
+                    'policyRankByMove':{' R ':1},'valueRankByMove':{' R ':2},
+                },
+            }]},
+            {'aiIndex':22,'settings':{'model':'transformer'},'cases':[{
+                'fixtureId':'1-1','initialStateHash':'same','directSolved':False,
+                'initialNeighborhood':{
+                    'policyRankByMove':{' R ':12},'valueRankByMove':{' R ':18},
+                },
+            }]},
+        ]
+        summary = _paired_summary(records,fixtures)[0]
+        self.assertEqual(summary['linearReferenceMoves'][0]['ranksByAi']['22'],{
+            'policyRank':12,'valueRank':18,
+        })
 
 
 if __name__ == '__main__':

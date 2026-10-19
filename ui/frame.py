@@ -179,6 +179,9 @@ class Frame(Tk.Frame):
             steps_to_goal_states_per_bands = config.steps_to_goal_states_per_bands,
             steps_to_goal_replay_stratified_ratios = config.steps_to_goal_replay_stratified_ratios,
             steps_to_goal_long_route_min_ratios = config.steps_to_goal_long_route_min_ratios,
+            steps_to_goal_plateau_fallback_min_ratios = config.steps_to_goal_plateau_fallback_min_ratios,
+            steps_to_goal_plateau_escape_rank_mixes = config.steps_to_goal_plateau_escape_rank_mixes,
+            steps_to_goal_plateau_escape_prefix_steps = config.steps_to_goal_plateau_escape_prefix_steps,
             original_long_direct_min_ratios = config.original_long_direct_min_ratios,
             hard_effect_direct_min_ratios = config.hard_effect_direct_min_ratios,
             steps_to_goal_value_max_route_efficiencies = config.steps_to_goal_value_max_route_efficiencies,
@@ -627,6 +630,9 @@ class Frame(Tk.Frame):
                                    steps_to_goal_states_per_bands = None,
                                    steps_to_goal_replay_stratified_ratios = None,
                                    steps_to_goal_long_route_min_ratios = None,
+                                   steps_to_goal_plateau_fallback_min_ratios = None,
+                                   steps_to_goal_plateau_escape_rank_mixes = None,
+                                   steps_to_goal_plateau_escape_prefix_steps = None,
                                    original_long_direct_min_ratios = None,
                                    hard_effect_direct_min_ratios = None,
                                    steps_to_goal_value_max_route_efficiencies = None,
@@ -767,6 +773,18 @@ class Frame(Tk.Frame):
             if steps_to_goal_long_route_min_ratios is not None:
                 self.AIs[i].set_steps_to_goal_long_route_min_ratio(
                     steps_to_goal_long_route_min_ratios[i]
+                )
+            if steps_to_goal_plateau_fallback_min_ratios is not None:
+                self.AIs[i].steps_to_goal_plateau_fallback_min_ratio = min(
+                    1.0, max(0.0, float(steps_to_goal_plateau_fallback_min_ratios[i]))
+                )
+            if steps_to_goal_plateau_escape_rank_mixes is not None:
+                self.AIs[i].steps_to_goal_plateau_escape_rank_mix = max(
+                    0.0, float(steps_to_goal_plateau_escape_rank_mixes[i])
+                )
+            if steps_to_goal_plateau_escape_prefix_steps is not None:
+                self.AIs[i].steps_to_goal_plateau_escape_prefix_steps = max(
+                    0, int(steps_to_goal_plateau_escape_prefix_steps[i])
                 )
             if original_long_direct_min_ratios is not None:
                 self.AIs[i].set_original_long_direct_min_ratio(

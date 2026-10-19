@@ -262,31 +262,39 @@ class MyLoss2:
 class MyLoss2Pairwise:
     """Adjacent pairwise margin loss for Search2 value training."""
 
-    def __init__(self, margin = 0.2):
+    def __init__(self, margin = 0.2, reduction = 'sum'):
         self.margin = float(margin)
+        if reduction not in ('sum', 'trajectory_mean'):
+            raise ValueError(f'unknown pairwise reduction: {reduction}')
+        self.reduction = reduction
         self.x = np.zeros(0,dtype = 'f')
         self.diffs = np.zeros(0,dtype = 'f')
         self.y = np.zeros(0,dtype = 'f')
         self.Indices = None
+        self.pair_scales = np.zeros((1,0),dtype = 'f')
 
     def forward(self,x,Indices):
         self.x = x
         self.Indices = Indices
         self.diffs = np.zeros((1,0),dtype = x.dtype)
+        scales = []
         for i in range(len(Indices) - 1):
             start = Indices[i]
             end = Indices[i + 1]
             if end - start <= 1:
                 continue
             self.diffs = np.c_[self.diffs,self.x[:,start + 1:end] - self.x[:,start:end - 1]]
+            scale = 1.0 / (end - start - 1) if self.reduction == 'trajectory_mean' else 1.0
+            scales.extend([scale] * (end - start - 1))
+        self.pair_scales = np.asarray(scales,dtype = x.dtype).reshape(1,-1)
         self.y = sigmoid(self.diffs - self.margin)
-        return np.sum(np.logaddexp(0.0,self.margin - self.diffs))
+        return np.sum(self.pair_scales * np.logaddexp(0.0,self.margin - self.diffs))
 
     def backward(self):
         dO = np.zeros_like(self.x)
         if self.Indices is None:
             return dO
-        D = self.y - 1.0
+        D = (self.y - 1.0) * self.pair_scales
         diff_index = 0
         for i in range(len(self.Indices) - 1):
             start = self.Indices[i]

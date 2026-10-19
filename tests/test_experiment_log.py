@@ -16,6 +16,31 @@ from core.experiment_log import (
 
 
 class ExperimentLogStoreTests(unittest.TestCase):
+    def test_effect_band_counts_only_probed_failure_terminals(self):
+        rows = [
+            {
+                'setupEffect': {'movedPieceCount': 16},
+                'outcome': 'greedy_fallback_success', 'searchSucceeded': False,
+                'searchMode': 'search3',
+                'directSearch': {'finalAttempt': {'terminalImprovingSuccessorCount': 3}},
+            },
+            {
+                'setupEffect': {'movedPieceCount': 16},
+                'outcome': 'greedy_fallback_success', 'searchSucceeded': False,
+                'searchMode': 'search3', 'directSearch': {'finalAttempt': {}},
+            },
+            {
+                'setupEffect': {'movedPieceCount': 16},
+                'outcome': 'search_success', 'searchSucceeded': True,
+                'searchMode': 'search3', 'directSearch': {'finalAttempt': {}},
+            },
+        ]
+        band = next(item for item in _setup_effect_bands(rows) if item['label'] == '14-19')
+        self.assertEqual(band['directSearchSuccessCount'], 1)
+        self.assertEqual(band['classifiedRunCount'], 3)
+        self.assertEqual(band['terminalProbedFailureCount'], 1)
+        self.assertEqual(band['terminalImprovingFailureCount'], 1)
+
     def test_appends_a_jsonl_and_csv_record_with_benchmark_fields(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             output_directory = Path(temporary_directory)

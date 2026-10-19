@@ -165,7 +165,81 @@ def _finite_float(value):
     return result if np.isfinite(result) else None
 
 
-def run_direct_solve_case(ai, fixture, max_search_calls=200, max_moves=300):
+def probe_position_neighborhood(ai, reference_move=None):
+    """Read-only Policy/Value ranks for every legal successor of one state.
+
+    The reference move is only a reproducible inverse-scramble comparison,
+    not a claim that it is the unique or shortest good move. Raw Value scales
+    differ by loss type; compare ranks within an AI, not scores across AIs.
+    """
+    cube = ai.cube
+    snapshot = cube._snapshot() if hasattr(cube, '_snapshot') else cube.state.copy()
+    moves = tuple(cube.move_keys)
+    try:
+        current = np.asarray(cube.makedata(),dtype='f').reshape(-1,1)
+        output = np.asarray(ai.predict(
+            current,policy=True,value=True,loss=False,retain_cache=False,
+        ),dtype='f')
+        policy = output[:-1,0]
+        current_value = float(output[-1,0])
+        columns = []
+        for move in moves:
+            if hasattr(cube,'_restore'):
+                cube._restore(snapshot)
+            else:
+                cube.state[:] = snapshot
+            cube.make_move(move)
+            columns.append(cube.makedata())
+        values = []
+        for start in range(0,len(columns),64):
+            batch = np.asarray(columns[start:start + 64],dtype='f').T
+            values.extend(np.asarray(ai.predict(
+                batch,policy=False,value=True,loss=False,retain_cache=False,
+            ),dtype='f').reshape(-1).tolist())
+        values = np.asarray(values,dtype='f')
+        if not (np.all(np.isfinite(policy)) and np.isfinite(current_value) and np.all(np.isfinite(values))):
+            raise ValueError('Non-finite Policy/Value in fixed-position neighborhood probe')
+        policy_order = np.argsort(-policy,kind='stable')
+        value_order = np.argsort(-values,kind='stable')
+        result = {
+            'valueDomain': 'raw_logit' if ai.search_mode == 'search3' else 'raw',
+            'currentValue': current_value,
+            'goalValue': _finite_float(getattr(ai,'perfect_val',None)),
+            'improvingSuccessorCount': int(np.count_nonzero(values > current_value)),
+            'bestSuccessorDelta': float(np.max(values) - current_value),
+            'topPolicyMoves': [moves[int(index)] for index in policy_order[:3]],
+            'topValueMoves': [moves[int(index)] for index in value_order[:3]],
+            'policyValueTop3Overlap': len(set(policy_order[:3]) & set(value_order[:3])),
+            # Optional offline output only; it lets a successful peer's
+            # actual first move be evaluated by every other AI afterward.
+            'policyRankByMove': {
+                move: int(np.count_nonzero(policy > policy[index]) + 1)
+                for index,move in enumerate(moves)
+            },
+            'valueRankByMove': {
+                move: int(np.count_nonzero(values > values[index]) + 1)
+                for index,move in enumerate(moves)
+            },
+        }
+        if reference_move in moves:
+            index = moves.index(reference_move)
+            result.update({
+                'referenceMove': reference_move,
+                'referencePolicyRank': int(np.count_nonzero(policy > policy[index]) + 1),
+                'referenceValueRank': int(np.count_nonzero(values > values[index]) + 1),
+                'referenceValueDelta': float(values[index] - current_value),
+            })
+        return result
+    finally:
+        if hasattr(cube,'_restore'):
+            cube._restore(snapshot)
+        else:
+            cube.state[:] = snapshot
+
+
+def run_direct_solve_case(ai, fixture, max_search_calls=200, max_moves=300,
+                          terminal_probe=None, record_route=False,
+                          record_search_trace=False):
     """Run one AI from a fixture's exact state until direct solve or fallback.
 
     Search2 may make several improving segments. Search3 stops when the GUI
@@ -197,6 +271,10 @@ def run_direct_solve_case(ai, fixture, max_search_calls=200, max_moves=300):
         'terminalStateHash': None,
         'elapsedSeconds': 0.0,
     }
+    if record_route:
+        result_row['routeMoves'] = []
+    if record_search_trace:
+        result_row['searchTrace'] = []
     depth_weighted = 0.0
     depth_count = 0
     deep20_weighted = 0.0
@@ -220,6 +298,61 @@ def run_direct_solve_case(ai, fixture, max_search_calls=200, max_moves=300):
             result_row['lastSearchEndReason'] = str(result.end_reason)
             result_row['terminalRootValue'] = _finite_float(result.root_value)
             result_row['terminalBestValue'] = _finite_float(result.best_value)
+            trace = None
+            if record_search_trace:
+                trace = {
+                    'call': result_row['searchCalls'],
+                    'rootStateHash': hashlib.sha256(
+                        ''.join(before).encode('ascii')
+                    ).hexdigest()[:16],
+                    'moveOffset': result_row['moveCount'],
+                    'endReason': str(result.end_reason),
+                    'proposedFirstMove': result.moves[0] if result.moves else None,
+                    'proposedMoveCount': len(result.moves),
+                    'acceptedMoves': [],
+                    'rootValue': _finite_float(result.root_value),
+                    'bestValue': _finite_float(result.best_value),
+                    'lastAttemptWorkCount': max(0, int(result.stats[1])),
+                }
+                if ai.search_mode == 'search3':
+                    diagnostics = result.search_diagnostics or {}
+                    budget = diagnostics.get('budgetSummary') or {}
+                    trace['budget'] = {
+                        'mode': budget.get('mode'),
+                        'stopReason': budget.get('stopReason'),
+                        'consumedPlayoutCount': budget.get('consumedPlayoutCount'),
+                        'stages': [
+                            {key: stage.get(key) for key in (
+                                'playoutLimit', 'consumedPlayoutCount',
+                                'rootVisitShare', 'bestImprovement',
+                                'playoutDepthMean', 'decision',
+                            )}
+                            for stage in budget.get('stages', ())
+                        ],
+                    }
+                    trace['playoutDepthMean'] = _finite_float(diagnostics.get('playoutDepthMean'))
+                    trace['playoutDepthMax'] = int(diagnostics.get('playoutDepthMax') or 0)
+                    root = getattr(ai.search3_engine, 'root_node', None)
+                    if root is not None:
+                        visits = np.asarray(root.visited).reshape(-1)
+                        if len(visits) == len(cube.move_keys):
+                            priors = np.asarray(root.P).reshape(-1)
+                            backed_values = np.asarray(root.val).reshape(-1)
+                            trace['rootVisitCounts'] = {
+                                move: int(visits[index])
+                                for index, move in enumerate(cube.move_keys)
+                                if visits[index] > 0
+                            }
+                            trace['rootPolicyProbabilities'] = {
+                                move: float(priors[index])
+                                for index, move in enumerate(cube.move_keys)
+                            }
+                            trace['rootMeanBackedValues'] = {
+                                move: float(backed_values[index] / visits[index])
+                                for index, move in enumerate(cube.move_keys)
+                                if visits[index] > 0
+                            }
+                result_row['searchTrace'].append(trace)
             if ai.search_mode == 'search3':
                 attempts = list(result.attempt_results or (result,))
                 for attempt in attempts:
@@ -259,8 +392,12 @@ def run_direct_solve_case(ai, fixture, max_search_calls=200, max_moves=300):
                 result_row['firstMove'] = moves[0]
             for move in moves:
                 cube.make_move(move)
+                if record_route:
+                    result_row['routeMoves'].append(move)
                 if ai.search_mode == 'search3':
                     ai.search3_engine.advance_root(move)
+            if trace is not None:
+                trace['acceptedMoves'] = list(moves)
             result_row['moveCount'] += len(moves)
             if cube.is_perfect():
                 result_row['directSolved'] = True
@@ -273,6 +410,8 @@ def run_direct_solve_case(ai, fixture, max_search_calls=200, max_moves=300):
                 ai.clear_training_cache(collect=False)
         else:
             result_row['terminalReason'] = 'search_call_limit'
+        if not result_row['directSolved'] and terminal_probe is not None:
+            result_row['terminalNeighborhood'] = terminal_probe(ai)
     finally:
         result_row['terminalStateHash'] = hashlib.sha256(
             ''.join(cube.state).encode('ascii')

@@ -317,12 +317,27 @@ class ExperimentLogStore:
             row for row in classified
             if row["outcome"] in ("greedy_fallback_success", "greedy_fallback_failed")
         ]
+        probed_failures = [
+            (row.get("directSearch") or {}).get("finalAttempt") or {}
+            for row in classified if row["outcome"] != "search_success"
+        ]
+        probed_failures = [
+            attempt for attempt in probed_failures
+            if isinstance(attempt.get("terminalImprovingSuccessorCount"), int)
+        ]
+        improving_failures = sum(
+            attempt["terminalImprovingSuccessorCount"] > 0
+            for attempt in probed_failures
+        )
         return {
             "runCount": len(window),
             "classifiedRunCount": len(classified),
             "directSearchSuccessCount": len(direct),
             "directSearchSuccessRate": _rate(len(direct),len(classified)),
             "fallbackCount": len(fallback),
+            "terminalProbedFailureCount": len(probed_failures),
+            "terminalImprovingFailureCount": improving_failures,
+            "terminalImprovingFailureRate": _rate(improving_failures, len(probed_failures)),
         }
 
     def recent_ai_search3_depth_bands(
@@ -838,6 +853,18 @@ def _setup_effect_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             _safe_float(attempt.get("returnedFirstMoveValueDelta"))
             for row, attempt in attempts if not row.get("searchSucceeded")
         ]
+        probed_failures = [
+            (row.get("directSearch") or {}).get("finalAttempt") or {}
+            for row in band_rows if row.get("outcome") not in ("search_success", "legacy_unknown")
+        ]
+        probed_failures = [
+            attempt for attempt in probed_failures
+            if isinstance(attempt.get("terminalImprovingSuccessorCount"), int)
+        ]
+        improving_failures = sum(
+            attempt["terminalImprovingSuccessorCount"] > 0
+            for attempt in probed_failures
+        )
         result.append({
             "label": label,
             "minimum": minimum,
@@ -846,6 +873,9 @@ def _setup_effect_bands(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "classifiedRunCount": len(classified),
             "directSearchSuccessCount": len(direct),
             "directSearchSuccessRate": _rate(len(direct), len(classified)),
+            "terminalProbedFailureCount": len(probed_failures),
+            "terminalImprovingFailureCount": improving_failures,
+            "terminalImprovingFailureRate": _rate(improving_failures, len(probed_failures)),
             "averageOrientationCount": _mean_number(orientations),
             "averageReducedMoveCount": _mean_number(reduced),
             "directFirstMoveVisitShare": _mean_number(direct_visits),

@@ -26,7 +26,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ai.paired_solve_benchmark import (
-    fixture_set_id, make_paired_fixtures, make_palm_fixtures, run_direct_solve_case,
+    fixture_set_id, make_paired_fixtures, make_palm_fixtures, probe_position_neighborhood,
+    run_direct_solve_case,
     summarize_direct_cases,
 )
 from ai.rubiks_ai import Rubiks_3_AI
@@ -130,6 +131,12 @@ def _settings(ai, config, index):
         'model': 'transformer' if ai.is_transformer else 'linear',
         'searchMode': ai.search_mode,
         'valueLossType': config.search2_value_loss_types[index],
+        'valueLossMargin': float(config.search2_value_loss_margins[index]),
+        'search2RankLossMix': float(config.search2_rank_loss_mixes[index]),
+        'search2RankLossApplyType': str(config.search2_rank_loss_apply_types[index]),
+        'plateauFallbackMinRatio': float(config.steps_to_goal_plateau_fallback_min_ratios[index]),
+        'plateauEscapeRankMix': float(config.steps_to_goal_plateau_escape_rank_mixes[index]),
+        'plateauEscapePrefixSteps': int(config.steps_to_goal_plateau_escape_prefix_steps[index]),
         'search3RankLossMix': float(config.search3_rank_loss_mixes[index]),
         'trainRecentRatio': float(config.original_train_recent_ratios[index]),
         'trainBatchMixMode': str(config.original_train_batch_mix_modes[index]),
@@ -165,13 +172,38 @@ def _paired_summary(records, fixtures):
             index for index, record in by_ai.items()
             if record['cases'][fixture_index]['directSolved']
         ]
-        comparisons.append({
+        comparison = {
             'fixtureId': fixture['fixtureId'],
             'band': fixture['band'],
             'initialStateHash': fixture['initialStateHash'],
             'solvedBy': solved,
             'failedBy': [index for index in by_ai if index not in solved],
-        })
+        }
+        linear_references = []
+        for source_index, source_record in by_ai.items():
+            source_case = source_record['cases'][fixture_index]
+            if (
+                source_record.get('settings',{}).get('model') != 'linear'
+                or not source_case['directSolved'] or not source_case.get('firstMove')
+            ):
+                continue
+            move = source_case['firstMove']
+            ranks = {}
+            for peer_index, peer_record in by_ai.items():
+                neighborhood = peer_record['cases'][fixture_index].get('initialNeighborhood') or {}
+                policy_rank = (neighborhood.get('policyRankByMove') or {}).get(move)
+                value_rank = (neighborhood.get('valueRankByMove') or {}).get(move)
+                if policy_rank is not None and value_rank is not None:
+                    ranks[str(peer_index)] = {
+                        'policyRank': policy_rank, 'valueRank': value_rank,
+                    }
+            if ranks:
+                linear_references.append({
+                    'aiIndex': source_index,'move': move,'ranksByAi': ranks,
+                })
+        if linear_references:
+            comparison['linearReferenceMoves'] = linear_references
+        comparisons.append(comparison)
     return comparisons
 
 
@@ -189,6 +221,8 @@ def main(argv=None):
     parser.add_argument('--checkpoint-root', type=Path, default=ROOT)
     parser.add_argument('--output', type=Path, default=ROOT / 'exports' / 'ai-paired-benchmark.jsonl')
     parser.add_argument('--list-fixtures', action='store_true', help='Print the fixed setups without loading AIs')
+    parser.add_argument('--neighbor-probe', action='store_true',
+                        help='Record read-only root Policy/Value ranks and failure-state neighborhoods')
     args = parser.parse_args(argv)
     if args.max_search_calls < 1 or args.max_moves < 1:
         parser.error('max-search-calls and max-moves must be positive')
@@ -220,11 +254,20 @@ def main(argv=None):
         ai, checkpoint = _load_ai(index, config, args.checkpoint_root)
         cases = []
         for fixture in fixtures:
+            root_probe = None
+            if args.neighbor_probe:
+                ai.cube.reset()
+                ai.cube.scramble(0,Move=tuple(fixture['scramble']))
+                inverse = tuple(ai.cube.invert_moves(tuple(fixture['scramble'])))
+                root_probe = probe_position_neighborhood(ai,inverse[0] if inverse else None)
             case = run_direct_solve_case(
                 ai, fixture,
                 max_search_calls=args.max_search_calls,
                 max_moves=args.max_moves,
+                terminal_probe=probe_position_neighborhood if args.neighbor_probe else None,
             )
+            if root_probe is not None:
+                case['initialNeighborhood'] = root_probe
             cases.append(case)
             print(
                 f'AI {index:02d} {fixture["fixtureId"]:>3} '

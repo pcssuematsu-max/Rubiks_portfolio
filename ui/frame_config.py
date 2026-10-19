@@ -85,6 +85,9 @@ class FrameConfig:
     steps_to_goal_states_per_bands: Optional[Sequence[int]] = None
     steps_to_goal_replay_stratified_ratios: Optional[Sequence[float]] = None
     steps_to_goal_long_route_min_ratios: Optional[Sequence[float]] = None
+    steps_to_goal_plateau_fallback_min_ratios: Optional[Sequence[float]] = None
+    steps_to_goal_plateau_escape_rank_mixes: Optional[Sequence[float]] = None
+    steps_to_goal_plateau_escape_prefix_steps: Optional[Sequence[int]] = None
     original_long_direct_min_ratios: Optional[Sequence[float]] = None
     hard_effect_direct_min_ratios: Optional[Sequence[float]] = None
     steps_to_goal_value_max_route_efficiencies: Optional[Sequence[float]] = None
@@ -178,6 +181,9 @@ class FrameConfig:
         self._validate_ai_sequence_length('steps_to_goal_states_per_bands', self.steps_to_goal_states_per_bands, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_replay_stratified_ratios', self.steps_to_goal_replay_stratified_ratios, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_long_route_min_ratios', self.steps_to_goal_long_route_min_ratios, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_plateau_fallback_min_ratios', self.steps_to_goal_plateau_fallback_min_ratios, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_plateau_escape_rank_mixes', self.steps_to_goal_plateau_escape_rank_mixes, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_plateau_escape_prefix_steps', self.steps_to_goal_plateau_escape_prefix_steps, ai_count)
         self._validate_ai_sequence_length('original_long_direct_min_ratios', self.original_long_direct_min_ratios, ai_count)
         self._validate_ai_sequence_length('hard_effect_direct_min_ratios', self.hard_effect_direct_min_ratios, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_value_max_route_efficiencies', self.steps_to_goal_value_max_route_efficiencies, ai_count)

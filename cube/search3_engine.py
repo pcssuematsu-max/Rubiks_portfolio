@@ -108,16 +108,16 @@ class Search3Engine:
             prediction = predictions[:, index:index + 1]
             self.prediction_cache[state_key] = prediction
             node_P = self._node_policy_from_prediction(prediction)
-            node_V = prediction[-1, 0]
+            value_logit = prediction[-1, 0]
             child_node = self.node_cache.get(state_key)
             if child_node is None:
-                child_node = self._create_node(state_key, node_P, node_V)
+                child_node = self._create_node(state_key, node_P, value_logit)
             else:
                 child_node.P[:] = node_P
-                child_node.value = node_V
+                child_node.set_value_from_logit(value_logit)
             pending_leaf['parent_node'].children[pending_leaf['move_label']] = child_node
             pending_leaf['path_nodes'].append(child_node)
-            pending_leaf['node_value'] = sigmoid(node_V)
+            pending_leaf['node_value'] = child_node.value
 
     def _transformer_leaf_predictions(self, pending_leaves):
         predictions = np.zeros((len(self.cube.move_keys) + 1, len(pending_leaves)), dtype='f')
@@ -195,13 +195,13 @@ class Search3Engine:
         state_key = self._state_key()
         node_PV = self._predict_current_state()
         node_P = self._node_policy_from_prediction(node_PV)
-        node_V = node_PV[-1, 0]
+        value_logit = node_PV[-1, 0]
         node = self.node_cache.get(state_key)
         if node is None:
-            node = self._create_node(state_key, node_P, node_V, C=C)
+            node = self._create_node(state_key, node_P, value_logit, C=C)
         else:
-            node.value = node_V
-        return node, node_V
+            node.set_value_from_logit(value_logit)
+        return node, value_logit
 
     def _node_policy_from_prediction(self, prediction):
         policy = prediction[:-1].reshape(-1)
@@ -577,10 +577,12 @@ class Search3Engine:
 
 
 class Node:
+    """PUCT node whose value is a normalized prior for unvisited actions."""
+
     def __init__(self, P, state_key=None, value=None, C=0.05):
         self.P = P
         self.state_key = state_key
-        self.value = sigmoid(value)
+        self.set_value_from_logit(value)
         self.val = np.zeros_like(P, dtype='f')
         self.visited = np.zeros_like(P, dtype='i')
         self.blocked = np.zeros_like(P, dtype=bool)
@@ -588,6 +590,10 @@ class Node:
         self.C = C
         self.children = {}
         self.score = None
+
+    def set_value_from_logit(self, value_logit):
+        """Keep unvisited-action estimates on the backup value's [0, 1] scale."""
+        self.value = sigmoid(value_logit)
 
     def select_node(self, invalid_index=None, C=None, action_limit=0):
         masked = self.blocked.copy()

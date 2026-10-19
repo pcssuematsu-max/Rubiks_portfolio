@@ -358,6 +358,7 @@ class SolveSessionManager:
                         trajectory_source = 'search3-fallback-prefix',
                     )
                     self._commit_main_progress_to_scramble()
+            self._record_terminal_value_neighborhood(AI)
             state.search_TF = False
             self._set_status('フォールバック中', 'myval greedy')
             return False
@@ -957,12 +958,58 @@ class SolveSessionManager:
     def _handle_no_progress_search(self, AI):
         """探索で状態が進まなかったときにsearch段階を打ち切る。"""
         state = self.frame.solve_state
+        self._record_terminal_value_neighborhood(AI)
         state.fallback_used = True
         state.search_TF = False
         if self.frame.AIs[self.frame.AI_idx].search_mode == 'search2':
             for moves in state.move_lis:
                 state.s += tuple(moves)
             self.frame.solve_state.reset_tracking()
+
+    def _record_terminal_value_neighborhood(self, ai):
+        """Keep two scalar failure diagnostics; never retain a Policy vector.
+
+        One batched successor prediction is made only at the hand-off to
+        fallback. The denominator in later reports is the number of probes,
+        not all failures (older logs have no probe).
+        """
+        attempts = self.frame.solve_state.direct_search_attempts
+        cube = self.frame.cube
+        if (
+            not attempts or 'terminalImprovingSuccessorCount' in attempts[-1]
+            or getattr(self.frame, 'cube_size', None) != 3
+            or not hasattr(cube, 'makedata')
+        ):
+            return
+        snapshot = cube._snapshot() if hasattr(cube, '_snapshot') else cube.state.copy()
+        try:
+            current = np.asarray(cube.makedata(), dtype='f').reshape(-1, 1)
+            current_value = float(np.asarray(ai.predict(
+                current, policy=False, value=True, loss=False, retain_cache=False,
+            )).reshape(-1)[0])
+            successors = []
+            for move in cube.move_keys:
+                if hasattr(cube, '_restore'):
+                    cube._restore(snapshot)
+                else:
+                    cube.state[:] = snapshot
+                cube.make_move(move)
+                successors.append(cube.makedata())
+            values = np.asarray(ai.predict(
+                np.asarray(successors, dtype='f').T,
+                policy=False, value=True, loss=False, retain_cache=False,
+            ), dtype='f').reshape(-1)
+            if values.size == len(successors) and np.isfinite(current_value) and np.all(np.isfinite(values)):
+                attempts[-1]['terminalImprovingSuccessorCount'] = int(np.count_nonzero(values > current_value))
+                attempts[-1]['terminalBestSuccessorDelta'] = float(np.max(values) - current_value)
+        except (AttributeError, KeyError, OSError, RuntimeError, TypeError, ValueError):
+            # Diagnostics must not prevent the fallback from completing.
+            pass
+        finally:
+            if hasattr(cube, '_restore'):
+                cube._restore(snapshot)
+            else:
+                cube.state[:] = snapshot
 
 
 
@@ -1708,6 +1755,9 @@ class SolveSessionManager:
                 'stepsToGoalLongRouteMinRatio': getattr(
                     ai, 'steps_to_goal_long_route_min_ratio', None,
                 ),
+                'plateauFallbackMinRatio': getattr(ai, 'steps_to_goal_plateau_fallback_min_ratio', None),
+                'plateauEscapeRankMix': getattr(ai, 'steps_to_goal_plateau_escape_rank_mix', None),
+                'plateauEscapePrefixSteps': getattr(ai, 'steps_to_goal_plateau_escape_prefix_steps', None),
                 'originalLongDirectMinRatio': getattr(ai, 'original_long_direct_min_ratio', None),
                 'stepsToGoalValueMaxRouteEfficiency': getattr(
                     ai, 'steps_to_goal_value_max_route_efficiency', None,
@@ -1898,7 +1948,21 @@ class SolveSessionManager:
             source_search_mode = getattr(source_ai,'search_mode','search2')
         if source_value_loss_type is None:
             source_value_loss_type = getattr(source_ai,'search2_value_loss_type',None)
-        if not state.search_TF:
+        stalled_steps_recovery = bool(
+            getattr(state, 'fallback_used', False)
+            and source_search_mode == 'search2'
+            and getattr(source_ai, 'search2_value_loss_type', None) == 'steps_to_goal'
+            and getattr(state, 'direct_search_attempts', None)
+            and state.direct_search_attempts[-1].get('returnedMoveCount') == 0
+        )
+        # Preserve the old source tag for the control AIs. AI22 alone keeps
+        # its steps label for verified stall recovery, making the treatment
+        # measurable without changing AI20's original Value supervision.
+        use_plateau_treatment = bool(
+            stalled_steps_recovery
+            and getattr(source_ai, 'steps_to_goal_plateau_escape_rank_mix', 0.0) > 0
+        )
+        if not state.search_TF and not use_plateau_treatment:
             source_search_mode = 'myval'
             source_value_loss_type = 'myval'
         if target_ai_indices is None:
@@ -1915,6 +1979,7 @@ class SolveSessionManager:
             trajectory_origin = ('fallback' if getattr(state,'fallback_used',False) else 'direct_search'),
             source_objective = self._training_source_objective(source_ai, source_search_mode),
             training_target = self._training_target_label(target_ai_indices),
+            plateau_escape = use_plateau_treatment,
             steps_to_goal = (
                 tuple(range(len(simplified_moves), -1, -1))
                 if steps_to_goal is None else steps_to_goal

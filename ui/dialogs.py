@@ -869,11 +869,10 @@ class LearningHistoryDialog(Tk.Toplevel):
     RECENT_SOLVE_LIMIT = 100
     RECENT_SEARCH_DEPTH_LIMIT = 200
     READING_GUIDE = (
-        '見る順  ① 実力: 直接探索成功率が上がる  '
-        '② Policy: CE/state が下がる  '
-        '③ Value: BCE/state・MAE が下がり、Δpred が Δtarget に近づく  '
-        '④ 勾配: RMSが発散せず、Policy/Value比が急変しない  '
-        '⑤ 固定検証: P@1/P@3・Value順位相関が上がる\n'
+        '見る順  ① 実力: Effect帯別の直接成功率  '
+        '② 失敗地点: Value上昇手の有無  '
+        '③ Policy/Value・勾配の推移  '
+        '④ 固定検証は補助指標\n'
         '注意  P / V sample は系列が長いほど増えるため、良し悪しの判断には使わない。'
     )
 
@@ -965,6 +964,7 @@ class LearningHistoryDialog(Tk.Toplevel):
             text = (
                 f"AI {ai_index} / {latest['searchMode']} / {len(records)} 回の学習\n"
                 f"実力（直近{recent_result['runCount']}回）: {recent_result['text']}\n"
+                f"局面Effect別: {self._setup_effect_summary_text(effect_bands)}\n"
                 f"最新: P={self._number(latest['policyLoss'])}  V={self._number(latest['valueLoss'])}  "
                 f"updates={latest['updatesDuringSolve']}  data={latest['trainingDataCount']}→{latest['retainedDataCount']}\n"
                 f"Search3 quality: {self._search3_quality_text(latest)}\n"
@@ -976,7 +976,6 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"固定局面Effect: {self._fixed_validation_effect_text(latest)}\n"
                 f"Transformer経路: {self._transformer_branch_text(latest)}\n"
                 f"Search3 深さ別: {self._search3_depth_summary_text(depth_bands)}\n"
-                f"局面Effect別: {self._setup_effect_summary_text(effect_bands)}\n"
                 f"lr={self._number(learning_rate['base'])}  lr_C={self._number(learning_rate['lrC'])}  "
                 f"update scale={self._number(update_scales['shared'])}/"
                 f"{self._number(update_scales['policy'])}/{self._number(update_scales['value'])}  "
@@ -1072,12 +1071,18 @@ class LearningHistoryDialog(Tk.Toplevel):
             return {'runCount': 0, 'text': '実験履歴を読めません'}
         if result['classifiedRunCount'] == 0:
             return {'runCount': result['runCount'], 'text': '判定済みの実験履歴なし'}
+        probe_count = result.get('terminalProbedFailureCount', 0)
+        probe_text = (
+            f"{result.get('terminalImprovingFailureCount', 0)}/{probe_count}"
+            if probe_count else '未計測'
+        )
         return {
             'runCount': result['runCount'],
             'text': (
                 f"直接探索 {result['directSearchSuccessCount']}/{result['classifiedRunCount']} "
                 f"({self._rate(result['directSearchSuccessRate'])})  "
-                f"fallback={result['fallbackCount']}"
+                f"fallback={result['fallbackCount']}  "
+                f"失敗地点の上り道={probe_text}"
             ),
         }
 
@@ -1307,6 +1312,13 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"{sample.get('hardEffectDirectSelectedBeforeItemCount', '--')}/"
                 f"{sample.get('hardEffectDirectRequiredItemCount', '--')}"
             )
+        if sample.get('plateauFallbackRequiredItemCount', 0):
+            long_route_text += (
+                f"  停止後fallback selected/required/eligible="
+                f"{sample.get('plateauFallbackSelectedItemCount', '--')}/"
+                f"{sample.get('plateauFallbackRequiredItemCount', '--')}/"
+                f"{sample.get('plateauFallbackEligibleItemCount', '--')}"
+            )
         minimum = sample.get('longSequenceMinSteps', 0)
         if not minimum:
             return prefix + stratified_text + long_route_text + '  長手数replay=off'
@@ -1456,6 +1468,7 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"bias={self._number(metrics.get('signedErrorMean'))}  "
             f"MAE/state={self._number(metrics.get('maePerState'))}  "
             f"Huber/state={self._number(metrics.get('huberPerState'))}"
+            f"  停止後escape/item={self._number(record.get('search2PlateauEscapeLossPerItem'))}"
             f"{self._steps_to_goal_origin_text(metrics.get('origins'))}"
             f"{self._steps_to_goal_value_selection_text(metrics.get('valueSelection'))}"
             f"{self._steps_to_goal_replay_text(metrics.get('replay'))}"
@@ -1671,6 +1684,11 @@ class LearningHistoryDialog(Tk.Toplevel):
             f"orient={self._number(band.get('averageOrientationCount'))} "
             f"reduced={self._number(band.get('averageReducedMoveCount'))}"
         )
+        if band.get('terminalProbedFailureCount', 0):
+            text += (
+                f"  失敗地点の上り道={band.get('terminalImprovingFailureCount', 0)}/"
+                f"{band['terminalProbedFailureCount']}"
+            )
         if band.get('directFirstMoveVisitShare') is not None or band.get('failedFirstMoveVisitShare') is not None:
             text += (
                 f"  最終段初手訪問比[直接成功/失敗]="
