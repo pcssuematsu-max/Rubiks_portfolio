@@ -1092,8 +1092,6 @@ class SolveSessionManager:
 
     def _myperms_sort_weights(self, AI):
         """myperm候補の並び替え用 move cost を返す。"""
-        if getattr(AI, 'is_transformer', False):
-            return np.ones(len(self.frame.cube.move_keys), dtype='f')
         x = self.frame.cube.makedata().reshape(-1,1)
         policy_logits = AI.predict(x,policy = True,value = False).reshape(-1)
         return -np.log(softmax(policy_logits) + 1.0e-8)
@@ -1368,10 +1366,7 @@ class SolveSessionManager:
         self.frame.set_color(AI.cube.state)
 
     def _viewer_policy_distribution(self, AI):
-        """表示用policy分布を返す。Transformerのgreedy fallback中は軽量表示にする。"""
-        if self._is_transformer_greedy_fallback(AI):
-            move_count = len(self.frame.cube.move_keys)
-            return np.ones(move_count, dtype='f') / max(1, move_count)
+        """表示用に現在局面のpolicy分布を返す。"""
         x = self.frame.cube.makedata().reshape(-1,1)
         return softmax(AI.predict(x,policy = True,value = False).reshape(-1))
 

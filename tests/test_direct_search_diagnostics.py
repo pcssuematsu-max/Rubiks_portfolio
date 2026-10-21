@@ -14,6 +14,31 @@ class DirectSearchDiagnosticsTests(unittest.TestCase):
         self.state = SolveSessionState()
         self.manager = SolveSessionManager(SimpleNamespace(solve_state=self.state))
 
+    def test_transformer_greedy_uses_policy_to_rank_myperms_and_display_weights(self):
+        cube = SimpleNamespace(
+            move_keys=('R', 'U', 'F'),
+            key_to_num={'R': 0, 'U': 1, 'F': 2},
+            myperms={'preferred': ('U',), 'other': ('R',)},
+            makedata=lambda: np.asarray([0.0], dtype='f'),
+        )
+        self.manager.frame = SimpleNamespace(cube=cube)
+        calls = []
+
+        def predict(x, policy, value):
+            calls.append((policy, value))
+            return np.asarray([[0.0], [2.0], [-1.0]], dtype='f')
+
+        ai = SimpleNamespace(is_transformer=True, predict=predict)
+        costs = self.manager._myperms_sort_weights(ai)
+        display = self.manager._viewer_policy_distribution(ai)
+
+        self.assertLess(
+            self.manager._myperms_log_weight(costs, 'preferred'),
+            self.manager._myperms_log_weight(costs, 'other'),
+        )
+        np.testing.assert_allclose(display, np.exp(-costs), rtol=1e-6)
+        self.assertEqual(calls, [(True, False), (True, False)])
+
     def test_terminal_probe_records_compact_value_counts_and_restores_cube(self):
         cube = Rubiks_3(size=3,RegisterMyperms=False,PointReindex=False)
         cube.make_move(cube.move_keys[0])
