@@ -114,6 +114,7 @@ class Search3Engine:
                 child_node = self._create_node(state_key, node_P, value_logit)
             else:
                 child_node.P[:] = node_P
+                child_node.policy_mass_width_cache.clear()
                 child_node.set_value_from_logit(value_logit)
             pending_leaf['parent_node'].children[pending_leaf['move_label']] = child_node
             pending_leaf['path_nodes'].append(child_node)
@@ -174,13 +175,15 @@ class Search3Engine:
         progress = min(max(int(depth) - start_depth, 0), ramp_depth) / ramp_depth
         return base_c + (max_c - base_c) * progress
 
-    def _widening_action_limit(self, node):
+    def _widening_action_limit(self, node, invalid_indices=()):
         """Return the number of policy actions available at one tree node.
 
         A full 18-way PUCT expansion is useful once a node is well sampled,
         but it is counterproductive at a newly reached node: almost every
         playout terminates after one more move.  The optional widening rule
         keeps a small policy-prior set first and grows it with ``sqrt(visits)``.
+        ``policy_mass`` chooses the initial set from cumulative *legal* prior
+        mass, bounded by the configured minimum and maximum initial widths.
         A zero initial count preserves the legacy all-actions behavior.
         """
         if node is getattr(self, 'root_node', None) and getattr(self.ai, 'search3_widening_root_all_actions', False):
@@ -188,6 +191,40 @@ class Search3Engine:
         initial = max(0, int(getattr(self.ai, 'search3_widening_initial_actions', 0)))
         if initial == 0:
             return 0
+        mode = getattr(self.ai, 'search3_widening_mode', 'fixed')
+        if mode == 'policy_mass':
+            minimum = max(1, int(getattr(self.ai, 'search3_widening_min_actions', 3)))
+            maximum = max(minimum, int(getattr(self.ai, 'search3_widening_max_actions', 6)))
+            mass = float(np.clip(getattr(self.ai, 'search3_widening_policy_mass', 0.8), 0.0, 1.0))
+            invalid_key = () if invalid_indices is None else (
+                tuple(sorted(invalid_indices))
+                if isinstance(invalid_indices, (set, list, tuple, np.ndarray))
+                else (int(invalid_indices),)
+            )
+            # A node is usually selected many times with the same legal moves.
+            # Blocked moves only accumulate, so their count is a valid version.
+            cache_key = (invalid_key, int(np.count_nonzero(node.blocked)), mass, minimum, maximum)
+            cached = node.policy_mass_width_cache.get(cache_key)
+            if cached is None:
+                available = ~node.blocked.copy()
+                if invalid_key:
+                    available[list(invalid_key)] = False
+                legal_count = int(np.count_nonzero(available))
+                if legal_count == 0:
+                    return 0
+                probabilities = np.maximum(np.asarray(node.P[available], dtype='d'), 0.0)
+                total = float(np.sum(probabilities))
+                if total > 0 and np.isfinite(total):
+                    ranked = np.sort(probabilities)[::-1]
+                    # Avoid an extra branch at an exactly-on-threshold mass.
+                    threshold = max(0.0, (mass - 1.0e-7) * total)
+                    initial = int(np.searchsorted(np.cumsum(ranked), threshold, side='left')) + 1
+                initial = min(legal_count, max(minimum, min(maximum, initial)))
+                node.policy_mass_width_cache[cache_key] = initial
+            else:
+                initial = cached
+        elif mode != 'fixed':
+            raise ValueError(f'Unknown Search3 widening mode: {mode}')
         growth = max(0.0, float(getattr(self.ai, 'search3_widening_visit_growth', 0.0)))
         return min(len(node.P), max(1, initial + int(growth * np.sqrt(max(0, node.S)))))
 
@@ -323,9 +360,10 @@ class Search3Engine:
         while True:
             exploration_c = self._exploration_c(len(path_moves))
             selection_cs.append(exploration_c)
-            widening_limits.append(self._widening_action_limit(node))
+            invalid_indices = self._find_invalid_indices(path_moves)
+            widening_limits.append(self._widening_action_limit(node, invalid_indices))
             index = node.select_node(
-                self._find_invalid_indices(path_moves),
+                invalid_indices,
                 C = exploration_c,
                 action_limit = widening_limits[-1],
             )
@@ -586,6 +624,7 @@ class Node:
         self.val = np.zeros_like(P, dtype='f')
         self.visited = np.zeros_like(P, dtype='i')
         self.blocked = np.zeros_like(P, dtype=bool)
+        self.policy_mass_width_cache = {}
         self.S = 0
         self.C = C
         self.children = {}

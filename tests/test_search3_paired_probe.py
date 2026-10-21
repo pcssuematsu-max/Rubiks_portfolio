@@ -27,6 +27,8 @@ class Search3PairedProbeTests(unittest.TestCase):
         ai.search3_budget_rescue_playouts = 0
         ai.search3_budget_mode = 'fixed'
         ai.search3_widening_initial_actions = 0
+        ai.search3_widening_mode = 'fixed'
+        ai.search3_widening_policy_mass = 0.7
         ai.search3_budget_shallow_widening_initial_actions = 0
         ai.search3_budget_shallow_widening_options = ()
         ai.cube.scramble(2)
@@ -45,9 +47,24 @@ class Search3PairedProbeTests(unittest.TestCase):
         np.testing.assert_array_equal(ai.cube.state,original_state)
         self.assertEqual(ai.search3_budget_mode,'fixed')
         self.assertEqual(ai.search3_widening_initial_actions,0)
+        self.assertEqual(ai.search3_widening_mode,'fixed')
+        self.assertEqual(ai.search3_widening_policy_mass,0.7)
         self.assertIsNone(ai.search3_engine.root_node)
         for key,value in original_weights.items():
             np.testing.assert_array_equal(ai.params[key],value)
+
+    def test_adaptive_variant_is_reported_and_restored(self):
+        ai = Rubiks_3_AI([8],cube_size=3,search_mode='search3')
+        ai.search_num3 = 10
+        ai.search_repeat3 = 1
+        rows = compare_search3_variants(ai,[(' U ',)],variants=(
+            ('adaptive','fixed',5,False,{'mode':'policy_mass','mass':0.8,'minimum':3,'maximum':6}),
+        ))
+
+        self.assertEqual(rows[0]['wideningMode'],'policy_mass')
+        self.assertGreater(rows[0]['wideningActionLimitMean'],0)
+        self.assertGreater(rows[0]['rootTop3PolicyMass'],0)
+        self.assertFalse(hasattr(ai,'search3_widening_mode'))
 
 
 if __name__ == '__main__':

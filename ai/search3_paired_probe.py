@@ -34,6 +34,8 @@ def compare_search3_variants(ai, scrambles, variants = DEFAULT_VARIANTS):
         'search3_budget_shallow_widening_initial_actions',
         'search3_budget_shallow_widening_options',
         'search3_widening_root_all_actions',
+        'search3_widening_mode', 'search3_widening_policy_mass',
+        'search3_widening_min_actions', 'search3_widening_max_actions',
     )
     settings = {
         name: getattr(ai, name)
@@ -48,7 +50,9 @@ def compare_search3_variants(ai, scrambles, variants = DEFAULT_VARIANTS):
             inverse = tuple(cube.invert_moves(scramble))
             target_move = inverse[0]
             effect = setup_effect_metrics('cube-3x3',getattr(ai,'cube_size',3),scramble)
-            for label, mode, width, root_all in variants:
+            for variant in variants:
+                label, mode, width, root_all = variant[:4]
+                widening = variant[4] if len(variant) > 4 else {}
                 cube.reset()
                 cube.scramble(0,scramble)
                 ai.search3_engine.reset_tree()
@@ -57,6 +61,10 @@ def compare_search3_variants(ai, scrambles, variants = DEFAULT_VARIANTS):
                 ai.search3_budget_shallow_widening_initial_actions = int(width)
                 ai.search3_budget_shallow_widening_options = ()
                 ai.search3_widening_root_all_actions = bool(root_all)
+                ai.search3_widening_mode = widening.get('mode', 'fixed')
+                ai.search3_widening_policy_mass = float(widening.get('mass', 0.8))
+                ai.search3_widening_min_actions = int(widening.get('minimum', 3))
+                ai.search3_widening_max_actions = int(widening.get('maximum', 6))
                 started = perf_counter()
                 result = ai.search()
                 elapsed = perf_counter() - started
@@ -75,10 +83,16 @@ def compare_search3_variants(ai, scrambles, variants = DEFAULT_VARIANTS):
                     (int((attempt.search_diagnostics or {}).get('playoutDepthMax',0)) for attempt in attempts),
                     default = 0,
                 )
+                weighted_width = sum(
+                    playouts[index] * float((attempt.search_diagnostics or {}).get('wideningActionLimitMean',0.0))
+                    for index, attempt in enumerate(attempts)
+                ) / max(1,sum(playouts))
                 rows.append({
                     'variant': label,
                     'mode': mode,
                     'initialWidth': int(width),
+                    'wideningMode': ai.search3_widening_mode,
+                    'wideningActionLimitMean': weighted_width,
                     'rootAllActions': bool(root_all),
                     'search3C': float(ai.search3_C),
                     'scramble': list(scramble),
@@ -89,6 +103,7 @@ def compare_search3_variants(ai, scrambles, variants = DEFAULT_VARIANTS):
                     'playoutDepthMean': weighted_depth,
                     'playoutDepthMax': max_depth,
                     'rootTopVisitShare': None if not total_visits else float(np.max(visits) / total_visits),
+                    'rootTop3PolicyMass': float(np.sum(np.sort(policy)[-3:])),
                     'inverseFirstMovePolicyRank': int(np.count_nonzero(policy > policy[target_index]) + 1),
                     'inverseFirstMoveVisitShare': None if not total_visits else float(visits[target_index] / total_visits),
                     'elapsedSeconds': elapsed,

@@ -63,7 +63,7 @@ class MainProfileTests(unittest.TestCase):
         )
         self.assertEqual(
             [config.search3_budget_modes[index] for index in (10,11,18,19)],
-            ['progressive'] * 4,
+            ['fixed'] * 4,
         )
         self.assertEqual(
             [config.transform_idx[index] for index in (10,11,18,19)],

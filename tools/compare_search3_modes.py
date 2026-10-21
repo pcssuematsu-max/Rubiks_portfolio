@@ -76,6 +76,14 @@ def main(argv = None):
     parser.add_argument('--fixtures-per-length',type = int,default = 2)
     parser.add_argument('--budget-scale',type = float,default = 1.0,
                         help = 'Use less than 1 only for a quick smoke test')
+    parser.add_argument('--compare-widening',action = 'store_true',
+                        help = 'Compare fixed width against bounded policy-mass width at the same budget')
+    parser.add_argument('--budget-mode',choices = ('fixed','progressive'),
+                        help = 'Override the profile budget mode for a matched comparison')
+    parser.add_argument('--fixed-width',type = int,default = 5)
+    parser.add_argument('--policy-mass',type = float,default = 0.8)
+    parser.add_argument('--min-width',type = int,default = 3)
+    parser.add_argument('--max-width',type = int,default = 6)
     args = parser.parse_args(argv)
     config = build_experiment_frame_config()
     if args.ai_index < 0 or args.ai_index >= len(config.ai_search_modes):
@@ -84,6 +92,8 @@ def main(argv = None):
         parser.error('fixtures-per-length must be 1..3')
     if not 0 < args.budget_scale <= 1:
         parser.error('budget-scale must be in (0,1]')
+    if not 0 <= args.policy_mass <= 1 or not 1 <= args.min_width <= args.max_width or args.fixed_width < 1:
+        parser.error('Widening settings require mass in [0,1] and 1 <= min <= max and fixed-width >= 1')
     lengths = tuple(int(value) for value in args.lengths.split(','))
     if not lengths or any(length < 1 for length in lengths):
         parser.error('lengths must be positive comma-separated integers')
@@ -101,20 +111,39 @@ def main(argv = None):
         _fixture_scramble(ai.cube,length,fixture_index)
         for length in lengths for fixture_index in range(args.fixtures_per_length)
     ]
-    rows = compare_search3_variants(ai,scrambles)
+    variants = None
+    if args.compare_widening:
+        budget_mode = args.budget_mode or config.search3_budget_modes[args.ai_index]
+        variants = (
+            ('fixed_width',budget_mode,args.fixed_width,False),
+            ('policy_mass',budget_mode,args.fixed_width,False,{
+                'mode': 'policy_mass', 'mass': args.policy_mass,
+                'minimum': args.min_width, 'maximum': args.max_width,
+            }),
+        )
+    rows = compare_search3_variants(ai,scrambles,variants=variants) if variants else compare_search3_variants(ai,scrambles)
     print(f'AI {args.ai_index}; C={ai.search3_C}; checkpoint={ROOT / f"AIdatas{args.ai_index}"}; budget scale={args.budget_scale}')
-    print('length effect variant solved stop playouts depthMean depthMax rootTop inverseVisit inverseRank seconds')
+    print('length effect variant solved stop playouts depthMean depthMax widthMean policyTop3 rootTop inverseVisit inverseRank seconds')
     for row in rows:
         print(
             f'{len(row["scramble"]):>6} {str(row["effectMovedPieceCount"]):>6} '
             f'{row["variant"]:<18} {int(row["solvedAtRoot"]):>6} '
             f'{row["endReason"]:<12} {row["consumedPlayouts"]:>8} '
             f'{row["playoutDepthMean"]:>9.2f} {row["playoutDepthMax"]:>8} '
+            f'{row["wideningActionLimitMean"]:>9.2f} {row["rootTop3PolicyMass"]:>10.3f} '
             f'{row["rootTopVisitShare"] or 0:>7.3f} '
             f'{row["inverseFirstMoveVisitShare"] or 0:>12.3f} '
             f'{row["inverseFirstMovePolicyRank"]:>11} '
             f'{row["elapsedSeconds"]:>7.2f}'
         )
+    if args.compare_widening:
+        for label in ('fixed_width', 'policy_mass'):
+            matching = [row for row in rows if row['variant'] == label]
+            print(
+                f'{label}: solved {sum(row["solvedAtRoot"] for row in matching)}/{len(matching)}, '
+                f'mean width {np.mean([row["wideningActionLimitMean"] for row in matching]):.2f}, '
+                f'total time {sum(row["elapsedSeconds"] for row in matching):.2f}s'
+            )
 
 
 if __name__ == '__main__':

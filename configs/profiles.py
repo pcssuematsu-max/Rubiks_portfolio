@@ -414,11 +414,10 @@ def build_experiment_frame_config():
         0.10 if ai_index in (10,11) else 0.0
         for ai_index in range(ai_count)
     ]
-    # Hold Search3 search settings constant within the Transformer replay
-    # comparisons; only the sampling recipe changes inside each pair.
+    # Use one fixed 10k-playout budget for every Search3 AI.  Branches start
+    # narrow and open with visits; the progressive early-stop/rescue settings
+    # below remain available for a later controlled comparison, but are inert.
     search3_budget_modes = ['fixed'] * ai_count
-    for ai_index in (3,5,7,10,11,18,19):
-        search3_budget_modes[ai_index] = 'progressive'
     search3_budget_stage_playouts = [(1000,3000,6000)] * ai_count
     search3_budget_confidence_visit_shares = [0.70] * ai_count
     # The progressive variants otherwise abandon 30+ move cases at tier 2
@@ -583,19 +582,19 @@ def build_experiment_frame_config():
         lr_vs = [0.99] * ai_count,
         lr_hs = [0.99] * ai_count,
         out_cs = [1.0] * ai_count,
-        # C=0.05 consistently left trees shallow while consuming budget.
-        # Search3 replay arms 10/11/18/19 share the same C schedule so it
-        # does not confound their sampler comparisons.
-        search3_cs = [0,0,0.5,0.5,1.0,0.5,5,0.5,0,0] + [0.5,0.5] + [1.0] * 6 + [0.5,0.5] + [0.0] * 5,
-        search3_c_depth_maxes = [0,0,0.5,0.5,5.0,0.5,5,0.5,0,0] + [0.5,0.5] + [2.0] * 6 + [0.5,0.5] + [0.0] * 5,
+        # Start the fixed-width comparison at C=0.5 for every Search3 AI;
+        # hold it constant across depth so C and branch width can be tuned
+        # independently in the next experiment.
+        search3_cs = [0,0] + [0.5] * 6 + [0,0] + [0.5,0.5] + [1.0] * 6 + [0.5,0.5] + [0.0] * 5,
+        search3_c_depth_maxes = [0,0] + [0.5] * 6 + [0,0] + [0.5,0.5] + [2.0] * 6 + [0.5,0.5] + [0.0] * 5,
         search3_c_depth_start_depths = [0] * 10 + [4] * 10 + [0] * 5,
         search3_c_depth_ramp_depths = [8] * 10 + [6] * 10 + [0] * 5,
-        # Newly reached nodes used to fan out across almost every action, so
-        # their visit counts rarely reached a deep child.  Progressive Linear
-        # and Transformer variants start from the top five policy moves and
-        # widen gradually; all four replay arms use the same setting.
-        search3_widening_initial_actions = [0,0,0,5,0,5,0,5,0,0] + [5,5] + [0] * 6 + [5,5] + [0] * 5,
-        search3_widening_visit_growths = [0.0,0.0,0.0,0.40,0.0,0.40,0.0,0.40,0.0,0.0] + [0.40,0.40] + [0.0] * 6 + [0.40,0.40] + [0.0] * 5,
+        # Fixed budget + visit-based progressive widening. AI2's top-three
+        # start performed best in the paired Linear probe; the other arms
+        # start with five moves. Policy-mass adaptation remains opt-in only.
+        search3_widening_initial_actions = [0,0,3,5,5,5,5,5,0,0] + [5,5] + [0] * 6 + [5,5] + [0] * 5,
+        search3_widening_visit_growths = [0.0,0.0] + [0.40] * 6 + [0.0,0.0] + [0.40,0.40] + [0.0] * 6 + [0.40,0.40] + [0.0] * 5,
+        search3_widening_modes = ['fixed'] * ai_count,
         search3_budget_modes = search3_budget_modes,
         search3_budget_stage_playouts = search3_budget_stage_playouts,
         search3_budget_confidence_visit_shares = search3_budget_confidence_visit_shares,

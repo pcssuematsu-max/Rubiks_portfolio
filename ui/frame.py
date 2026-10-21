@@ -155,6 +155,10 @@ class Frame(Tk.Frame):
             search3_c_depth_ramp_depths = config.search3_c_depth_ramp_depths,
             search3_widening_initial_actions = config.search3_widening_initial_actions,
             search3_widening_visit_growths = config.search3_widening_visit_growths,
+            search3_widening_modes = config.search3_widening_modes,
+            search3_widening_policy_masses = config.search3_widening_policy_masses,
+            search3_widening_min_actions = config.search3_widening_min_actions,
+            search3_widening_max_actions = config.search3_widening_max_actions,
             search3_budget_modes = config.search3_budget_modes,
             search3_budget_stage_playouts = config.search3_budget_stage_playouts,
             search3_budget_confidence_visit_shares = config.search3_budget_confidence_visit_shares,
@@ -606,6 +610,10 @@ class Frame(Tk.Frame):
                                    search3_c_depth_ramp_depths = None,
                                    search3_widening_initial_actions = None,
                                    search3_widening_visit_growths = None,
+                                   search3_widening_modes = None,
+                                   search3_widening_policy_masses = None,
+                                   search3_widening_min_actions = None,
+                                   search3_widening_max_actions = None,
                                    search3_budget_modes = None,
                                    search3_budget_stage_playouts = None,
                                    search3_budget_confidence_visit_shares = None,
@@ -699,6 +707,23 @@ class Frame(Tk.Frame):
             if search3_widening_visit_growths is not None:
                 self.AIs[i].search3_widening_visit_growth = max(
                     0.0, float(search3_widening_visit_growths[i])
+                )
+            if search3_widening_modes is not None:
+                mode = str(search3_widening_modes[i])
+                if mode not in ('fixed', 'policy_mass'):
+                    raise ValueError(f'Unknown Search3 widening mode: {mode}')
+                self.AIs[i].search3_widening_mode = mode
+            if search3_widening_policy_masses is not None:
+                self.AIs[i].search3_widening_policy_mass = min(
+                    1.0, max(0.0, float(search3_widening_policy_masses[i]))
+                )
+            if search3_widening_min_actions is not None:
+                self.AIs[i].search3_widening_min_actions = max(
+                    1, int(search3_widening_min_actions[i])
+                )
+            if search3_widening_max_actions is not None:
+                self.AIs[i].search3_widening_max_actions = max(
+                    1, int(search3_widening_max_actions[i])
                 )
             if search3_budget_modes is not None:
                 self.AIs[i].search3_budget_mode = str(search3_budget_modes[i])

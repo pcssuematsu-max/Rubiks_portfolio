@@ -61,6 +61,10 @@ class FrameConfig:
     search3_c_depth_ramp_depths: Optional[Sequence[int]] = None
     search3_widening_initial_actions: Optional[Sequence[int]] = None
     search3_widening_visit_growths: Optional[Sequence[float]] = None
+    search3_widening_modes: Optional[Sequence[str]] = None
+    search3_widening_policy_masses: Optional[Sequence[float]] = None
+    search3_widening_min_actions: Optional[Sequence[int]] = None
+    search3_widening_max_actions: Optional[Sequence[int]] = None
     search3_budget_modes: Optional[Sequence[str]] = None
     search3_budget_stage_playouts: Optional[Sequence[Sequence[int]]] = None
     search3_budget_confidence_visit_shares: Optional[Sequence[float]] = None
@@ -157,6 +161,10 @@ class FrameConfig:
         self._validate_ai_sequence_length('search3_c_depth_ramp_depths', self.search3_c_depth_ramp_depths, ai_count)
         self._validate_ai_sequence_length('search3_widening_initial_actions', self.search3_widening_initial_actions, ai_count)
         self._validate_ai_sequence_length('search3_widening_visit_growths', self.search3_widening_visit_growths, ai_count)
+        self._validate_ai_sequence_length('search3_widening_modes', self.search3_widening_modes, ai_count)
+        self._validate_ai_sequence_length('search3_widening_policy_masses', self.search3_widening_policy_masses, ai_count)
+        self._validate_ai_sequence_length('search3_widening_min_actions', self.search3_widening_min_actions, ai_count)
+        self._validate_ai_sequence_length('search3_widening_max_actions', self.search3_widening_max_actions, ai_count)
         self._validate_ai_sequence_length('search3_budget_modes', self.search3_budget_modes, ai_count)
         self._validate_ai_sequence_length('search3_budget_stage_playouts', self.search3_budget_stage_playouts, ai_count)
         self._validate_ai_sequence_length('search3_budget_confidence_visit_shares', self.search3_budget_confidence_visit_shares, ai_count)
