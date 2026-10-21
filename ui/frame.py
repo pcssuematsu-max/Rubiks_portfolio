@@ -314,6 +314,7 @@ class Frame(Tk.Frame):
                 mid_size,
                 cube_size = self.cube_size,
                 Activation = self._ai_activation(ai_index),
+                silu_beta_initial = self._ai_silu_beta_initial(ai_index),
                 cube = self.cube,
                 search_mode = search_mode,
                 residual = self._ai_residual_enabled(ai_index, search_mode),
@@ -381,6 +382,10 @@ class Frame(Tk.Frame):
         if activations is None:
             return 'ReLU'
         return activations[ai_index]
+
+    def _ai_silu_beta_initial(self, ai_index):
+        values = getattr(self.config, 'silu_beta_initials', None)
+        return 0.0 if values is None else float(values[ai_index])
 
     def _ai_residual_enabled(self, ai_index, search_mode):
         residuals = getattr(self.config, 'residuals', None)
@@ -1240,7 +1245,8 @@ class Frame(Tk.Frame):
         """ログ欄上部の固定表示へ、現在のAI処理段階を設定する。"""
         self.log_viewer.set_status(message)
 
-    def initialize(self,N):
+    def initialize(self,N,beta = None):
+        """Initialize W1 and reset SiLU beta to the configured or requested value."""
         #for key in ['W1','W2','W3','W4','W5','W6','W7','W8','WM_P','WM_V']:
         for key in ['W1']:
             if key in self.AIs[N].params:
@@ -1251,6 +1257,9 @@ class Frame(Tk.Frame):
                 A[:size,:size] = np.diag(Z[1])
                 self.AIs[N].params[key][:] = Z[0] @ A @ Z[2]
                 self.AIs[N].v[key] *= 0
+        if beta is None:
+            beta = self._ai_silu_beta_initial(N)
+        self.AIs[N].initialize_silu_beta(beta)
                 
 
     def toggle_move_pad(self):

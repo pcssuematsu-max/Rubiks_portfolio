@@ -329,6 +329,7 @@ def build_experiment_frame_config():
     skip_search = [is_search2_ai[ai_index] for ai_index in range(ai_count)]
     weight_decay = [True] * ai_count
     activations = ['SiLU'] * ai_count
+    silu_beta_initials = [0.0] * ai_count  # AIごとに初期Betaを指定
     residuals = [True] * ai_count
     # AI21/23/24 compare route-state pairs again.  They share the same
     # direct, connected routes as the calibrated steps_to_goal group, while
@@ -579,6 +580,7 @@ def build_experiment_frame_config():
         weight_decay = weight_decay,
         adam = adam,
         activations = activations,
+        silu_beta_initials = silu_beta_initials,
         lr_vs = [0.99] * ai_count,
         lr_hs = [0.99] * ai_count,
         out_cs = [1.0] * ai_count,

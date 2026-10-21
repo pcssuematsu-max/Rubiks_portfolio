@@ -1,6 +1,7 @@
 """Configuration object for the main Tkinter frame."""
 
 from dataclasses import dataclass
+import math
 from typing import Any, Mapping, Optional, Sequence, Tuple
 
 
@@ -50,6 +51,7 @@ class FrameConfig:
     weight_decay: Optional[Sequence[bool]] = None
     adam: Optional[Sequence[bool]] = None
     activations: Optional[Sequence[str]] = None
+    silu_beta_initials: Optional[Sequence[float]] = None
 
     # Additional runtime coefficients for each AI.
     lr_vs: Optional[Sequence[float]] = None
@@ -152,6 +154,11 @@ class FrameConfig:
         self._validate_ai_sequence_length('weight_decay', self.weight_decay, ai_count)
         self._validate_ai_sequence_length('adam', self.adam, ai_count)
         self._validate_ai_sequence_length('activations', self.activations, ai_count)
+        self._validate_ai_sequence_length('silu_beta_initials', self.silu_beta_initials, ai_count)
+        if self.silu_beta_initials is not None and any(
+            not math.isfinite(float(beta)) for beta in self.silu_beta_initials
+        ):
+            raise ValueError('silu_beta_initials must contain finite values')
         self._validate_ai_sequence_length('lr_vs', self.lr_vs, ai_count)
         self._validate_ai_sequence_length('lr_hs', self.lr_hs, ai_count)
         self._validate_ai_sequence_length('out_cs', self.out_cs, ai_count)

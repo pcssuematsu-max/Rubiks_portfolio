@@ -32,7 +32,7 @@ class Rubiks_3_AI:
         """Expose the model type to search and solve-session consumers."""
         return bool(self.use_transformer_attention)
 
-    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_batch_mix_mode = 'ordered',train_short_sequence_max_steps = None,train_short_sequence_min_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_value_target_scale = 1.0,steps_to_goal_value_loss_weight = 1.0,steps_to_goal_states_per_band = 0,steps_to_goal_replay_stratified_ratio = 0.0,steps_to_goal_long_route_min_ratio = 0.0,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None,transformer_linear_skip = False,transformer_linear_skip_variance = 0.125):
+    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_batch_mix_mode = 'ordered',train_short_sequence_max_steps = None,train_short_sequence_min_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_value_target_scale = 1.0,steps_to_goal_value_loss_weight = 1.0,steps_to_goal_states_per_band = 0,steps_to_goal_replay_stratified_ratio = 0.0,steps_to_goal_long_route_min_ratio = 0.0,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None,transformer_linear_skip = False,transformer_linear_skip_variance = 0.125,silu_beta_initial = 0.0):
         if cube == None:
             self.cube = Rubiks_3(size = cube_size)
         else:
@@ -81,6 +81,9 @@ class Rubiks_3_AI:
         self._last_training_gradient_metrics = None
         self.torch_training_device = 'cpu' if self.use_transformer_attention else 'auto'
         self.activation = Activation
+        self.silu_beta_initial = float(silu_beta_initial)
+        if not math.isfinite(self.silu_beta_initial):
+            raise ValueError('silu_beta_initial must be finite')
         self.ips = self.cube.ips
         self.ops = self.cube.move_len
         self.Mid = self.requested_Mid
@@ -451,7 +454,7 @@ class Rubiks_3_AI:
         """Create the configured hidden activation for one trunk layer."""
         activation = self._normalized_activation_name()
         if activation == 'silu':
-            return SiLU(beta = 0)
+            return SiLU(beta = self.silu_beta_initial)
         if activation == 'relu':
             return ReLU()
         if activation == 'hard_sigmoid':
@@ -464,7 +467,7 @@ class Rubiks_3_AI:
         """Create policy/value hidden-head activation matching the configured activation."""
         activation = self._normalized_activation_name()
         if activation == 'silu':
-            return SiLU(beta = 0)
+            return SiLU(beta = self.silu_beta_initial)
         if activation == 'hard_sigmoid':
             return Hard_Sigmoid()
         if activation == 'sigmoid':
@@ -492,6 +495,18 @@ class Rubiks_3_AI:
         key = 'ActBeta' + str(suffix)
         self.params[key] = layer.beta
         self.activation_betas.append((key, layer))
+
+    def initialize_silu_beta(self, beta):
+        """Reset every trainable SiLU beta and its optimizer state in place."""
+        beta = float(beta)
+        if not math.isfinite(beta):
+            raise ValueError('SiLU beta must be finite')
+        for key, layer in self.activation_betas:
+            layer.beta[:] = beta
+            self.v[key][:] = 0
+            self.h[key][:] = 0
+        if self.activation_betas and hasattr(self, '_mark_torch_params_dirty'):
+            self._mark_torch_params_dirty()
 
     def _apply_w1_initializers(self, initializers):
         """Apply optional rule-based offsets to selected W1 columns at construction time."""
