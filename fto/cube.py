@@ -53,6 +53,7 @@ class FtoCube:
     """3-layer Face Turning Octahedron model using the shared puzzle API."""
 
     myperm_point_puzzle = "fto"
+    myperm_expansion_inverts_transform = False
 
     def __init__(self, S = "", size = 3, F2L = False, OLL = False, Centers = False, Edges = False, Cross = False):
         self.size = 3

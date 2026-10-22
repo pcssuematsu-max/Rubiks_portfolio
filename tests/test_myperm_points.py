@@ -24,6 +24,28 @@ from skewb.cube import SkewbCube
 
 
 class MypermPointTableTest(unittest.TestCase):
+    def test_reindexed_myperms_follow_symmetries_of_point_best_source(self):
+        for cube in (Rubiks_3(size = 3), FtoCube(), SkewbCube()):
+            with self.subTest(puzzle = type(cube).__name__):
+                name = next(iter(cube.myperms2))
+                source = cube.myperms2[name]
+                rows = cube.myperm_transform_points[name]
+                self.assertEqual(rows[0]["point"], max(row["point"] for row in rows))
+                invert = getattr(cube, "myperm_expansion_inverts_transform", True)
+                signature = tuple(cube.move_keys)
+                identity_index = next(
+                    index for index in range(len(cube.transformation_keys))
+                    if tuple(cube.transform(signature, index, invert = invert)) == signature
+                )
+                relative_order = [identity_index] + [
+                    index for index in range(len(rows)) if index != identity_index
+                ]
+                for new_index, transform_index in enumerate(relative_order):
+                    self.assertEqual(
+                        tuple(cube.myperms[make_myperm_key(name, new_index)]),
+                        tuple(cube.transform(source, transform_index, invert = invert)),
+                    )
+
     def test_default_rubiks_registry_uses_highest_point_source(self):
         for size in (3, 7):
             with self.subTest(size = size):

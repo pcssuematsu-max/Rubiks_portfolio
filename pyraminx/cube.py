@@ -30,6 +30,7 @@ MOVE_VERTICES = {
 
 
 class PyraminxCube:
+    myperm_expansion_inverts_transform = False
     """Tetrahedral twisty puzzle using the Rubiks/Megaminx cube interface."""
 
     def __init__(self, S = "", size = 3, F2L = False, OLL = False, Centers = False, Edges = False, Cross = False):

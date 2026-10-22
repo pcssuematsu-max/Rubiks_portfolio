@@ -353,11 +353,12 @@ def point_representative_transform(cube, moves, point_table = None, include_inte
 
 
 def reindex_myperms_by_points(cube, point_table, names = None):
-    """Reassign each registered myperm's transform #00 to its highest-point transform."""
+    """Choose #00 by points, then number its transforms in symmetry order."""
     calculator = MypermPointCalculator(cube, point_table)
     names = tuple(names) if names is not None else tuple(getattr(cube, "myperms2", ()))
     point_rows_by_name = {}
     available_indices = defaultdict(list)
+    relative_indices_cache = {}
     for key in cube.myperms:
         if isinstance(key, tuple) and len(key) == 2:
             available_indices[key[0]].append(key[1])
@@ -376,17 +377,51 @@ def reindex_myperms_by_points(cube, point_table, names = None):
                     "point":calculator.point_for_key(key),
                 }
             )
-        ordered_rows = sorted(scored_rows, key = lambda row:(-row["point"], row["old_index"]))
+        best = min(scored_rows, key = lambda row:(-row["point"], row["old_index"]))
+        cache_key = (best["old_index"], tuple(transform_indices))
+        if cache_key not in relative_indices_cache:
+            relative_indices_cache[cache_key] = _relative_myperm_transform_indices(
+                cube, best["old_index"], transform_indices,
+            )
+        points_by_old_index = {row["old_index"]:row["point"] for row in scored_rows}
         point_rows_by_name[name] = tuple(
             {
-                "old_index":row["old_index"],
+                "old_index":old_index,
                 "new_index":new_index,
-                "point":row["point"],
+                "point":points_by_old_index[old_index],
             }
-            for new_index, row in enumerate(ordered_rows)
+            for new_index, old_index in enumerate(relative_indices_cache[cache_key])
         )
 
     return apply_myperm_point_rows(cube, point_rows_by_name)
+
+
+def _relative_myperm_transform_indices(cube, best_old_index, transform_indices):
+    """Map each symmetry of the chosen #00 back to its original registry index."""
+    signature = tuple(cube.move_keys)
+    invert = getattr(cube, "myperm_expansion_inverts_transform", True)
+    old_signatures = {
+        tuple(cube.transform(signature, index, invert = invert)):index
+        for index in transform_indices
+    }
+    if len(old_signatures) != len(transform_indices):
+        raise ValueError("myperm transforms cannot be distinguished by move keys")
+    chosen_signature = cube.transform(signature, best_old_index, invert = invert)
+    identity_index = old_signatures.get(signature)
+    if identity_index is None:
+        raise ValueError("myperm transforms have no identity")
+    relative_transform_order = [identity_index] + [
+        index for index in transform_indices if index != identity_index
+    ]
+    relative_indices = []
+    for index in relative_transform_order:
+        transformed = tuple(cube.transform(chosen_signature, index, invert = invert))
+        if transformed not in old_signatures:
+            raise ValueError("myperm transform indices do not form a closed group")
+        relative_indices.append(old_signatures[transformed])
+    if len(set(relative_indices)) != len(transform_indices):
+        raise ValueError("myperm relative transform indices are not unique")
+    return tuple(relative_indices)
 
 
 def apply_myperm_point_rows(cube, point_rows_by_name):
@@ -531,7 +566,7 @@ def point_file_text(path):
     )
 
 
-_POINT_CACHE_VERSION = 1
+_POINT_CACHE_VERSION = 2
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _DEFAULT_POINT_CACHE_DIRECTORY = _PROJECT_ROOT / "cache" / "myperm_points"
 

@@ -46,6 +46,7 @@ AXIS_TO_MOVE = {tuple(axis.astype(int)):move for move, axis in MOVE_AXES.items()
 
 
 class SkewbCube:
+    myperm_expansion_inverts_transform = False
     """Skewb puzzle model compatible with Rubiks/Megaminx/Pyraminx managers."""
 
     myperm_point_puzzle = "skewb"
