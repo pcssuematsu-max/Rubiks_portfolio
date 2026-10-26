@@ -1,0 +1,492 @@
+{
+  "method": "nonnegative coefficients summing to 1; minimize mean hinge slack per source algorithm",
+  "margin": 0.1,
+  "assumption": "Each source algorithm is preferred to its distinct rotation/mirror variants",
+  "candidate_count": 8,
+  "models": {
+    "single_moves": {
+      "feature_count": 27,
+      "nonzero_coefficient_count": 15,
+      "coefficients": [
+        {
+          "feature": "move:B",
+          "weight": 0.132419
+        },
+        {
+          "feature": "move:B'",
+          "weight": 0.128108
+        },
+        {
+          "feature": "move:D",
+          "weight": 0.105263
+        },
+        {
+          "feature": "move:D'",
+          "weight": 0.105263
+        },
+        {
+          "feature": "move:F",
+          "weight": 0.080263
+        },
+        {
+          "feature": "move:F'",
+          "weight": 0.080263
+        },
+        {
+          "feature": "move:U",
+          "weight": 0.055263
+        },
+        {
+          "feature": "move:E2",
+          "weight": 0.052632
+        },
+        {
+          "feature": "move:S2",
+          "weight": 0.052632
+        },
+        {
+          "feature": "move:L'",
+          "weight": 0.052082
+        },
+        {
+          "feature": "move:F2",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:L",
+          "weight": 0.047918
+        },
+        {
+          "feature": "move:L2",
+          "weight": 0.047368
+        },
+        {
+          "feature": "move:R2",
+          "weight": 0.005263
+        },
+        {
+          "feature": "move:U'",
+          "weight": 0.005263
+        }
+      ],
+      "training": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 47,
+          "mean_gap": 0.595521,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 47,
+          "mean_gap": 0.595521,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.689138,
+          "minimum_gap": 0.075,
+          "mean_slack": 0.000532
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 44,
+          "mean_gap": 0.309071,
+          "minimum_gap": -0.1,
+          "mean_slack": 0.007839
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 47,
+          "mean_gap": 0.411198,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 46,
+          "mean_gap": 0.213214,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.002128
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "strictly_preferred": 23,
+          "margin_satisfied": 23,
+          "mean_gap": 0.291076,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 46,
+          "mean_gap": 0.389698,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.002128
+        }
+      ],
+      "leave_one_algorithm_out": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.596521,
+          "minimum_gap": 0.095455,
+          "mean_slack": 9.7e-05
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.596521,
+          "minimum_gap": 0.095455,
+          "mean_slack": 9.7e-05
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.652856,
+          "minimum_gap": 0.05,
+          "mean_slack": 0.001064
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "strictly_preferred": 39,
+          "margin_satisfied": 28,
+          "mean_gap": 0.159768,
+          "minimum_gap": -0.165909,
+          "mean_slack": 0.037023
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 47,
+          "mean_gap": 0.411198,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 36,
+          "mean_gap": 0.175887,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.013475
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "strictly_preferred": 23,
+          "margin_satisfied": 23,
+          "mean_gap": 0.291076,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "strictly_preferred": 36,
+          "margin_satisfied": 28,
+          "mean_gap": 0.123863,
+          "minimum_gap": -0.211218,
+          "mean_slack": 0.062565
+        }
+      ]
+    },
+    "single_moves_and_adjacent_pairs": {
+      "feature_count": 459,
+      "nonzero_coefficient_count": 29,
+      "coefficients": [
+        {
+          "feature": "pair:U2 R",
+          "weight": 0.066667
+        },
+        {
+          "feature": "move:D",
+          "weight": 0.066667
+        },
+        {
+          "feature": "pair:U R2",
+          "weight": 0.064683
+        },
+        {
+          "feature": "move:B'",
+          "weight": 0.054688
+        },
+        {
+          "feature": "move:B",
+          "weight": 0.05464
+        },
+        {
+          "feature": "pair:R2 U",
+          "weight": 0.054383
+        },
+        {
+          "feature": "move:D'",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:S2",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:E2",
+          "weight": 0.05
+        },
+        {
+          "feature": "pair:R' D2",
+          "weight": 0.048731
+        },
+        {
+          "feature": "move:L2",
+          "weight": 0.045595
+        },
+        {
+          "feature": "move:F2",
+          "weight": 0.033333
+        },
+        {
+          "feature": "move:F'",
+          "weight": 0.033333
+        },
+        {
+          "feature": "move:F",
+          "weight": 0.033333
+        },
+        {
+          "feature": "pair:R F",
+          "weight": 0.033333
+        },
+        {
+          "feature": "pair:F' U'",
+          "weight": 0.033029
+        },
+        {
+          "feature": "move:L",
+          "weight": 0.027984
+        },
+        {
+          "feature": "move:L'",
+          "weight": 0.026777
+        },
+        {
+          "feature": "pair:B U2",
+          "weight": 0.026475
+        },
+        {
+          "feature": "move:B2",
+          "weight": 0.025
+        },
+        {
+          "feature": "pair:M2 U",
+          "weight": 0.020837
+        },
+        {
+          "feature": "pair:U M2",
+          "weight": 0.020837
+        },
+        {
+          "feature": "pair:U' B",
+          "weight": 0.019047
+        },
+        {
+          "feature": "move:U",
+          "weight": 0.016667
+        },
+        {
+          "feature": "pair:M' U2",
+          "weight": 0.011683
+        },
+        {
+          "feature": "pair:U2 M",
+          "weight": 0.011683
+        },
+        {
+          "feature": "pair:U' R2",
+          "weight": 0.010822
+        },
+        {
+          "feature": "pair:U' B'",
+          "weight": 0.006224
+        },
+        {
+          "feature": "pair:U' L2",
+          "weight": 0.00355
+        }
+      ],
+      "training": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.336673,
+          "minimum_gap": 0.094407,
+          "mean_slack": 0.000119
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.336673,
+          "minimum_gap": 0.094407,
+          "mean_slack": 0.000119
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.37329,
+          "minimum_gap": 0.099392,
+          "mean_slack": 1.3e-05
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 42,
+          "mean_gap": 0.179322,
+          "minimum_gap": 0.033333,
+          "mean_slack": 0.004126
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.213364,
+          "minimum_gap": 0.098017,
+          "mean_slack": 7.3e-05
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 44,
+          "mean_gap": 0.150515,
+          "minimum_gap": 0.023366,
+          "mean_slack": 0.002197
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "strictly_preferred": 23,
+          "margin_satisfied": 23,
+          "mean_gap": 0.224148,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.233866,
+          "minimum_gap": 0.097463,
+          "mean_slack": 9e-05
+        }
+      ],
+      "leave_one_algorithm_out": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.292233,
+          "minimum_gap": 0.011231,
+          "mean_slack": 0.001889
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.292622,
+          "minimum_gap": 0.011682,
+          "mean_slack": 0.001879
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 41,
+          "mean_gap": 0.307453,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.007247
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "strictly_preferred": 42,
+          "margin_satisfied": 20,
+          "mean_gap": 0.084113,
+          "minimum_gap": -0.103469,
+          "mean_slack": 0.036115
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 35,
+          "mean_gap": 0.178207,
+          "minimum_gap": 0.021324,
+          "mean_slack": 0.007054
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 32,
+          "mean_gap": 0.108577,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.017021
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "strictly_preferred": 23,
+          "margin_satisfied": 22,
+          "mean_gap": 0.223053,
+          "minimum_gap": 0.094138,
+          "mean_slack": 0.000255
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "strictly_preferred": 24,
+          "margin_satisfied": 12,
+          "mean_gap": 0.018736,
+          "minimum_gap": -0.176051,
+          "mean_slack": 0.098753
+        }
+      ]
+    }
+  }
+}

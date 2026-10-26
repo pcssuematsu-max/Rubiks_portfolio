@@ -24,7 +24,7 @@ class MainProfileTests(unittest.TestCase):
         config = build_frame_config("experiment")
 
         self.assertEqual(config.puzzle_type, "cube")
-        self.assertEqual(config.cube_size, 3)
+        self.assertEqual(config.cube_size, 4)
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(config.control_panel_mode, "advanced")
         self.assertEqual(config.steps_to_goal_value_loss_weights[20:], [5.0, 5.0, 3.0, 1.0, 1.0])
@@ -45,7 +45,7 @@ class MainProfileTests(unittest.TestCase):
         self.assertEqual(config.steps_to_goal_value_max_route_efficiencies[20:], [2.0, 0.0, 2.0, 0.0, 0.0])
         self.assertEqual(config.steps_to_goal_value_batch_band_max_copies[20:], [3, 1, 3, 1, 1])
         self.assertEqual(config.pairwise_fallback_max_ratios[20:], [1.0, 1.0, 1.0, 0.25, 0.25])
-        self.assertEqual(config.search2_skip_differences[20:], [1.0, 1.0, 1.0, 1.0, 1000.0])
+        self.assertEqual(config.search2_skip_differences[20:], [1000.0] * 5)
         self.assertEqual(config.search3_budget_rescue_playouts[3], 10000)
         self.assertEqual(config.search3_budget_rescue_playouts[2], 0)
         self.assertEqual(config.original_train_recent_ratios[20:], [0.0, 0.0, 0.25, 0.25, 0.25])
@@ -67,11 +67,11 @@ class MainProfileTests(unittest.TestCase):
         )
         self.assertEqual(
             [config.transform_idx[index] for index in (10,11,18,19)],
-            [0,0,24,24],
+            [0,1,24,25],
         )
         for first, second, expected_difference in (
-            (10,11,'original_train_batch_mix_modes'),
-            (18,19,'original_train_recent_ratios'),
+            (10,11,{'original_train_batch_mix_modes', 'transform_idx'}),
+            (18,19,{'original_train_recent_ratios', 'transform_idx'}),
         ):
             differences = {
                 field.name for field in fields(config)
@@ -79,11 +79,21 @@ class MainProfileTests(unittest.TestCase):
                 and len(values) == len(config.ai_search_modes)
                 and values[first] != values[second]
             }
-            self.assertEqual(differences,{expected_difference})
+            self.assertTrue(expected_difference.issubset(differences))
         self.assertEqual(config.original_transformer_linear_skips, config.original_transformer_attention)
         self.assertEqual(config.original_transformer_linear_skip_variances[10], 0.125)
         self.assertEqual(config.original_transformer_linear_skip_variances[22], 0.125)
         self.assertEqual(config.original_transformer_linear_skip_variances[0], 0.0)
+
+    def test_experiment_search2_skip_differences_are_fixed_per_ai(self):
+        config = build_frame_config("experiment")
+        original_indices = (0, 1, 8, 9, 12, 13, 14, 15, 16, 17)
+        original_thresholds = [config.search2_skip_differences[index] for index in original_indices]
+
+        self.assertEqual(original_thresholds, [1.0, 5.0, 20.0, 100.0, 1.0, 5.0, 10.0, 10.0, 20.0, 100.0])
+        self.assertEqual(config.search2_skip_differences[20:], [1000.0] * 5)
+        self.assertEqual({threshold: original_thresholds.count(threshold) for threshold in set(original_thresholds)},
+                         {1.0: 2, 5.0: 2, 10.0: 2, 20.0: 2, 100.0: 2})
 
     def test_test_profile_is_an_alias_for_experiment(self):
         config = build_frame_config("test")

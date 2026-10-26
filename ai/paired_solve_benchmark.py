@@ -26,12 +26,40 @@ EFFECT_BANDS = (
     ('20+', 20, None),
     ('14+ / reduced40+', 14, None),
 )
-PALM_SCRAMBLES = (
-    ('T-palm', (
+PERM_SCRAMBLES = (
+    ('T-perm', (
         'R', 'U', "R'", "U'", "R'", 'F', 'R2', "U'", "R'", "U'", 'R', 'U', "R'", "F'",
     )),
-    ('Y-palm', (
+    ('Y-perm', (
         'F', 'R', "U'", "R'", "U'", 'R', 'U', "R'", "F'", 'R', 'U', "R'", "U'", "R'", 'F', 'R', "F'",
+    )),
+)
+# Keep the old import name for external scripts; fixture IDs use "Perm".
+PALM_SCRAMBLES = PERM_SCRAMBLES
+_WING_2_SWAP_4X4 = (
+    '2U2', " F'", "2R'", ' F ', ' R2', " F'", '2R ', " F'", "2U'",
+    ' F2', '2U2', ' R2', '2U ', ' F2', '2U2', ' F2', ' R2',
+    '2U ', ' R2',
+)
+_CORNER_2_SWAP_4X4 = (
+    ' B2', " L'", ' B2', ' D2', " F'", " R'", ' F ', ' D2',
+    " B'", ' L ', ' B ', '2F2', ' R2', ' U2', '2F2', ' U2',
+    ' R2', '2F2',
+)
+ALGORITHM_4X4_SCRAMBLES = (
+    ('wing-2-swap', 'Wing 2 Swap', 'low-effect/long-sequence', _WING_2_SWAP_4X4),
+    ('wing-4-cycle', 'Wing 4 Cycle', 'low-effect/long-sequence', (
+        '2R2', ' F2', '2R ', ' U2', '2R ', ' U2', ' F2', '2R ',
+        ' F2', "2R'", ' F2', '2R ', ' F2', '2R2', ' F2',
+    )),
+    ('corner-2-swap', 'Corner 2 Swap', 'low-effect/long-sequence', _CORNER_2_SWAP_4X4),
+    ('wing-2-plus-corner-2-swap', 'Wing 2 + Corner 2 Swap',
+     'low-effect/very-long-sequence', _WING_2_SWAP_4X4 + _CORNER_2_SWAP_4X4),
+    ('center-3-cycle-a', 'Center 3 Cycle A', 'low-effect/short-sequence', (
+        '2R ', ' U ', "2L'", " U'", "2R'", ' U ', '2L ', " U'",
+    )),
+    ('center-3-cycle-b', 'Center 3 Cycle B', 'low-effect/short-sequence', (
+        '2R2', ' U ', '2L2', " U'", '2R2', ' U ', '2L2', " U'",
     )),
 )
 
@@ -117,13 +145,13 @@ def make_paired_fixtures(per_band=2, seed=FIXTURE_SEED):
     return fixtures
 
 
-def make_palm_fixtures():
+def make_perm_fixtures():
     """Return the two user-supplied low-Effect, unreduced long algorithms."""
     cube = Rubiks_3(size=3, RegisterMyperms=False, PointReindex=False)
     display_to_key = {str(key).strip(): key for key in cube.move_keys}
     fixtures = []
     seen_states = set()
-    for fixture_id, notation in PALM_SCRAMBLES:
+    for fixture_id, notation in PERM_SCRAMBLES:
         scramble = tuple(display_to_key[move] for move in notation)
         effect = setup_effect_metrics('cube-3x3', 3, scramble)
         if effect is None or effect['movedPieceCount'] != 4:
@@ -136,11 +164,48 @@ def make_palm_fixtures():
             raise ValueError(f'{fixture_id} unexpectedly produces a solved state')
         state_hash = hashlib.sha256(''.join(cube.state).encode('ascii')).hexdigest()[:16]
         if state_hash in seen_states:
-            raise ValueError('Palm fixtures must have distinct start states')
+            raise ValueError('Perm fixtures must have distinct start states')
         seen_states.add(state_hash)
         fixtures.append({
             'fixtureId': fixture_id,
             'band': '0-7',
+            'scramble': list(scramble),
+            'setupEffect': effect,
+            'initialStateHash': state_hash,
+        })
+    cube.reset()
+    return fixtures
+
+
+def make_palm_fixtures():
+    """Backward-compatible alias for the correctly named Perm fixtures."""
+    return make_perm_fixtures()
+
+
+def make_4x4_algorithm_fixtures():
+    """Return the user-supplied low-Effect 4x4 wing/corner/center algorithms."""
+    cube = Rubiks_3(size=4, RegisterMyperms=False, PointReindex=False)
+    legal_moves = set(cube.move_keys)
+    fixtures = []
+    seen_states = set()
+    for fixture_id, name, band, scramble in ALGORITHM_4X4_SCRAMBLES:
+        if any(move not in legal_moves for move in scramble):
+            raise ValueError(f'{fixture_id} contains a move unavailable on 4x4')
+        effect = setup_effect_metrics('cube-4x4', 4, scramble)
+        if effect is None:
+            raise ValueError(f'{fixture_id} has no measurable Effect')
+        cube.reset()
+        cube.scramble(0, Move=scramble)
+        if cube.is_perfect():
+            raise ValueError(f'{fixture_id} unexpectedly produces a solved state')
+        state_hash = hashlib.sha256(''.join(cube.state).encode('ascii')).hexdigest()[:16]
+        if state_hash in seen_states:
+            raise ValueError(f'{fixture_id} duplicates another 4x4 fixture')
+        seen_states.add(state_hash)
+        fixtures.append({
+            'fixtureId': fixture_id,
+            'algorithmName': name,
+            'band': band,
             'scramble': list(scramble),
             'setupEffect': effect,
             'initialStateHash': state_hash,
@@ -226,8 +291,11 @@ def probe_position_neighborhood(ai, reference_move=None):
             result.update({
                 'referenceMove': reference_move,
                 'referencePolicyRank': int(np.count_nonzero(policy > policy[index]) + 1),
+                'referencePolicyScore': float(policy[index]),
                 'referenceValueRank': int(np.count_nonzero(values > values[index]) + 1),
+                'referenceSuccessorValue': float(values[index]),
                 'referenceValueDelta': float(values[index] - current_value),
+                'referenceValueGapToBest': float(np.max(values) - values[index]),
             })
         return result
     finally:
@@ -235,6 +303,157 @@ def probe_position_neighborhood(ai, reference_move=None):
             cube._restore(snapshot)
         else:
             cube.state[:] = snapshot
+
+
+def _probe_search3_root_for_reference_move(ai, move, playouts, trace_root=False):
+    """Measure PUCT allocation at one route state without advancing the cube."""
+    engine = ai.search3_engine
+    engine.reset_tree()
+    try:
+        if trace_root:
+            result = engine.search3(int(playouts), C=ai.search3_C, trace_root_move=move)
+        else:
+            result = ai.search3(int(playouts))
+        root = engine.root_node
+        if root is None:
+            return None
+        index = ai.cube.key_to_num[move]
+        visits = np.asarray(root.visited, dtype='f').reshape(-1)
+        priors = np.asarray(root.P, dtype='f').reshape(-1)
+        backed = np.asarray(root.val, dtype='f').reshape(-1)
+        total = float(np.sum(visits))
+        diagnostics = result.search_diagnostics or {}
+        probe = {
+            'playouts': int(result.stats[1]),
+            'endReason': str(result.end_reason),
+            'referenceVisits': int(visits[index]),
+            'referenceVisitShare': float(visits[index] / total) if total else 0.0,
+            'referencePrior': float(priors[index]),
+            'referenceBackedMean': (
+                float(backed[index] / visits[index]) if visits[index] else None
+            ),
+            'topVisitShare': float(np.max(visits) / total) if total else 0.0,
+            'playoutDepthMean': _finite_float(diagnostics.get('playoutDepthMean')),
+            'playoutDepthMax': int(diagnostics.get('playoutDepthMax') or 0),
+        }
+        if trace_root:
+            probe['rootActionTrace'] = result.root_action_trace
+        return probe
+    finally:
+        engine.reset_tree()
+
+
+def probe_reference_route(ai, fixture, route_moves, max_probe_steps=None,
+                          search3_probe_playouts=0, trace_search3_root=False):
+    """Evaluate every decision on one solved reference route without learning.
+
+    The route is a comparison path, not a claim that its moves are uniquely
+    optimal.  Only compact per-step metrics are retained; the full successor
+    ranking maps from probe_position_neighborhood are discarded.
+    """
+    route = tuple(route_moves)
+    if not route:
+        raise ValueError('A reference route must contain at least one move')
+    if max_probe_steps is not None and int(max_probe_steps) < 1:
+        raise ValueError('max_probe_steps must be positive')
+    if int(search3_probe_playouts) < 0:
+        raise ValueError('search3_probe_playouts must be nonnegative')
+    cube = ai.cube
+    snapshot = cube._snapshot() if hasattr(cube, '_snapshot') else cube.state.copy()
+    steps = []
+    route_start_value = None
+    try:
+        cube.reset()
+        cube.scramble(0, Move=tuple(fixture['scramble']))
+        state_hash = hashlib.sha256(''.join(cube.state).encode('ascii')).hexdigest()[:16]
+        if state_hash != fixture['initialStateHash']:
+            raise ValueError(f"Initial state differs for {fixture['fixtureId']}")
+        for step_index, move in enumerate(route, start=1):
+            if move not in cube.move_keys:
+                raise ValueError(f'Invalid reference move at step {step_index}: {move!r}')
+            if max_probe_steps is None or step_index <= max_probe_steps:
+                probe = probe_position_neighborhood(ai, move)
+                if route_start_value is None:
+                    route_start_value = probe['currentValue']
+                step = {
+                    'step': step_index,
+                    'remainingMoveCount': len(route) - step_index + 1,
+                    'stateHash': state_hash,
+                    'referenceMove': move,
+                    'policyRank': probe['referencePolicyRank'],
+                    'policyScore': probe['referencePolicyScore'],
+                    'valueRank': probe['referenceValueRank'],
+                    'currentValue': probe['currentValue'],
+                    'successorValue': probe['referenceSuccessorValue'],
+                    'valueDelta': probe['referenceValueDelta'],
+                    'valueFromRouteStart': probe['referenceSuccessorValue'] - route_start_value,
+                    'valueGapToBest': probe['referenceValueGapToBest'],
+                    'improvingSuccessorCount': probe['improvingSuccessorCount'],
+                    'topPolicyMoves': probe['topPolicyMoves'],
+                    'topValueMoves': probe['topValueMoves'],
+                }
+                if ai.search_mode == 'search3' and search3_probe_playouts:
+                    step['search3Root'] = _probe_search3_root_for_reference_move(
+                        ai, move, search3_probe_playouts,
+                        trace_root=trace_search3_root,
+                    )
+                steps.append(step)
+            cube.make_move(move)
+            state_hash = hashlib.sha256(''.join(cube.state).encode('ascii')).hexdigest()[:16]
+        if not cube.is_perfect():
+            raise ValueError(f"Reference route does not solve {fixture['fixtureId']}")
+        def first_step(condition):
+            return next((step['step'] for step in steps if condition(step)), None)
+
+        route_probe = {
+            'fixtureId': fixture['fixtureId'],
+            'initialStateHash': fixture['initialStateHash'],
+            'routeMoveCount': len(route),
+            'probedMoveCount': len(steps),
+            'valueDomain': 'raw_logit' if ai.search_mode == 'search3' else 'raw',
+            'routeStartValue': route_start_value,
+            'summary': {
+                'policyTop3Count': sum(step['policyRank'] <= 3 for step in steps),
+                'valueTop3Count': sum(step['valueRank'] <= 3 for step in steps),
+                'bothTop3Count': sum(
+                    step['policyRank'] <= 3 and step['valueRank'] <= 3 for step in steps
+                ),
+                'firstPolicyOutsideTop3Step': first_step(lambda step: step['policyRank'] > 3),
+                'firstValueOutsideTop3Step': first_step(lambda step: step['valueRank'] > 3),
+                'firstBothOutsideTop3Step': first_step(
+                    lambda step: step['policyRank'] > 3 and step['valueRank'] > 3
+                ),
+                'firstValueDropStep': first_step(lambda step: step['valueDelta'] < 0.0),
+                'firstValueAboveStartStep': first_step(
+                    lambda step: step['valueFromRouteStart'] > 0.0
+                ),
+                'minValueFromStart': min(step['valueFromRouteStart'] for step in steps),
+                'maxValueFromStart': max(step['valueFromRouteStart'] for step in steps),
+            },
+            'steps': steps,
+        }
+        if trace_search3_root and ai.search_mode == 'search3' and search3_probe_playouts:
+            traces = [step['search3Root']['rootActionTrace'] for step in steps]
+            route_probe['summary'].update({
+                'rootNeverEligibleCount': sum(
+                    trace['firstEligiblePlayout'] is None for trace in traces
+                ),
+                'rootEligibleUnvisitedCount': sum(
+                    trace['firstEligiblePlayout'] is not None
+                    and trace['firstVisitPlayout'] is None for trace in traces
+                ),
+                'rootVisitedCount': sum(
+                    trace['firstVisitPlayout'] is not None for trace in traces
+                ),
+            })
+        return route_probe
+    finally:
+        if hasattr(cube, '_restore'):
+            cube._restore(snapshot)
+        else:
+            cube.state[:] = snapshot
+        if hasattr(ai, 'clear_training_cache'):
+            ai.clear_training_cache(collect=False)
 
 
 def run_direct_solve_case(ai, fixture, max_search_calls=200, max_moves=300,

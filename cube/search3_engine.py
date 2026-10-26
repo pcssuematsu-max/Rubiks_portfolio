@@ -349,7 +349,7 @@ class Search3Engine:
         for move in self.cube.invert_moves(tuple(path_moves)):
             self.cube.make_move(move)
 
-    def _collect_leaf_path(self, root_node, max_depth):
+    def _collect_leaf_path(self, root_node, max_depth, root_trace=None):
         node = root_node
         path_nodes = [root_node]
         path_indices = []
@@ -362,11 +362,19 @@ class Search3Engine:
             selection_cs.append(exploration_c)
             invalid_indices = self._find_invalid_indices(path_moves)
             widening_limits.append(self._widening_action_limit(node, invalid_indices))
+            selection_trace = root_trace if root_trace is not None and not path_moves else None
             index = node.select_node(
                 invalid_indices,
                 C = exploration_c,
                 action_limit = widening_limits[-1],
+                selection_trace = selection_trace,
             )
+            if selection_trace is not None:
+                if (selection_trace['targetAllowed']
+                        and selection_trace['firstEligiblePlayout'] is None):
+                    selection_trace['firstEligiblePlayout'] = selection_trace['currentPlayout']
+                if index == selection_trace['targetIndex'] and selection_trace['firstVisitPlayout'] is None:
+                    selection_trace['firstVisitPlayout'] = selection_trace['currentPlayout']
             if index is None:
                 return {
                     'resolved': True,
@@ -496,7 +504,8 @@ class Search3Engine:
             return None
         return self.cube.makedata().reshape(-1)
 
-    def search3(self, N, C=0.05):
+    def search3(self, N, C=0.05, trace_root_move=None):
+        """Run PUCT, optionally tracing one root action for an offline comparison."""
         root_value_raw = self._ensure_root_node(C=C)
         root_value = sigmoid(root_value_raw)
         root_node = self.root_node
@@ -509,14 +518,42 @@ class Search3Engine:
         playout_depths = []
         selection_cs = []
         widening_limits = []
+        root_trace = None
+        if trace_root_move is not None:
+            if trace_root_move not in self.cube.key_to_num:
+                raise ValueError(f'Unknown root trace move: {trace_root_move!r}')
+            target_index = self.cube.key_to_num[trace_root_move]
+            root_trace = {
+                'targetMove': trace_root_move,
+                'valueDomain': 'sigmoid_0_1',
+                'targetIndex': target_index,
+                'targetPolicyPrior': float(root_node.P[target_index]),
+                'rootValue': float(root_node.value),
+                'firstEligiblePlayout': None,
+                'firstVisitPlayout': None,
+                'firstChildValue': None,
+                'firstBackedValue': None,
+                'visitSamples': [],
+                'currentPlayout': 0,
+                'targetAllowed': False,
+            }
+            trace_milestones = {1, 10, 100, 1000, 10000, int(N)}
 
         while remaining_playouts > 0 and solved_move is None:
             current_batch_size = min(batch_size, remaining_playouts)
             pending_leaves = []
             processed_playouts = 0
             for _ in range(current_batch_size):
-                leaf_path = self._collect_leaf_path(root_node, max_depth)
+                if root_trace is not None:
+                    root_trace['currentPlayout'] = total_playouts + processed_playouts + 1
+                leaf_path = self._collect_leaf_path(root_node, max_depth, root_trace=root_trace)
                 processed_playouts += 1
+                if root_trace is not None and root_trace['currentPlayout'] in trace_milestones:
+                    visits_now = root_node.visited
+                    root_trace['visitSamples'].append({
+                        'playouts': root_trace['currentPlayout'],
+                        'targetVisits': int(visits_now[root_trace['targetIndex']]),
+                    })
                 playout_depths.append(len(leaf_path['path_moves']))
                 selection_cs.extend(leaf_path.get('selectionCs',()))
                 widening_limits.extend(leaf_path.get('wideningLimits',()))
@@ -532,6 +569,17 @@ class Search3Engine:
             self._predict_leaf_batch(pending_leaves)
             for pending_leaf in pending_leaves:
                 self._backup_path(pending_leaf['path_nodes'], pending_leaf['path_indices'], pending_leaf['node_value'])
+            if root_trace is not None and root_trace['firstVisitPlayout'] is not None and root_trace['firstChildValue'] is None:
+                target_child = root_node.children.get(trace_root_move)
+                if target_child is not None:
+                    root_trace['firstChildValue'] = float(target_child.value)
+                elif solved_move is not None and solved_move[0] == trace_root_move:
+                    root_trace['firstChildValue'] = 1.0
+                if root_trace['firstChildValue'] is not None:
+                    root_trace['firstBackedValue'] = (
+                        float(getattr(self.ai, 'value_target_gamma', 1.0))
+                        * root_trace['firstChildValue']
+                    )
 
             total_playouts += processed_playouts
             remaining_playouts -= processed_playouts
@@ -541,6 +589,20 @@ class Search3Engine:
         search_diagnostics = self._search_diagnostics(
             playout_depths, selection_cs, widening_limits,
         )
+        if root_trace is not None:
+            target_index = root_trace.pop('targetIndex')
+            root_trace.pop('currentPlayout')
+            root_trace.pop('targetAllowed')
+            target_visits = int(root_node.visited[target_index] - start_root_visits[target_index])
+            root_trace.update({
+                'playouts': int(total_playouts),
+                'finalVisits': target_visits,
+                'finalVisitShare': float(target_visits / total_playouts) if total_playouts else 0.0,
+                'finalBackedMean': (
+                    float(root_node.val[target_index] / root_node.visited[target_index])
+                    if root_node.visited[target_index] else None
+                ),
+            })
 
         if solved_move is not None:
             best_moves = self._legal_prefix(solved_move)
@@ -551,6 +613,8 @@ class Search3Engine:
             if len(value_trace) > 0:
                 value_trace[-1] = best_value
             result = SearchResult(True, best_moves, root_value, value_trace, best_value, stats, local_visits.copy(), self.ai.search_mode, 'solved', root_value_raw=root_value_raw, value_trace_raw=raw_value_trace, best_value_raw=raw_best_value, search_diagnostics=search_diagnostics)
+            if root_trace is not None:
+                result.root_action_trace = root_trace
             self.prune_caches()
             return result
 
@@ -564,6 +628,8 @@ class Search3Engine:
         best_value = sigmoid(best_value_raw)
         value_trace = self._value_trace_for_moves(root_value, best_moves)
         result = SearchResult(False, best_moves, root_value, value_trace, best_value, stats, local_visits.copy(), self.ai.search_mode, 'budget', root_value_raw=root_value_raw, value_trace_raw=raw_value_trace, best_value_raw=best_value_raw, search_diagnostics=search_diagnostics)
+        if root_trace is not None:
+            result.root_action_trace = root_trace
         self.prune_caches()
         return result
 
@@ -634,7 +700,7 @@ class Node:
         """Keep unvisited-action estimates on the backup value's [0, 1] scale."""
         self.value = sigmoid(value_logit)
 
-    def select_node(self, invalid_index=None, C=None, action_limit=0):
+    def select_node(self, invalid_index=None, C=None, action_limit=0, selection_trace=None):
         masked = self.blocked.copy()
         if invalid_index is not None:
             if isinstance(invalid_index, (set, list, tuple, np.ndarray)):
@@ -642,6 +708,8 @@ class Node:
                     masked[index] = True
             else:
                 masked[invalid_index] = True
+        if selection_trace is not None:
+            selection_trace['targetAllowed'] = False
         if np.all(masked):
             return None
         action_limit = max(0, int(action_limit))
@@ -655,6 +723,8 @@ class Node:
                 restricted = np.ones_like(masked, dtype=bool)
                 restricted[selected] = False
                 masked |= restricted
+        if selection_trace is not None:
+            selection_trace['targetAllowed'] = not bool(masked[selection_trace['targetIndex']])
         average_value = np.full_like(self.P, self.value, dtype='f')
         np.divide(self.val, self.visited, out=average_value, where=self.visited != 0)
         exploration_c = self.C if C is None else float(C)

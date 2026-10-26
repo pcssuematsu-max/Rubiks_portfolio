@@ -1,0 +1,624 @@
+{
+  "method": "nonnegative coefficients summing to 1; minimize mean hinge slack per source algorithm",
+  "margin": 0.1,
+  "assumption": "Each source algorithm is preferred to its distinct rotation/mirror variants",
+  "candidate_count": 10,
+  "models": {
+    "single_moves": {
+      "feature_count": 27,
+      "nonzero_coefficient_count": 14,
+      "coefficients": [
+        {
+          "feature": "move:L'",
+          "weight": 0.142812
+        },
+        {
+          "feature": "move:L",
+          "weight": 0.142717
+        },
+        {
+          "feature": "move:B",
+          "weight": 0.098687
+        },
+        {
+          "feature": "move:B'",
+          "weight": 0.098453
+        },
+        {
+          "feature": "move:F",
+          "weight": 0.075
+        },
+        {
+          "feature": "move:D",
+          "weight": 0.072658
+        },
+        {
+          "feature": "move:D'",
+          "weight": 0.072642
+        },
+        {
+          "feature": "move:F2",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:S2",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:E2",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:U",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:L2",
+          "weight": 0.047031
+        },
+        {
+          "feature": "move:F'",
+          "weight": 0.025
+        },
+        {
+          "feature": "move:B2",
+          "weight": 0.025
+        }
+      ],
+      "training": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.677247,
+          "minimum_gap": 0.09714,
+          "mean_slack": 6.1e-05
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.677247,
+          "minimum_gap": 0.09714,
+          "mean_slack": 6.1e-05
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.819189,
+          "minimum_gap": 0.075,
+          "mean_slack": 0.000532
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "strictly_preferred": 44,
+          "margin_satisfied": 41,
+          "mean_gap": 0.315904,
+          "minimum_gap": -0.1,
+          "mean_slack": 0.012966
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 47,
+          "mean_gap": 0.418032,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 46,
+          "mean_gap": 0.221277,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.002128
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "strictly_preferred": 23,
+          "margin_satisfied": 23,
+          "mean_gap": 0.295652,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 43,
+          "mean_gap": 0.408511,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.002454
+        },
+        {
+          "id": "ergonomics_09",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 45,
+          "mean_gap": 0.600691,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.002336
+        },
+        {
+          "id": "ergonomics_10",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 45,
+          "mean_gap": 0.600691,
+          "minimum_gap": -0.0,
+          "mean_slack": 0.002336
+        }
+      ],
+      "leave_one_algorithm_out": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.680301,
+          "minimum_gap": 0.067384,
+          "mean_slack": 0.000694
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.680301,
+          "minimum_gap": 0.067384,
+          "mean_slack": 0.000694
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.734935,
+          "minimum_gap": 0.05,
+          "mean_slack": 0.00127
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "strictly_preferred": 41,
+          "margin_satisfied": 39,
+          "mean_gap": 0.285957,
+          "minimum_gap": -0.12,
+          "mean_slack": 0.018609
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 44,
+          "mean_gap": 0.384351,
+          "minimum_gap": 0.080645,
+          "mean_slack": 0.00103
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 34,
+          "mean_gap": 0.195745,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.012766
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "strictly_preferred": 23,
+          "margin_satisfied": 22,
+          "mean_gap": 0.296252,
+          "minimum_gap": 0.096551,
+          "mean_slack": 0.00015
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "strictly_preferred": 39,
+          "margin_satisfied": 33,
+          "mean_gap": 0.204255,
+          "minimum_gap": -0.2,
+          "mean_slack": 0.045745
+        },
+        {
+          "id": "ergonomics_09",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 45,
+          "mean_gap": 0.574468,
+          "minimum_gap": -0.0,
+          "mean_slack": 0.003191
+        },
+        {
+          "id": "ergonomics_10",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 44,
+          "mean_gap": 0.574467,
+          "minimum_gap": -0.0,
+          "mean_slack": 0.003192
+        }
+      ]
+    },
+    "single_moves_and_adjacent_pairs": {
+      "feature_count": 471,
+      "nonzero_coefficient_count": 45,
+      "coefficients": [
+        {
+          "feature": "pair:U2 R",
+          "weight": 0.075964
+        },
+        {
+          "feature": "move:B'",
+          "weight": 0.0663
+        },
+        {
+          "feature": "move:B",
+          "weight": 0.06355
+        },
+        {
+          "feature": "pair:R' U2",
+          "weight": 0.058227
+        },
+        {
+          "feature": "move:S2",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:E2",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:D",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:D'",
+          "weight": 0.05
+        },
+        {
+          "feature": "move:L2",
+          "weight": 0.046162
+        },
+        {
+          "feature": "move:L'",
+          "weight": 0.044396
+        },
+        {
+          "feature": "pair:D R'",
+          "weight": 0.043283
+        },
+        {
+          "feature": "move:F2",
+          "weight": 0.038806
+        },
+        {
+          "feature": "move:F",
+          "weight": 0.037313
+        },
+        {
+          "feature": "move:L",
+          "weight": 0.036681
+        },
+        {
+          "feature": "pair:R D'",
+          "weight": 0.035821
+        },
+        {
+          "feature": "move:F'",
+          "weight": 0.034328
+        },
+        {
+          "feature": "move:B2",
+          "weight": 0.03209
+        },
+        {
+          "feature": "pair:R F",
+          "weight": 0.030045
+        },
+        {
+          "feature": "pair:F' U'",
+          "weight": 0.021642
+        },
+        {
+          "feature": "pair:U' L",
+          "weight": 0.021099
+        },
+        {
+          "feature": "pair:M2 U",
+          "weight": 0.019878
+        },
+        {
+          "feature": "pair:U M2",
+          "weight": 0.019878
+        },
+        {
+          "feature": "move:U",
+          "weight": 0.014925
+        },
+        {
+          "feature": "pair:U R",
+          "weight": 0.013433
+        },
+        {
+          "feature": "pair:R' D2",
+          "weight": 0.011639
+        },
+        {
+          "feature": "pair:U' R2",
+          "weight": 0.009765
+        },
+        {
+          "feature": "pair:R U'",
+          "weight": 0.007463
+        },
+        {
+          "feature": "pair:L' U",
+          "weight": 0.004978
+        },
+        {
+          "feature": "pair:M' U2",
+          "weight": 0.004841
+        },
+        {
+          "feature": "pair:U2 M",
+          "weight": 0.004841
+        },
+        {
+          "feature": "pair:U' L2",
+          "weight": 0.002648
+        },
+        {
+          "feature": "pair:R2 U",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:D' M2",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:M2 D'",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:U F",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:F U'",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:F R'",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:D M2",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:M2 D",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:F' R'",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:B U2",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:U' B",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:U' B'",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:U' F",
+          "weight": 0.0
+        },
+        {
+          "feature": "pair:R B2",
+          "weight": 0.0
+        }
+      ],
+      "training": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 47,
+          "mean_gap": 0.378706,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 47,
+          "mean_gap": 0.378706,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.419906,
+          "minimum_gap": 0.097404,
+          "mean_slack": 5.5e-05
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 43,
+          "mean_gap": 0.189628,
+          "minimum_gap": -0.003667,
+          "mean_slack": 0.004971
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.22621,
+          "minimum_gap": 0.022388,
+          "mean_slack": 0.00265
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 40,
+          "mean_gap": 0.157772,
+          "minimum_gap": 0.009682,
+          "mean_slack": 0.003009
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "strictly_preferred": 23,
+          "margin_satisfied": 23,
+          "mean_gap": 0.232075,
+          "minimum_gap": 0.1,
+          "mean_slack": 0.0
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 44,
+          "mean_gap": 0.23986,
+          "minimum_gap": 0.009845,
+          "mean_slack": 0.002255
+        },
+        {
+          "id": "ergonomics_09",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.343459,
+          "minimum_gap": 0.089089,
+          "mean_slack": 0.000342
+        },
+        {
+          "id": "ergonomics_10",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 45,
+          "mean_gap": 0.341242,
+          "minimum_gap": 0.061587,
+          "mean_slack": 0.000817
+        }
+      ],
+      "leave_one_algorithm_out": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.391576,
+          "minimum_gap": 0.04578,
+          "mean_slack": 0.001154
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 46,
+          "mean_gap": 0.391444,
+          "minimum_gap": 0.045781,
+          "mean_slack": 0.001154
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 44,
+          "mean_gap": 0.420919,
+          "minimum_gap": 0.009622,
+          "mean_slack": 0.005129
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "strictly_preferred": 42,
+          "margin_satisfied": 33,
+          "mean_gap": 0.16459,
+          "minimum_gap": -0.072919,
+          "mean_slack": 0.023022
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "strictly_preferred": 47,
+          "margin_satisfied": 44,
+          "mean_gap": 0.225749,
+          "minimum_gap": 0.008511,
+          "mean_slack": 0.003803
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "strictly_preferred": 46,
+          "margin_satisfied": 28,
+          "mean_gap": 0.118898,
+          "minimum_gap": 0.0,
+          "mean_slack": 0.017725
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "strictly_preferred": 23,
+          "margin_satisfied": 20,
+          "mean_gap": 0.229778,
+          "minimum_gap": 0.060845,
+          "mean_slack": 0.001702
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "strictly_preferred": 37,
+          "margin_satisfied": 21,
+          "mean_gap": 0.075945,
+          "minimum_gap": -0.169848,
+          "mean_slack": 0.055233
+        },
+        {
+          "id": "ergonomics_09",
+          "variants": 47,
+          "strictly_preferred": 45,
+          "margin_satisfied": 37,
+          "mean_gap": 0.224355,
+          "minimum_gap": -0.062286,
+          "mean_slack": 0.011537
+        },
+        {
+          "id": "ergonomics_10",
+          "variants": 47,
+          "strictly_preferred": 44,
+          "margin_satisfied": 44,
+          "mean_gap": 0.291283,
+          "minimum_gap": -0.1,
+          "mean_slack": 0.008511
+        }
+      ]
+    }
+  }
+}

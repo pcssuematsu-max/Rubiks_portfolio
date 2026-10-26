@@ -1760,6 +1760,9 @@ class SolveSessionManager:
                 'stepsToGoalValueBatchBandMaxCopies': getattr(
                     ai, 'steps_to_goal_value_batch_band_max_copies', None,
                 ),
+                'stepsToGoalExcludeConflictingValueStates': getattr(
+                    ai, 'steps_to_goal_exclude_conflicting_value_states', None,
+                ),
                 'pairwiseFallbackMaxRatio': getattr(ai, 'pairwise_fallback_max_ratio', None),
                 'rankLossMix': getattr(ai, 'search2_rank_loss_mix', None),
                 'rankLossApplyType': getattr(ai, 'search2_rank_loss_apply_type', None),

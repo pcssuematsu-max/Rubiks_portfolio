@@ -31,12 +31,27 @@ python3 -m ruff check .
 ```bash
 python3.14 tools/compare_ai_same_positions.py --list-fixtures
 python3.14 tools/compare_ai_same_positions.py --ai-indices 0,3,10,11,12,18,19,20,21,22,23,24
-python3.14 tools/compare_ai_same_positions.py --fixture-set palms --ai-indices 0,3,10,11,12,18,19,20,21,22,23,24
+python3.14 tools/compare_ai_same_positions.py --fixture-set perms --ai-indices 0,3,10,11,12,18,19,20,21,22,23,24
 ```
 
-`--fixture-set palms` は、ユーザー提供のTパーム（Effect 4・14手）とYパーム（Effect 4・17手）だけを同一局面として比較します。`--fixture-set all` なら元の固定10局面と合わせて比較できます。`--ai-indices` を省略すると実験用25体すべてを比較します。結果は通常の実験ログと別の `exports/ai-paired-benchmark.jsonl` に追記され、各AI・各局面の直接成功、探索量、深さ、保存済みパラメータの識別子を残します。比較前にGUIのパラメータを保存し、保存処理中の実行は避けてください。GUIで交互に使うSearch3の浅い探索幅は、この比較では設定値側に固定します。局面は再現可能な固定サンプルであり、通常の200試行の出題分布そのものを代表するわけではありません。
+`--fixture-set perms` は、ユーザー提供のT-Perm（Effect 4・14手）とY-Perm（Effect 4・17手）だけを同一局面として比較します。`--fixture-set all` なら元の固定10局面と合わせて比較できます。4×4では `--fixture-set 4x4-algorithms` でWing、Corner、Centerの固定6局面を比較できます。追加した局面はWing 2 SwapとCorner 2 Swapを連結したEffect 4・37手の手順です。`--ai-indices` を省略すると実験用25体すべてを比較します。結果は通常の実験ログと別の `exports/ai-paired-benchmark.jsonl` に追記され、各AI・各局面の直接成功、探索量、深さ、保存済みパラメータの識別子を残します。比較前にGUIのパラメータを保存し、保存処理中の実行は避けてください。GUIで交互に使うSearch3の浅い探索幅は、この比較では設定値側に固定します。局面は再現可能な固定サンプルであり、通常の200試行の出題分布そのものを代表するわけではありません。
+
+4×4の通常ソルブログは、Effect数の計算時に得られる `setupEffect.effectClass` も短い文字列として保存します。手順そのものは引き続き保存しません。次のコマンドでEffect Type・設定手数帯・AI種別ごとの直接成功率を後から集計できます。旧ログには手順とEffect Typeが残っていないため、旧試行は分類不能として件数を表示します。固定比較ログには手順があるので、旧形式でもオフラインで分類できます。
+
+```bash
+python3.14 tools/analyze_effect_type_success.py exports/ai-experiments-cube-4x4.jsonl
+python3.14 tools/analyze_effect_type_success.py AI_logs_storage/Rubiks_4x4/benchmarks/ai-paired-4x4-20261025-latest.jsonl
+```
 
 `--neighbor-probe` を付けると、同一初期局面でのPolicy上位手・Value上位手、各候補手の両順位、Valueが現在より高い後続局面数を各AIについて記録します。失敗した場合は探索終了時の局面も同じ方法で調べます。集計には、実際に成功したLinear AIの初手を他AIが何位に置いたかも残します。逆手順初手も比較用に記録しますが、唯一の正解手とは限りません。診断は固定比較の結果ファイルだけに保存され、学習データ・パラメータを変更しません。
+
+4×4のmypermsから作った別のWing＋Corner連結3例と高Effect短手順2例は、`--fixture-set 4x4-myperm-composites` で検証できます。元のEffect 4・37手は引き続き検証専用です。学習側には異なるmypermの組み合わせとその対称変換から、同じ開始局面を重複排除した少量の補助手順を起動時に追加します。これは200試行の出題回数には含まれず、Search3では低い重みで使います。steps_to_goalの絶対Valueには、逆手順が最短とは限らないこの補助データを使いません。
+
+同じ保存済みSearch3重みでFixedとProgressiveの完全な直接ソルブを比較するには `python3.14 tools/compare_search3_budgets.py --ai-indices 2,10 --fixture-ids wing-2-plus-corner-2-swap,myperm-wing-corner-a` を使います。直接成功率に加え、実際の総playout数と探索回数を記録します。Original Search2が解いた経路の最初の数手についてPolicy/Value順位とSearch3のPUCT訪問比を調べるには `python3.14 tools/probe_success_routes.py --reference-ai-indices 0,9 --target-ai-indices 2,10 --max-probe-steps 5 --trace-search3-root` を使います。出力には、成功経路上の手が枝幅内に入った探索回、初訪問回、初回の分岐先Value、探索回数別の累積訪問数が含まれます。`--fixture-id myperm-wing-corner-a` のようにmyperm連結局面も指定できます。どちらも学習や保存済みパラメータには触れません。
+
+複数回の固定比較結果から、同じfixture setだけで難しい手順の成功を優先してcheckpointを並べるには `python3.14 tools/rank_fixed_checkpoints.py 比較結果1.jsonl 比較結果2.jsonl` を使います。異なる固定局面群やパズル設定の結果は同列に比較しません。選択結果は一覧のみで、パラメータの自動置換は行いません。
+
+steps_to_goalの学習MAE、固定手数帯別MAE、gradient、同一局面の目標衝突率は `python3.14 tools/analyze_steps_to_goal_drift.py` で直近20回とその前20回を比較できます。4×4実験ではAI20を従来どおり最短観測ラベル採用の対照群とし、AI22だけ衝突した局面を絶対Value学習から除きます。Policyの学習例は維持し、除いた件数を学習履歴の `stepsToGoalRegression.valueSelection.excludedAmbiguousValueStateCount` に残します。
 
 Search3 の C と「浅い探索で使う枝幅」だけを同一チェックポイント・同一局面で比較するには、`python3.14 tools/sweep_search3_inference.py --ai-indices 10,18 --c-values 0.2,0.5,1.0 --shallow-widths 3,5 --fixtures-per-band 1` を使います。通常の探索budget、学習率、保存済み重みは変更せず、結果を別の JSONL に保存します。GUI実験中に使う場合は、先にパラメータを保存してください。
 

@@ -62,6 +62,16 @@ class FixedValidationTests(unittest.TestCase):
         self.assertNotIn('valuePathCrossEntropy', metrics)
         self.assertGreaterEqual(metrics['valueMae'], 0.0)
 
+    def test_4x4_fixed_validation_records_effect_bands(self):
+        ai = Rubiks_3_AI([8], cube_size = 4, search_mode = 'search3')
+        state_before = ai.cube.state.copy()
+
+        metrics = evaluate_fixed_validation(ai)
+
+        self.assertTrue(np.array_equal(ai.cube.state, state_before))
+        self.assertEqual(sum(band['stateCount'] for band in metrics['byEffect'].values()),
+                         metrics['stateCount'])
+
     def test_steps_to_goal_reports_near_mid_and_far_remaining_step_bands(self):
         ai = Rubiks_3_AI([8], cube_size = 3, search_mode = 'search2')
         ai.set_search2_value_loss_type('steps_to_goal')

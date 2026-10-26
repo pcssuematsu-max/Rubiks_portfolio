@@ -1,0 +1,1104 @@
+{
+  "source_count": 22,
+  "comparison_count": 2018,
+  "models": {
+    "single_moves": {
+      "margin": 0.1,
+      "lambda": 0.1,
+      "minimum_ordering_gap": 0.001,
+      "feature_count": 63,
+      "nonzero_coefficient_count": 56,
+      "coefficients": [
+        {
+          "feature": "move:2B",
+          "weight": 0.021839899
+        },
+        {
+          "feature": "move:2B'",
+          "weight": 0.021825282
+        },
+        {
+          "feature": "move:2B2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2D",
+          "weight": 0.025991072
+        },
+        {
+          "feature": "move:2D'",
+          "weight": 0.026012949
+        },
+        {
+          "feature": "move:2D2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2F",
+          "weight": 0.021825282
+        },
+        {
+          "feature": "move:2F'",
+          "weight": 0.021839899
+        },
+        {
+          "feature": "move:2F2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2L",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2L'",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2L2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2R",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2R'",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2R2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2U",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2U'",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:2U2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:3B",
+          "weight": 0.021839899
+        },
+        {
+          "feature": "move:3B'",
+          "weight": 0.021825282
+        },
+        {
+          "feature": "move:3B2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:3D",
+          "weight": 0.023157226
+        },
+        {
+          "feature": "move:3D'",
+          "weight": 0.023061577
+        },
+        {
+          "feature": "move:3D2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:3F",
+          "weight": 0.021825282
+        },
+        {
+          "feature": "move:3F'",
+          "weight": 0.021839899
+        },
+        {
+          "feature": "move:3F2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:3L",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:3L'",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:3L2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:3R",
+          "weight": 0.026007135
+        },
+        {
+          "feature": "move:3R'",
+          "weight": 0.026007135
+        },
+        {
+          "feature": "move:3R2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:3U",
+          "weight": 0.023061577
+        },
+        {
+          "feature": "move:3U'",
+          "weight": 0.023157226
+        },
+        {
+          "feature": "move:3U2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:B",
+          "weight": 0.012499098
+        },
+        {
+          "feature": "move:B'",
+          "weight": 0.012499098
+        },
+        {
+          "feature": "move:B2",
+          "weight": 0.012499098
+        },
+        {
+          "feature": "move:D",
+          "weight": 0.012499098
+        },
+        {
+          "feature": "move:D'",
+          "weight": 0.012499098
+        },
+        {
+          "feature": "move:D2",
+          "weight": 0.012499098
+        },
+        {
+          "feature": "move:E",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:E'",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:E2",
+          "weight": 0.038499027
+        },
+        {
+          "feature": "move:F",
+          "weight": 0.012486266
+        },
+        {
+          "feature": "move:F'",
+          "weight": 0.012486266
+        },
+        {
+          "feature": "move:F2",
+          "weight": 0.0
+        },
+        {
+          "feature": "move:L",
+          "weight": 0.012499098
+        },
+        {
+          "feature": "move:L'",
+          "weight": 0.012499098
+        },
+        {
+          "feature": "move:L2",
+          "weight": 0.012499098
+        },
+        {
+          "feature": "move:M",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:M'",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:M2",
+          "weight": 0.013499098
+        },
+        {
+          "feature": "move:R",
+          "weight": 0.0
+        },
+        {
+          "feature": "move:R'",
+          "weight": 0.0
+        },
+        {
+          "feature": "move:R2",
+          "weight": 0.0
+        },
+        {
+          "feature": "move:S",
+          "weight": 0.03847921
+        },
+        {
+          "feature": "move:S'",
+          "weight": 0.03847921
+        },
+        {
+          "feature": "move:S2",
+          "weight": 0.038484061
+        },
+        {
+          "feature": "move:U",
+          "weight": 0.0
+        },
+        {
+          "feature": "move:U'",
+          "weight": 0.0
+        },
+        {
+          "feature": "move:U2",
+          "weight": 0.0
+        }
+      ],
+      "optimization": {
+        "objective": 0.03648308510430654,
+        "iterations": 35,
+        "outer_maximum": 0.012499098090601528,
+        "inner_minimum": 0.013499098090601153,
+        "ordering_gap": 0.0009999999999996245
+      },
+      "training": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "wins": 46,
+          "ties": 1,
+          "losses": 0,
+          "margin_satisfied": 20,
+          "mean_hinge_loss": 0.024470465
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "wins": 46,
+          "ties": 1,
+          "losses": 0,
+          "margin_satisfied": 20,
+          "mean_hinge_loss": 0.024470465
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "wins": 46,
+          "ties": 1,
+          "losses": 0,
+          "margin_satisfied": 24,
+          "mean_hinge_loss": 0.02446439
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.042570441
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.042570441
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 8,
+          "mean_hinge_loss": 0.031932428
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "wins": 22,
+          "ties": 1,
+          "losses": 0,
+          "margin_satisfied": 10,
+          "mean_hinge_loss": 0.021752475
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "wins": 36,
+          "ties": 11,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.055335478
+        },
+        {
+          "id": "ergonomics_09",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 20,
+          "mean_hinge_loss": 0.020229649
+        },
+        {
+          "id": "ergonomics_10",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 20,
+          "mean_hinge_loss": 0.020229649
+        },
+        {
+          "id": "ergonomics_11",
+          "variants": 191,
+          "wins": 184,
+          "ties": 7,
+          "losses": 0,
+          "margin_satisfied": 8,
+          "mean_hinge_loss": 0.036759706
+        },
+        {
+          "id": "ergonomics_12",
+          "variants": 191,
+          "wins": 160,
+          "ties": 15,
+          "losses": 16,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.070217613
+        },
+        {
+          "id": "ergonomics_13",
+          "variants": 191,
+          "wins": 172,
+          "ties": 3,
+          "losses": 16,
+          "margin_satisfied": 74,
+          "mean_hinge_loss": 0.031362551
+        },
+        {
+          "id": "ergonomics_14",
+          "variants": 191,
+          "wins": 184,
+          "ties": 7,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.04051262
+        },
+        {
+          "id": "ergonomics_15",
+          "variants": 191,
+          "wins": 176,
+          "ties": 15,
+          "losses": 0,
+          "margin_satisfied": 32,
+          "mean_hinge_loss": 0.039552399
+        },
+        {
+          "id": "ergonomics_16",
+          "variants": 191,
+          "wins": 184,
+          "ties": 7,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.04051262
+        },
+        {
+          "id": "ergonomics_17",
+          "variants": 95,
+          "wins": 92,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 20,
+          "mean_hinge_loss": 0.032349323
+        },
+        {
+          "id": "ergonomics_18",
+          "variants": 95,
+          "wins": 88,
+          "ties": 7,
+          "losses": 0,
+          "margin_satisfied": 16,
+          "mean_hinge_loss": 0.034779488
+        },
+        {
+          "id": "ergonomics_19",
+          "variants": 95,
+          "wins": 92,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 52,
+          "mean_hinge_loss": 0.015830235
+        },
+        {
+          "id": "ergonomics_20",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 8,
+          "mean_hinge_loss": 0.036190667
+        },
+        {
+          "id": "ergonomics_21",
+          "variants": 47,
+          "wins": 40,
+          "ties": 7,
+          "losses": 0,
+          "margin_satisfied": 4,
+          "mean_hinge_loss": 0.065937945
+        },
+        {
+          "id": "ergonomics_22",
+          "variants": 47,
+          "wins": 46,
+          "ties": 1,
+          "losses": 0,
+          "margin_satisfied": 20,
+          "mean_hinge_loss": 0.027659143
+        }
+      ],
+      "best_variants": [
+        {
+          "id": "pll_t",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "R U R' U' R' F R2 U' R' U' R U R' F'",
+          "source_cost": 0.024973,
+          "best_transformed_algorithm": "U' R' U R U F' U2 R U R U' R' U F",
+          "best_transformed_cost": 0.024973,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 1,
+          "best_transform": {
+            "index": 40,
+            "key": [
+              "240",
+              "XX"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "pll_jb",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "R U R' F' R U R' U' R' F R2 U' R' U'",
+          "source_cost": 0.024973,
+          "best_transformed_algorithm": "U' R' U F U' R' U R U F' U2 R U R",
+          "best_transformed_cost": 0.024973,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 1,
+          "best_transform": {
+            "index": 40,
+            "key": [
+              "240",
+              "XX"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "pll_y",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "F R U' R' U' R U R' F' R U R' U' R' F R F'",
+          "source_cost": 0.049945,
+          "best_transformed_algorithm": "F' U' R U R U' R' U F U' R' U R U F' U' F",
+          "best_transformed_cost": 0.049945,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 1,
+          "best_transform": {
+            "index": 40,
+            "key": [
+              "240",
+              "XX"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "oll_sune",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "R U R' U R U2 R'",
+          "source_cost": 0.0,
+          "best_transformed_algorithm": "R' U' R U' R' U2 R",
+          "best_transformed_cost": 0.0,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 3,
+          "best_transform": {
+            "index": 3,
+            "key": [
+              "FB"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "oll_antisune",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "R U2 R' U' R U' R'",
+          "source_cost": 0.0,
+          "best_transformed_algorithm": "R' U2 R U R' U R",
+          "best_transformed_cost": 0.0,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 3,
+          "best_transform": {
+            "index": 3,
+            "key": [
+              "FB"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "pll_u",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "M2 U' M U2 M' U' M2",
+          "source_cost": 0.053996,
+          "best_transformed_algorithm": "M2 U M U2 M' U M2",
+          "best_transformed_cost": 0.053996,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 3,
+          "best_transform": {
+            "index": 7,
+            "key": [
+              "LR"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "pll_h",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "M2 U' M2 U2 M2 U' M2",
+          "source_cost": 0.053996,
+          "best_transformed_algorithm": "M2 U M2 U2 M2 U M2",
+          "best_transformed_cost": 0.053996,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 1,
+          "best_transform": {
+            "index": 3,
+            "key": [
+              "FB"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "pll_a",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "R U' R D2 R' U R D2 R2",
+          "source_cost": 0.024998,
+          "best_transformed_algorithm": "R B' R F2 R' B R F2 R2",
+          "best_transformed_cost": 0.024998,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 11,
+          "best_transform": {
+            "index": 37,
+            "key": [
+              "UD",
+              "120",
+              "XX"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "ergonomics_09",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "R2 U' R U' R U R' U R2 U D' R U' R' D",
+          "source_cost": 0.024998,
+          "best_transformed_algorithm": "R2 U R' U R' U' R U' R2 U' D R' U R D'",
+          "best_transformed_cost": 0.024998,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 3,
+          "best_transform": {
+            "index": 3,
+            "key": [
+              "FB"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "ergonomics_10",
+          "source_puzzle": "3x3",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "D' R U R' D U' R2 U' R U' R' U R' U R2",
+          "source_cost": 0.024998,
+          "best_transformed_algorithm": "D R' U' R D' U R2 U R' U R U' R U' R2",
+          "best_transformed_cost": 0.024998,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 3,
+          "best_transform": {
+            "index": 3,
+            "key": [
+              "FB"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "ergonomics_11",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "2U' R U' R' 2U R U R'",
+          "source_cost": 0.026998,
+          "best_transformed_algorithm": "2L U R' U' 2L' U R U'",
+          "best_transformed_cost": 0.026998,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 7,
+          "best_transform": {
+            "index": 43,
+            "key": [
+              "FB",
+              "240",
+              "XX"
+            ],
+            "flip_inside": true
+          }
+        },
+        {
+          "id": "ergonomics_12",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "2U' F R' F' R 2U R' F R F'",
+          "source_cost": 0.076943,
+          "best_transformed_algorithm": "2B R U' R' U 2B' U' R U R'",
+          "best_transformed_cost": 0.043665,
+          "cost_difference": -0.033278,
+          "strictly_lower_variants": 16,
+          "tied_variants": 15,
+          "best_transform": {
+            "index": 16,
+            "key": [
+              "240"
+            ],
+            "flip_inside": true
+          }
+        },
+        {
+          "id": "ergonomics_13",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "2U' R U R' F R' F' R 2U R' F R F' R U' R'",
+          "source_cost": 0.076943,
+          "best_transformed_algorithm": "2B U F U' R U' R' U 2B' U' R U R' U F' U'",
+          "best_transformed_cost": 0.068638,
+          "cost_difference": -0.008306,
+          "strictly_lower_variants": 16,
+          "tied_variants": 3,
+          "best_transform": {
+            "index": 16,
+            "key": [
+              "240"
+            ],
+            "flip_inside": true
+          }
+        },
+        {
+          "id": "ergonomics_14",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "2R U 2L' U' 2R' U 2L U'",
+          "source_cost": 0.053996,
+          "best_transformed_algorithm": "2L U 2R' U' 2L' U 2R U'",
+          "best_transformed_cost": 0.053996,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 7,
+          "best_transform": {
+            "index": 4,
+            "key": [
+              "FB",
+              "LR"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "ergonomics_15",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "2R U M' U' 2R' U M U'",
+          "source_cost": 0.053996,
+          "best_transformed_algorithm": "2L U M U' 2L' U M' U'",
+          "best_transformed_cost": 0.053996,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 15,
+          "best_transform": {
+            "index": 4,
+            "key": [
+              "FB",
+              "LR"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "ergonomics_16",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "2R U 3L' U' 2R' U 3L U'",
+          "source_cost": 0.053996,
+          "best_transformed_algorithm": "2R U' 3L' U 2R' U' 3L U",
+          "best_transformed_cost": 0.053996,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 7,
+          "best_transform": {
+            "index": 7,
+            "key": [
+              "LR"
+            ],
+            "flip_inside": true
+          }
+        },
+        {
+          "id": "ergonomics_17",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "2R U2 2R U2 F2 2R F2 2L' U2 2L U2 2R2",
+          "source_cost": 0.080995,
+          "best_transformed_algorithm": "2L F2 2L F2 U2 2L U2 2R' F2 2R F2 2L2",
+          "best_transformed_cost": 0.080995,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 3,
+          "best_transform": {
+            "index": 32,
+            "key": [
+              "120",
+              "XX"
+            ],
+            "flip_inside": true
+          }
+        },
+        {
+          "id": "ergonomics_18",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "2R2 F2 U2 2R U2 2R2 F2 2R U2 2R2 U2 F2 2R F2",
+          "source_cost": 0.080995,
+          "best_transformed_algorithm": "2L2 F2 U2 2L' U2 2L2 F2 2L' U2 2L2 U2 F2 2L' F2",
+          "best_transformed_cost": 0.080995,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 7,
+          "best_transform": {
+            "index": 0,
+            "key": [],
+            "flip_inside": true
+          }
+        },
+        {
+          "id": "ergonomics_19",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "2R U2 2R F2 2R F2 2L' U2 2L U2 2R' U2 2R U2 2R' U2 2R'",
+          "source_cost": 0.121492,
+          "best_transformed_algorithm": "2L F2 2L U2 2L U2 2R' F2 2R F2 2L' F2 2L F2 2L' F2 2L'",
+          "best_transformed_cost": 0.121492,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 3,
+          "best_transform": {
+            "index": 32,
+            "key": [
+              "120",
+              "XX"
+            ],
+            "flip_inside": true
+          }
+        },
+        {
+          "id": "ergonomics_20",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "E R U' R' E' R U R'",
+          "source_cost": 0.026998,
+          "best_transformed_algorithm": "E' R' U R E R' U' R",
+          "best_transformed_cost": 0.026998,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 3,
+          "best_transform": {
+            "index": 3,
+            "key": [
+              "FB"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "ergonomics_21",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "E F R' F' R E' R' F R F'",
+          "source_cost": 0.076943,
+          "best_transformed_algorithm": "E F' R F R' E' R F' R' F",
+          "best_transformed_cost": 0.076943,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 7,
+          "best_transform": {
+            "index": 5,
+            "key": [
+              "UD"
+            ],
+            "flip_inside": false
+          }
+        },
+        {
+          "id": "ergonomics_22",
+          "source_puzzle": "7x7",
+          "analysis_puzzle": "7x7",
+          "source_algorithm": "E R U R' F R' F' R E' R' F R F' R U' R'",
+          "source_cost": 0.076943,
+          "best_transformed_algorithm": "M' U' R' U F' U F U' M U F' U' F U' R U",
+          "best_transformed_cost": 0.076943,
+          "cost_difference": 0.0,
+          "strictly_lower_variants": 0,
+          "tied_variants": 1,
+          "best_transform": {
+            "index": 40,
+            "key": [
+              "240",
+              "XX"
+            ],
+            "flip_inside": false
+          }
+        }
+      ],
+      "leave_one_algorithm_out": [
+        {
+          "id": "pll_t",
+          "variants": 47,
+          "wins": 45,
+          "ties": 0,
+          "losses": 2,
+          "margin_satisfied": 20,
+          "mean_hinge_loss": 0.026130811
+        },
+        {
+          "id": "pll_jb",
+          "variants": 47,
+          "wins": 45,
+          "ties": 0,
+          "losses": 2,
+          "margin_satisfied": 20,
+          "mean_hinge_loss": 0.026130811
+        },
+        {
+          "id": "pll_y",
+          "variants": 47,
+          "wins": 46,
+          "ties": 1,
+          "losses": 0,
+          "margin_satisfied": 20,
+          "mean_hinge_loss": 0.025614471
+        },
+        {
+          "id": "oll_sune",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.047124978
+        },
+        {
+          "id": "oll_antisune",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.047124978
+        },
+        {
+          "id": "pll_u",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.045649747
+        },
+        {
+          "id": "pll_h",
+          "variants": 23,
+          "wins": 16,
+          "ties": 7,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.075797736
+        },
+        {
+          "id": "pll_a",
+          "variants": 47,
+          "wins": 38,
+          "ties": 5,
+          "losses": 4,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.058879849
+        },
+        {
+          "id": "ergonomics_09",
+          "variants": 47,
+          "wins": 44,
+          "ties": 1,
+          "losses": 2,
+          "margin_satisfied": 16,
+          "mean_hinge_loss": 0.024912154
+        },
+        {
+          "id": "ergonomics_10",
+          "variants": 47,
+          "wins": 44,
+          "ties": 1,
+          "losses": 2,
+          "margin_satisfied": 16,
+          "mean_hinge_loss": 0.024912154
+        },
+        {
+          "id": "ergonomics_11",
+          "variants": 191,
+          "wins": 184,
+          "ties": 7,
+          "losses": 0,
+          "margin_satisfied": 8,
+          "mean_hinge_loss": 0.03864378
+        },
+        {
+          "id": "ergonomics_12",
+          "variants": 191,
+          "wins": 144,
+          "ties": 31,
+          "losses": 16,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.070532839
+        },
+        {
+          "id": "ergonomics_13",
+          "variants": 191,
+          "wins": 168,
+          "ties": 7,
+          "losses": 16,
+          "margin_satisfied": 84,
+          "mean_hinge_loss": 0.031378811
+        },
+        {
+          "id": "ergonomics_14",
+          "variants": 191,
+          "wins": 184,
+          "ties": 7,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.049798501
+        },
+        {
+          "id": "ergonomics_15",
+          "variants": 191,
+          "wins": 176,
+          "ties": 15,
+          "losses": 0,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.045277467
+        },
+        {
+          "id": "ergonomics_16",
+          "variants": 191,
+          "wins": 168,
+          "ties": 15,
+          "losses": 8,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.064458971
+        },
+        {
+          "id": "ergonomics_17",
+          "variants": 95,
+          "wins": 92,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 6,
+          "mean_hinge_loss": 0.040899831
+        },
+        {
+          "id": "ergonomics_18",
+          "variants": 95,
+          "wins": 88,
+          "ties": 7,
+          "losses": 0,
+          "margin_satisfied": 7,
+          "mean_hinge_loss": 0.04479999
+        },
+        {
+          "id": "ergonomics_19",
+          "variants": 95,
+          "wins": 92,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 40,
+          "mean_hinge_loss": 0.030389954
+        },
+        {
+          "id": "ergonomics_20",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 4,
+          "mean_hinge_loss": 0.042120055
+        },
+        {
+          "id": "ergonomics_21",
+          "variants": 47,
+          "wins": 28,
+          "ties": 15,
+          "losses": 4,
+          "margin_satisfied": 0,
+          "mean_hinge_loss": 0.074467922
+        },
+        {
+          "id": "ergonomics_22",
+          "variants": 47,
+          "wins": 44,
+          "ties": 3,
+          "losses": 0,
+          "margin_satisfied": 24,
+          "mean_hinge_loss": 0.031060963
+        }
+      ]
+    }
+  }
+}

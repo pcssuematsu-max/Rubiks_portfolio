@@ -169,10 +169,6 @@ def _default_initial_scramble_groups(size,puzzle_type):
     if size == 3:
         return (
             [
-                (" U "," R2"," x "," F "," D'"," B2"," U'"," F2"," D2"," L "," R'"," z "," U'"," F2"," R'"),
-                (" U'"," R2"," y "," F "," D'"," B2"," U'"," F2"," D2"," L "," R'"," z "," U'"," F2"," R'"),
-                (" U'"," R2"," x "," F "," D'"," B2"," U'"," F'"," D2"," L "," R'"," y "," U'"," F2"," R'"),
-                (" U "," R2"," x2"," F "," D'"," B'"," U'"," F2"," D2"," L "," R'"," z "," U'"," F2"," R'"),
                 (" F "," R'"," F'"," D'"," F "," D "," F2"," U "," B2"," U'"," F2"," U "," B2"," U'"," R "),
                 (" M'"," F "," R'"," F'"," D'"," F "," D "," F2"," U "," B2"," U'"," F2"," U "," B2"," U'"," R "," M "),
                 (" U'", ' R2', " F'", ' R ', ' F ', ' R ', " U'", ' R2', ' F ', ' R ', ' F ', " R'", " F'", ' R ', ' U ', ' R ', ' U '),
@@ -209,10 +205,21 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 (" E2"," B "," E2"," F'"," M "," F2"," M2"," F2"," M "," F "),
                 (" D'"," F2"," D "," R2"," U'"," R'"," U "," R'"," F'"),
 
+                (" R "," U2"," R'"," L'"," U2"," L "),
+                (" U2"," R "," U2"," R'"," L'"," U2"," L "," U2"),
+                (" M2"," U "," M "," U2"," M'"," U "," M2"),
+                (" M'"," U "," M "," U2"," M'"," U "," M "),
+                (" L'"," U2"," B'"," R2"," B "," U2"," L "),
+                (" D "," R "," F'"," R'"," D'"," L'"," F "," L "),
+                (" R'"," D'"," F2"," D "," R "," U'"," R "," U "," R'"),
+                (" L'"," U "," L'"," U'"," L2"," D "," F2"," D'"),
+                (' B ', " L'", " B'", ' R ', ' B ', ' L ', " B'", ' U2', ' R ', ' D ', " R'", ' U2', ' R ', " D'", ' R2'),
+                (" F "," R "," U "," R'"," U'"," F'") * 2,
+                (" F "," U "," R "," U'"," R'"," F'") * 2,
+
 
             ],
             [
-                (" F "," E "," F "," E "," F'"," E "," F "," E "," F'"," E "," F'"),
             ],
             [
             ],
@@ -225,9 +232,68 @@ def _default_initial_scramble_groups(size,puzzle_type):
     elif size == 4:
         return (
             [
-                ("2R "," U ","2F'","2R'"," U ","2F "),
-                (" U ","2R ","2F "," D "," R ","2B'","2L'"," F'","2U "," F'"," R ","2D'","2F2"),
-                (" U "," R "," F'"," D2"," R'"," F "," B2"," R "," L'"," U2"," R "," F2"," R2"),
+                (" R ","2U "," R'"),
+                ("2R ","2F'","2R'"),
+                ("2R "," U ","2R'"),
+                (" R "," U "," R'"),
+                ("2F ","2R2"," R2"),
+                ("2F ","2U2"," U2"),
+                (" F "," R ","2U "," R'"," F'"),
+                (" R'"," F ","2U "," F'"," R "),
+                (" F2"," R ","2U "," R'"," F2"),
+                (" R2"," F ","2U "," F'"," R2"),
+                (" F "," R ","2U2"," R'"," F'"),
+                (" R'"," F ","2U2"," F'"," R "),
+                (" F2"," R ","2U2"," R'"," F2"),
+                (" R2"," F ","2U2"," F'"," R2"),
+                ("2U "," R "," U'"," R'","2U'"),
+                (" R "," U2"," R'"," L'"," U2"," L ","2R2"," F2","2R'"," B2","2R "," F2","2R'"," B2","2R'"),
+                (" U2"," R "," U2"," R'"," L'"," U2"," L "," U2","2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2"),
+                (" F "," R "," F'","2U "," F "," R'"," F'"),
+                (" R "," F'"," R'","2U "," R "," F "," R'"),
+                (" F2"," R "," F2","2U "," F2"," R'"," F2"),
+                (" R2"," F "," R2","2U "," R2"," F'"," R2"),
+                (" F "," R "," F'","2U2"," F "," R'"," F'"),
+                (" R "," F'"," R'","2U2"," R "," F "," R'"),
+                (" F2"," R "," F2","2U2"," F2"," R'"," F2"),
+                (" R2"," F "," R2","2U2"," R2"," F'"," R2"),
+                ("2R2"," F2","2R'"," B2","2R "," F2","2R'"," B2","2R'") + (" F "," R "," U "," R'"," U'"," F'") * 2,
+                (" F "," R "," U "," R'"," U'"," F'") * 2 + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
+                (" F "," R "," U "," R'"," U'"," F'") * 2 + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
+                (" F "," R "," U "," R'"," U'"," F'") * 2 + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
+                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" F "," U "," R "," U'"," R'"," F'") * 2,
+                (" F "," U "," R "," U'"," R'"," F'") * 2 + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
+                (" F "," U "," R "," U'"," R'"," F'") * 2 + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
+                (" F "," U "," R "," U'"," R'"," F'") * 2 + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
+                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'"),
+                (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
+                (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'") + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
+                (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'") + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
+
+
+
+
+                (" L2", " F2", " U2", " L'", " U2", " L2", " F2", " L'", " U2", " L2", " U2", " F2", " L'", " F2"),
+
+                (" R "," B'"," R'"," F "," R "," B "," R'"," F'","2R2"," F2","2R'"," B2","2R "," F2","2R'"," B2","2R'","2F "," R2","2F "," L2","2F'"," R2","2F "," L2","2F2"),
+                (" L2", " F2", " U2", " L'", " U2", " L2", " F2", " L'", " U2", " L2", " U2", " F2", " L'", " F2","2R2"," B2","2R "," F2","2R'"," B2","2R "," F2","2R ","2F'"," L2","2F'"," R2","2F "," L2","2F'"," R2","2F2"),
+                (" R "," U "," R'"," U'"," F'"," U "," F ") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'),
+                (" F'"," U'"," F "," U "," R "," U'"," R'") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'),
+                (" U ","2R ","2F ","2R'","2F'","2L'","2B'","2L ","2B "," U'"),
+                (" U ","2R ","2F'","2R'","2F ","2L'","2B ","2L ","2B'"," U'"),
+
+                (" F2"," U2","2R2"," U2"," F2","2R2"),
+                ("2U "," R "," U "," R'","2U'"," F2","2L2"," U "," L'"," U'","2L2"),
+                ("2R "," U "," F'"," U'"," F ","2R'"," R2","2L "," D "," L2"," D'","2L'"),
+                ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2') + ("2F "," R "," U "," R'"," U'","2F'"," D2","2F "," U "," F "," U'","2F'"),
+                ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2") + ("2B "," U "," B "," U'"," B'","2B'"," R2","2F "," R "," F2"," R'","2F'"),
+
+                (" B2","2D2"," B2"," R2"," B2","2D ","2U'"," B2","2U ","2D "," R2","2R2","2U ","2R2","2U'"," F ","2F2","2D'","2F2","2D "," F'"),
+                ("2D "," R2","2D "," L2","2D'"," L2"," R2","2U "," L2","2U'"," L2"," B2","2U'"," B2","2D'"," R2","2U ","2F2","2U'","2F2"," R2"," F ","2D ","2R2","2D'","2R2"," F'"),
+                ("2R2","2F2","2U2","2F2","2R2"," F ","2R2","2U ","2R2","2U'"," F'"),
+                (" F2","2U "," F2","2U "," F2","2U "," F2","2U "," F2","2U2","2R2","2U ","2R2"," F2"),
+
+
 
             ],
             [
@@ -329,7 +395,7 @@ def build_experiment_frame_config():
     skip_search = [is_search2_ai[ai_index] for ai_index in range(ai_count)]
     weight_decay = [True] * ai_count
     activations = ['SiLU'] * ai_count
-    silu_beta_initials = [0.0] * ai_count  # AIごとに初期Betaを指定
+    silu_beta_initials = [0.2] * ai_count  # AIごとに初期Betaを指定
     residuals = [True] * ai_count
     # AI21/23/24 compare route-state pairs again.  They share the same
     # direct, connected routes as the calibrated steps_to_goal group, while
@@ -401,6 +467,11 @@ def build_experiment_frame_config():
     # The cap is an oversampling bound, so every selected direct trajectory
     # remains available to Policy even when 31+ Value states are scarce.
     steps_to_goal_value_batch_band_max_copies = [1] * 20 + [3,1,3,1,1]
+    # Keep AI20 as the shortest-label control; AI22 omits ambiguous exact
+    # states only from its absolute Value loss.
+    steps_to_goal_exclude_conflicting_value_states = [
+        index == 22 for index in range(ai_count)
+    ]
     # Transformer pairwise buffers currently contain about one third fallback
     # routes.  Keep a direct-route majority in each sampled learning pass.
     pairwise_fallback_max_ratios = [1.0] * 23 + [0.25,0.25]
@@ -495,7 +566,7 @@ def build_experiment_frame_config():
 
     adam = weight_decay.copy()
 
-    cube_size = 3
+    cube_size = 4
     puzzle_type = 'cube'
     if cube_size >= 6:
         transform_idx = ([0,49,50,3,52,5,54,7,24,25] * 2) + [0] * 5
@@ -612,12 +683,18 @@ def build_experiment_frame_config():
         search3_max_node_caches = search3_max_node_caches,
         search3_max_prediction_caches = search3_max_prediction_caches,
         search2_max_frontiers = [30000] * ai_count,
-        # One correct calibrated steps_to_goal move should increase Value by
-        # roughly one.  A 0.75 margin accepts that progress despite ordinary
-        # prediction noise; rank-based objectives retain the proven 1.0 gate.
-        # Compare the pairwise skip gate within the Transformer group:
-        # AI23 uses a one-point gate; AI24 keeps the permissive 1000 control.
-        search2_skip_differences = [1.0,10.0] + [1.0] * 6 + [100.0,1000.0] + [1.0,1.0,1.0,1.0,10.0,10.0,1000.0,1000.0,1.0,1.0] + [1.0,1.0,1.0,1.0,1000.0],
+        # Keep Original Search2's early-improvement training signal while
+        # spreading its ten AIs evenly across five fixed thresholds.  The
+        # connected-route objectives instead search nearly to their budget.
+        search2_skip_differences = [
+            1.0, 5.0,                  # Original Linear: AI0-1
+            *([1.0] * 6),             # Search3: AI2-7 (unused)
+            20.0, 100.0,              # Original Linear: AI8-9
+            1.0, 1.0,                 # Search3: AI10-11 (unused)
+            1.0, 5.0, 10.0, 10.0, 20.0, 100.0,  # Original Transformer: AI12-17
+            1.0, 1.0,                 # Search3: AI18-19 (unused)
+            *([1000.0] * 5),          # steps_to_goal / pairwise: AI20-24
+        ],
         search2_torch_batch_sizes = [
             64 if original_transformer_attention[ai_index] else 100
             for ai_index in range(ai_count)
@@ -636,6 +713,7 @@ def build_experiment_frame_config():
         hard_effect_direct_min_ratios = hard_effect_direct_min_ratios,
         steps_to_goal_value_max_route_efficiencies = steps_to_goal_value_max_route_efficiencies,
         steps_to_goal_value_batch_band_max_copies = steps_to_goal_value_batch_band_max_copies,
+        steps_to_goal_exclude_conflicting_value_states = steps_to_goal_exclude_conflicting_value_states,
         pairwise_fallback_max_ratios = pairwise_fallback_max_ratios,
         search2_rank_loss_mixes = search2_rank_loss_mixes,
         search2_rank_loss_apply_types = search2_rank_loss_apply_types,
@@ -750,4 +828,5 @@ def build_experiment_frame_config():
         priority_list = priority_list,
         bootstrap_datas = bootstrap_datas,
         bootstrap_search3_datas = bootstrap_search3_datas,
+        supplemental_myperm_composites = puzzle_type == 'cube' and cube_size == 4,
     )

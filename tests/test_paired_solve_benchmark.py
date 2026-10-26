@@ -1,17 +1,23 @@
+import io
+import json
 import random
 import unittest
+from contextlib import redirect_stdout
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
 from ai.paired_solve_benchmark import (
-    EFFECT_BANDS, fixture_set_id, make_paired_fixtures, make_palm_fixtures,
-    probe_position_neighborhood, run_direct_solve_case, summarize_direct_cases,
+    EFFECT_BANDS, fixture_set_id, make_4x4_algorithm_fixtures,
+    make_paired_fixtures, make_palm_fixtures, make_perm_fixtures,
+    probe_position_neighborhood, probe_reference_route, run_direct_solve_case,
+    summarize_direct_cases,
 )
 from cube.rubiks_cube import Rubiks_3
 from ai.rubiks_ai import Rubiks_3_AI
 from model.search_result import SearchResult
-from tools.compare_ai_same_positions import _indices, _paired_summary
+from tools.compare_ai_same_positions import _indices, _paired_summary, main
 
 
 class _FakeAI:
@@ -67,6 +73,37 @@ class PairedSolveBenchmarkTests(unittest.TestCase):
         for key,value in weights.items():
             np.testing.assert_array_equal(ai.params[key],value)
 
+    def test_reference_route_probe_finds_each_step_and_restores_cube(self):
+        ai = Rubiks_3_AI([8], cube_size=3, search_mode='search2')
+        scramble = (' U ', ' R ')
+        fixture = _fixture(scramble, ai.cube)
+        route = tuple(ai.cube.invert_moves(scramble))
+        ai.cube.scramble(0, Move=(' F ',))
+        original = ai.cube.state.copy()
+        result = probe_reference_route(ai, fixture, route)
+        self.assertEqual(result['routeMoveCount'], 2)
+        self.assertEqual([row['referenceMove'] for row in result['steps']], list(route))
+        self.assertEqual([row['step'] for row in result['steps']], [1, 2])
+        self.assertTrue(all(row['policyRank'] >= 1 for row in result['steps']))
+        self.assertTrue(all(row['valueRank'] >= 1 for row in result['steps']))
+        self.assertAlmostEqual(
+            result['steps'][0]['valueFromRouteStart'],
+            result['steps'][0]['successorValue'] - result['routeStartValue'],
+        )
+        self.assertEqual(
+            result['summary']['maxValueFromStart'],
+            max(row['valueFromRouteStart'] for row in result['steps']),
+        )
+        self.assertNotIn('policyRankByMove', result['steps'][0])
+        prefix = probe_reference_route(ai, fixture, route, max_probe_steps=1)
+        self.assertEqual(prefix['routeMoveCount'], 2)
+        self.assertEqual(prefix['probedMoveCount'], 1)
+        self.assertEqual(len(prefix['steps']), 1)
+        np.testing.assert_array_equal(ai.cube.state, original)
+        with self.assertRaisesRegex(ValueError, 'does not solve'):
+            probe_reference_route(ai, fixture, (' U ',))
+        np.testing.assert_array_equal(ai.cube.state, original)
+
     def test_fixtures_are_balanced_unique_and_deterministic(self):
         before = random.getstate()
         fixtures = make_paired_fixtures(per_band=1)
@@ -78,9 +115,9 @@ class PairedSolveBenchmarkTests(unittest.TestCase):
         self.assertEqual(fixture_set_id(fixtures), fixture_set_id(again))
         self.assertGreaterEqual(fixtures[-1]['setupEffect']['reducedMoveCount'], 40)
 
-    def test_user_supplied_palms_have_low_effect_without_reduction(self):
-        fixtures = make_palm_fixtures()
-        self.assertEqual([row['fixtureId'] for row in fixtures], ['T-palm', 'Y-palm'])
+    def test_user_supplied_perms_have_low_effect_without_reduction(self):
+        fixtures = make_perm_fixtures()
+        self.assertEqual([row['fixtureId'] for row in fixtures], ['T-perm', 'Y-perm'])
         self.assertEqual(
             [row['setupEffect']['movedPieceCount'] for row in fixtures], [4, 4]
         )
@@ -91,7 +128,56 @@ class PairedSolveBenchmarkTests(unittest.TestCase):
             [len(row['scramble']) for row in fixtures], [14, 17]
         )
         self.assertEqual(len({row['initialStateHash'] for row in fixtures}), 2)
+        self.assertEqual(fixtures, make_perm_fixtures())
         self.assertEqual(fixtures, make_palm_fixtures())
+
+    def test_user_supplied_4x4_algorithms_are_distinct_low_effect_cases(self):
+        before = random.getstate()
+        fixtures = make_4x4_algorithm_fixtures()
+        self.assertEqual(random.getstate(), before)
+        self.assertEqual(
+            [row['fixtureId'] for row in fixtures],
+            ['wing-2-swap', 'wing-4-cycle', 'corner-2-swap',
+             'wing-2-plus-corner-2-swap',
+             'center-3-cycle-a', 'center-3-cycle-b'],
+        )
+        self.assertEqual([len(row['scramble']) for row in fixtures], [19, 15, 18, 37, 8, 8])
+        self.assertEqual(fixtures[3]['scramble'], fixtures[0]['scramble'] + fixtures[2]['scramble'])
+        self.assertEqual(
+            [row['setupEffect']['movedPieceCount'] for row in fixtures], [2, 4, 2, 4, 3, 3]
+        )
+        self.assertEqual(
+            [row['setupEffect']['reducedMoveCount'] for row in fixtures], [19, 15, 18, 37, 8, 8]
+        )
+        self.assertEqual(fixtures[3]['setupEffect']['componentCount'], 2)
+        self.assertEqual(
+            [row['initialStateHash'] for row in fixtures],
+            ['ec2929098d478bda', 'e37c0092d84474b4', '56a84cc8217d6f55',
+             '27badee768e25208',
+             '11444ff63ac968ac', '05b13d7b6adff561'],
+        )
+        self.assertEqual(fixtures[3]['band'], 'low-effect/very-long-sequence')
+        self.assertEqual(
+            [row['band'] for row in fixtures[-2:]],
+            ['low-effect/short-sequence', 'low-effect/short-sequence'],
+        )
+        self.assertEqual(fixtures, make_4x4_algorithm_fixtures())
+        self.assertEqual(fixture_set_id(fixtures), fixture_set_id(make_4x4_algorithm_fixtures()))
+
+    def test_4x4_profile_lists_algorithm_fixtures_by_default(self):
+        output = io.StringIO()
+        with patch(
+            'tools.compare_ai_same_positions.build_experiment_frame_config',
+            return_value=SimpleNamespace(cube_size=4),
+        ), redirect_stdout(output):
+            self.assertEqual(main(['--list-fixtures']), 0)
+        listed = json.loads(output.getvalue())
+        self.assertEqual(
+            [row['fixtureId'] for row in listed['fixtures']],
+            ['wing-2-swap', 'wing-4-cycle', 'corner-2-swap',
+             'wing-2-plus-corner-2-swap',
+             'center-3-cycle-a', 'center-3-cycle-b'],
+        )
 
     def test_search2_follows_multiple_segments_and_restores_state(self):
         ai = _FakeAI([
@@ -102,11 +188,12 @@ class PairedSolveBenchmarkTests(unittest.TestCase):
         original = ai.cube.state.copy()
         fixture = _fixture((' U ', ' R '), ai.cube)
         ai.cube.state[:] = original
-        row = run_direct_solve_case(ai, fixture)
+        row = run_direct_solve_case(ai, fixture, record_route=True)
         self.assertTrue(row['directSolved'])
         self.assertEqual(row['searchCalls'], 2)
         self.assertEqual(row['evaluatedStates'], 18)
         self.assertEqual(row['moveCount'], 2)
+        self.assertEqual(row['routeMoves'], [" R'", " U'"])
         np.testing.assert_array_equal(ai.cube.state, original)
 
     def test_search3_budget_does_not_count_greedy_recovery(self):

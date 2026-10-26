@@ -29,7 +29,8 @@ class SearchDataManager:
             return 'search3'
         return 'original_search2'
 
-    def append_bootstrap_search3_datas(self, bootstrap_datas = None):
+    def append_bootstrap_search3_datas(self, bootstrap_datas = None,
+                                       source_objective='bootstrap'):
         """Append bootstrap move sequences as Search3-format training data."""
         if bootstrap_datas is None:
             return
@@ -39,7 +40,9 @@ class SearchDataManager:
                 continue
             next_index = len(ai.datas_search3)
             for moves in bootstrap_datas:
-                search_data = self.build_bootstrap_search3_sample(moves, ai)
+                search_data = self.build_bootstrap_search3_sample(
+                    moves, ai, source_objective=source_objective,
+                )
                 if search_data is None:
                     continue
                 search_data.succeeded = True
@@ -47,7 +50,8 @@ class SearchDataManager:
                 ai.indices_search3.append(next_index)
                 next_index += 1
 
-    def build_bootstrap_search3_sample(self, moves, ai):
+    def build_bootstrap_search3_sample(self, moves, ai,
+                                       source_objective='bootstrap'):
         """Convert one bootstrap move sequence into a Search3 training sample."""
         scramble_moves = self.frame.cube.simplify(moves)
         if len(scramble_moves) == 0:
@@ -84,7 +88,7 @@ class SearchDataManager:
             solve_succeeded = True,
             steps_to_goal = len(segment_moves),
             trajectory_source = 'bootstrap',
-            source_objective = 'bootstrap',
+            source_objective = source_objective,
             training_target = 'search3',
         )
 

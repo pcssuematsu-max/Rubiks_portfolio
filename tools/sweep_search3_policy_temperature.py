@@ -31,7 +31,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ai.paired_solve_benchmark import (
-    fixture_set_id, make_paired_fixtures, make_palm_fixtures, run_direct_solve_case,
+    fixture_set_id, make_paired_fixtures, make_perm_fixtures, run_direct_solve_case,
 )
 from configs.profiles import build_experiment_frame_config
 from cube.search3_engine import softmax_1d
@@ -153,7 +153,7 @@ def main(argv=None):
     parser.add_argument('--budget-mode', choices=('fixed', 'progressive'), default='fixed')
     parser.add_argument('--initial-width', type=int, default=5)
     parser.add_argument('--fixtures-per-band', type=int, default=2)
-    parser.add_argument('--fixture-set', choices=('generated', 'palms', 'all'), default='all')
+    parser.add_argument('--fixture-set', choices=('generated', 'perms', 'palms', 'all'), default='all')
     parser.add_argument('--seed', type=int, default=20261017)
     parser.add_argument('--max-search-calls', type=int, default=200)
     parser.add_argument('--max-moves', type=int, default=300)
@@ -178,8 +178,8 @@ def main(argv=None):
         fixtures = []
         if args.fixture_set in ('generated', 'all'):
             fixtures.extend(make_paired_fixtures(args.fixtures_per_band, args.seed))
-        if args.fixture_set in ('palms', 'all'):
-            fixtures.extend(make_palm_fixtures())
+        if args.fixture_set in ('perms', 'palms', 'all'):
+            fixtures.extend(make_perm_fixtures())
     except (ValueError, RuntimeError) as exc:
         parser.error(str(exc))
     run_id = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')

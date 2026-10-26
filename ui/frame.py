@@ -190,6 +190,7 @@ class Frame(Tk.Frame):
             hard_effect_direct_min_ratios = config.hard_effect_direct_min_ratios,
             steps_to_goal_value_max_route_efficiencies = config.steps_to_goal_value_max_route_efficiencies,
             steps_to_goal_value_batch_band_max_copies = config.steps_to_goal_value_batch_band_max_copies,
+            steps_to_goal_exclude_conflicting_value_states = config.steps_to_goal_exclude_conflicting_value_states,
             pairwise_fallback_max_ratios = config.pairwise_fallback_max_ratios,
             search2_rank_loss_mixes = config.search2_rank_loss_mixes,
             search2_rank_loss_apply_types = config.search2_rank_loss_apply_types,
@@ -206,7 +207,10 @@ class Frame(Tk.Frame):
         # Prepare myperm lookup tables and bootstrap training data.
         self._init_myperms_metadata()
         if getattr(self.puzzle_adapter, 'key', None) == 'cube':
-            self._append_bootstrap_datas(config.bootstrap_datas)
+            self._append_bootstrap_datas(
+                config.bootstrap_datas,
+                supplemental_myperm_composites=config.supplemental_myperm_composites,
+            )
 
         self.grad_index = 0
         self.grad_mode = "Grad"
@@ -215,6 +219,11 @@ class Frame(Tk.Frame):
         # Construct managers first, then create the visible UI widgets.
         self._init_managers()
         self.search_data_manager.append_bootstrap_search3_datas(config.bootstrap_search3_datas)
+        if getattr(self, '_supplemental_myperm_scrambles', ()):
+            self.search_data_manager.append_bootstrap_search3_datas(
+                self._supplemental_myperm_scrambles,
+                source_objective='myperm_composite_bootstrap',
+            )
         control_font = self._build_control_panel()
         self._build_move_pad(control_font)
         self._build_viewers(config.cube_size)
@@ -650,6 +659,7 @@ class Frame(Tk.Frame):
                                    hard_effect_direct_min_ratios = None,
                                    steps_to_goal_value_max_route_efficiencies = None,
                                    steps_to_goal_value_batch_band_max_copies = None,
+                                   steps_to_goal_exclude_conflicting_value_states = None,
                                    pairwise_fallback_max_ratios = None,
                                    search2_rank_loss_mixes = None,
                                    search2_rank_loss_apply_types = None,
@@ -832,6 +842,10 @@ class Frame(Tk.Frame):
                 self.AIs[i].set_steps_to_goal_value_batch_band_max_copies(
                     steps_to_goal_value_batch_band_max_copies[i]
                 )
+            if steps_to_goal_exclude_conflicting_value_states is not None:
+                self.AIs[i].set_steps_to_goal_exclude_conflicting_value_states(
+                    steps_to_goal_exclude_conflicting_value_states[i]
+                )
             if pairwise_fallback_max_ratios is not None:
                 self.AIs[i].set_pairwise_fallback_max_ratio(
                     pairwise_fallback_max_ratios[i]
@@ -904,7 +918,8 @@ class Frame(Tk.Frame):
 
         return myperms_col
 
-    def _append_bootstrap_datas(self, bootstrap_datas = None):
+    def _append_bootstrap_datas(self, bootstrap_datas = None,
+                                supplemental_myperm_composites = False):
         """追加の初期学習データを登録し、全 AI の index を張り直す。"""
         if bootstrap_datas is None:
             bootstrap_datas = build_default_bootstrap_datas(self.cube_size)
@@ -919,6 +934,33 @@ class Frame(Tk.Frame):
             )
             d.succeeded = True
             self.AIs[0].datas.append(d)
+
+        self._supplemental_myperm_scrambles = []
+        if supplemental_myperm_composites and self.cube_size == 4:
+            from ai.myperm_composites import (
+                make_4x4_myperm_fixtures, make_4x4_myperm_training_scrambles,
+            )
+            from ai.paired_solve_benchmark import make_4x4_algorithm_fixtures
+            # The live cube renames myperm keys during point reindexing.  The
+            # fixed specs refer to source names, so resolve both sets using
+            # one unreindexed registry and then release it after startup.
+            source_cube = Rubiks_3(size=4, PointReindex=False)
+            held_out = make_4x4_algorithm_fixtures() + make_4x4_myperm_fixtures(source_cube)
+            self._supplemental_myperm_scrambles = make_4x4_myperm_training_scrambles(
+                source_cube, (case['initialStateHash'] for case in held_out),
+            )
+            del source_cube
+            for moves in self._supplemental_myperm_scrambles:
+                sample = data(
+                    moves, self.cube.invert_moves(moves), None,
+                    source_search_mode='bootstrap',
+                    source_search2_value_loss_type='myperm_composite_bootstrap',
+                    trajectory_origin='myperm_composite',
+                    source_objective='myperm_composite_bootstrap',
+                    training_target='auxiliary',
+                )
+                sample.succeeded = True
+                self.AIs[0].datas.append(sample)
 
         for i in range(self.AInum):
             self.AIs[i].indices = list(range(len(self.AIs[0].datas)))

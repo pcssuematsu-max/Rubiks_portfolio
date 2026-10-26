@@ -9,6 +9,7 @@ from functools import lru_cache
 import json
 import os
 from pathlib import Path
+import re
 from statistics import median
 from typing import Any
 
@@ -155,7 +156,19 @@ class ExperimentLogRecord:
 class ExperimentLogStore:
     """Write a run to JSONL and an analysis-friendly CSV companion."""
 
-    def __init__(self, path: Path | None = None, csv_path: Path | None = None):
+    def __init__(
+        self,
+        path: Path | None = None,
+        csv_path: Path | None = None,
+        *,
+        partition_by_puzzle: bool | None = None,
+    ):
+        # The application uses puzzle-specific logs. Explicit paths retain the
+        # single-file behavior used by standalone analyses and older callers.
+        if partition_by_puzzle is None:
+            self.partition_by_puzzle = path is None and csv_path is None
+        else:
+            self.partition_by_puzzle = bool(partition_by_puzzle)
         self.path = Path(path) if path is not None else default_experiment_log_path()
         self.csv_path = (
             Path(csv_path)
@@ -165,6 +178,9 @@ class ExperimentLogStore:
 
     def append(self, record: ExperimentLogRecord) -> None:
         """Append one compact solve record and bound retained benchmark history."""
+        if self.partition_by_puzzle:
+            self._puzzle_store(record.puzzle).append(record)
+            return
         payload = record.to_dict()
         if self.path.exists() and self.path.stat().st_size >= EXPERIMENT_COMPACT_THRESHOLD_BYTES:
             self.compact()
@@ -181,6 +197,12 @@ class ExperimentLogStore:
         the experiment log is for outcome analysis, while reproducible notable
         routes belong in the discovery archive.
         """
+        if self.partition_by_puzzle:
+            counts = [
+                ExperimentLogStore(path, self._matching_csv_path(path)).compact()
+                for path in self._puzzle_paths(self.path)
+            ]
+            return (sum(before for before, _ in counts), sum(after for _, after in counts))
         if not self.path.exists():
             return (0, 0)
         retained: dict[tuple[str, str, int | None], list[dict[str, Any]]] = {}
@@ -398,33 +420,66 @@ class ExperimentLogStore:
             return self._read_csv_records()
         if source != "jsonl":
             raise ValueError("Experiment summary source must be 'jsonl' or 'csv'")
-        if not self.path.exists():
-            return []
         records = []
-        with self.path.open(encoding = "utf-8") as stream:
-            for line_number, line in enumerate(stream, 1):
-                if not line.strip():
-                    continue
-                try:
-                    payload = json.loads(line)
-                except json.JSONDecodeError as error:
-                    raise ValueError(
-                        f"Invalid experiment log at line {line_number}"
-                    ) from error
-                records.append(_normalize_experiment_record(payload, line_number))
+        for path in self._read_paths(self.path):
+            with path.open(encoding = "utf-8") as stream:
+                for line_number, line in enumerate(stream, 1):
+                    if not line.strip():
+                        continue
+                    try:
+                        payload = json.loads(line)
+                    except json.JSONDecodeError as error:
+                        raise ValueError(
+                            f"Invalid experiment log at {path}:{line_number}"
+                        ) from error
+                    records.append(_normalize_experiment_record(payload, line_number))
+        if self.partition_by_puzzle:
+            records.sort(key = lambda record: record["timestamp"])
         return records
 
     def _read_csv_records(self) -> list[dict[str, Any]]:
-        if not self.csv_path.exists():
-            return []
         records = []
-        with self.csv_path.open(encoding = "utf-8", newline = "") as stream:
-            for line_number, row in enumerate(csv.DictReader(stream), 2):
-                records.append(_normalize_experiment_record(
-                    _csv_row_to_payload(row),
-                    line_number,
-                ))
+        for path in self._read_paths(self.csv_path):
+            with path.open(encoding = "utf-8", newline = "") as stream:
+                for line_number, row in enumerate(csv.DictReader(stream), 2):
+                    records.append(_normalize_experiment_record(
+                        _csv_row_to_payload(row),
+                        line_number,
+                    ))
+        if self.partition_by_puzzle:
+            records.sort(key = lambda record: record["timestamp"])
         return records
+
+    def _puzzle_store(self, puzzle: str) -> "ExperimentLogStore":
+        return ExperimentLogStore(
+            self._puzzle_path(self.path, puzzle),
+            self._puzzle_path(self.csv_path, puzzle),
+            partition_by_puzzle = False,
+        )
+
+    @staticmethod
+    def _puzzle_path(base: Path, puzzle: str) -> Path:
+        if not re.fullmatch(r"[a-z0-9_-]+-[0-9]+x[0-9]+", puzzle):
+            raise ValueError(f"Invalid experiment puzzle key: {puzzle!r}")
+        return base.with_name(f"{base.stem}-{puzzle}{base.suffix}")
+
+    def _puzzle_paths(self, base: Path) -> list[Path]:
+        paths = []
+        for path in sorted(base.parent.glob(f"{base.stem}-*{base.suffix}")):
+            puzzle = path.name[len(base.stem) + 1:-len(base.suffix)]
+            if re.fullmatch(r"[a-z0-9_-]+-[0-9]+x[0-9]+", puzzle):
+                paths.append(path)
+        return paths
+
+    def _matching_csv_path(self, jsonl_path: Path) -> Path:
+        puzzle = jsonl_path.name[len(self.path.stem) + 1:-len(self.path.suffix)]
+        return self._puzzle_path(self.csv_path, puzzle)
+
+    def _read_paths(self, base: Path) -> list[Path]:
+        paths = [base] if base.exists() else []
+        if self.partition_by_puzzle:
+            paths.extend(self._puzzle_paths(base))
+        return paths
 
     @staticmethod
     def _write_summary_csv(payload: dict[str, Any], path: Path) -> None:
@@ -528,16 +583,17 @@ def _normalize_json_value(value: Any) -> Any:
 
 
 def setup_effect_metrics(puzzle: str, cube_size: Any, setup) -> dict[str, Any] | None:
-    """Return compact physical difficulty metrics for a 3x3 setup.
+    """Return orientation-independent physical difficulty for 3x3 or 4x4.
 
-    A whole-cube rotation changes notation but not puzzle difficulty.  We
-    append the shortest orientation-restoring rotation before analysing the
-    net permutation, then count only visible piece effects.
+    A whole-cube rotation changes notation but not puzzle difficulty.  The
+    3x3 uses its fixed centers to restore orientation; the 4x4 chooses the
+    smallest visible effect over all 24 whole-cube orientations.
     """
-    if str(puzzle) not in {"cube-3x3", "rubiks-3x3"}:
-        return None
     try:
-        if int(cube_size) != 3:
+        size = int(cube_size)
+        if size not in (3, 4) or str(puzzle) not in {
+            f"cube-{size}x{size}", f"rubiks-{size}x{size}",
+        }:
             return None
     except (TypeError, ValueError):
         return None
@@ -545,17 +601,32 @@ def setup_effect_metrics(puzzle: str, cube_size: Any, setup) -> dict[str, Any] |
         moves = tuple(str(move).strip() for move in setup if str(move).strip())
     except TypeError:
         return None
-    return _cube_setup_effect_metrics(moves)
+    return _cube_setup_effect_metrics(moves, size)
 
 
 @lru_cache(maxsize = 8192)
-def _cube_setup_effect_metrics(moves: tuple[str, ...]) -> dict[str, Any] | None:
-    """Analyse one normalized 3x3 route once, even when many AIs share it."""
+def _cube_setup_effect_metrics(moves: tuple[str, ...], size: int = 3) -> dict[str, Any] | None:
+    """Analyse one setup once, even when many AIs share the same route."""
     try:
-        cube, analyzer, display_to_key, orientation_suffixes = _rubiks_effect_context()
+        cube, analyzer, display_to_key, orientation_suffixes = _rubiks_effect_context(size)
         moves = tuple(display_to_key[move] for move in moves)
-        suffix = _orientation_restoring_suffix(cube, moves, orientation_suffixes)
-        effect = analyzer.analyze(moves + suffix)
+        if size == 3:
+            suffix = _orientation_restoring_suffix(cube, moves, orientation_suffixes)
+            effect = analyzer.analyze(moves + suffix)
+        else:
+            # Even cubes have no fixed centers to identify a unique global
+            # orientation.  Count the smallest visible effect among the 24
+            # equivalent whole-cube orientations instead.
+            suffix, effect = min(
+                ((candidate, analyzer.analyze(moves + candidate)) for candidate in orientation_suffixes),
+                key = lambda item: (
+                    sum(component.moved_count for component in item[1].components
+                        if not component.is_internal_center_permutation()),
+                    sum(component.orientation_count for component in item[1].components
+                        if not component.is_internal_center_permutation()),
+                    len(item[0]),
+                ),
+            )
         visible = tuple(
             component for component in effect.components
             if not component.is_internal_center_permutation()
@@ -570,16 +641,22 @@ def _cube_setup_effect_metrics(moves: tuple[str, ...]) -> dict[str, Any] | None:
         "componentCount": len(visible),
         "reducedMoveCount": len(simplified),
         "orientationNormalizationMoveCount": len(suffix),
+        # The component analysis above has already been done for Effect count.
+        # Save its compact class so failures remain classifiable after routes
+        # are omitted from the bounded solve log.
+        "effectClass": effect.concise_name(max_positions = 0),
     }
 
 
-@lru_cache(maxsize = 1)
-def _rubiks_effect_context():
-    """Build one immutable 3x3 effect-analysis context for experiment logs."""
+@lru_cache(maxsize = 2)
+def _rubiks_effect_context(size: int = 3):
+    """Build one reusable effect-analysis context per supported cube size."""
     from cube.rubiks_cube import Rubiks_3
     from core.myperm_effects import MypermEffectAnalyzer
 
-    cube = Rubiks_3()
+    cube = Rubiks_3() if size == 3 else Rubiks_3(
+        size = size, RegisterMyperms = False, PointReindex = False,
+    )
     display_to_key = {str(key).strip(): key for key in cube.move_keys}
     orientation_keys = tuple(
         key for key in cube.move_keys if str(key).strip().lstrip("1234567890")[:1] in {"x", "y", "z"}
@@ -587,7 +664,7 @@ def _rubiks_effect_context():
     center_positions = tuple(int(piece[0]) for piece in cube.center_index)
     identity = tuple(range(len(cube.state_0)))
     queue = [()]
-    seen = {tuple(identity[position] for position in center_positions)}
+    seen = {tuple(identity[position] for position in center_positions) if size == 3 else identity}
     suffixes = []
     while queue:
         sequence = queue.pop(0)
@@ -595,7 +672,7 @@ def _rubiks_effect_context():
         for move in orientation_keys:
             candidate = sequence + (move,)
             state = _move_permutation(cube, candidate)
-            signature = tuple(state[position] for position in center_positions)
+            signature = tuple(state[position] for position in center_positions) if size == 3 else tuple(state)
             if signature not in seen:
                 seen.add(signature)
                 queue.append(candidate)
@@ -623,13 +700,18 @@ def _setup_effect(value: Any) -> dict[str, Any] | None:
         "version", "movedPieceCount", "orientationCount", "componentCount",
         "reducedMoveCount", "orientationNormalizationMoveCount",
     }
-    if not isinstance(value, dict) or set(value) != required:
+    if not isinstance(value, dict) or not required <= set(value) or set(value) - required - {"effectClass"}:
         return None
     normalized = {key: _safe_int(value.get(key)) for key in required}
     if any(number is None or number < 0 for number in normalized.values()):
         return None
     if normalized["version"] != 1:
         return None
+    if "effectClass" in value:
+        effect_class = value["effectClass"]
+        if not isinstance(effect_class, str) or not effect_class or len(effect_class) > 256:
+            return None
+        normalized["effectClass"] = effect_class
     return normalized
 
 
@@ -1005,6 +1087,8 @@ def _csv_row_to_payload(row: dict[str, str]) -> dict[str, Any]:
         "setup": _parse_csv_json_list(row.get("setup")),
         "moves": _parse_csv_json_list(row.get("moves")),
         "stats": _parse_csv_json_list(row.get("stats")),
+        "directSearch": _parse_csv_json_object(row.get("directSearch")),
+        "setupEffect": _parse_csv_json_object(row.get("setupEffect")),
         "aiSettings": _parse_csv_json_object(row.get("aiSettings")),
     }
 

@@ -1,8 +1,10 @@
 import csv
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from core.experiment_log import (
     CSV_FIELDS,
@@ -16,6 +18,17 @@ from core.experiment_log import (
 
 
 class ExperimentLogStoreTests(unittest.TestCase):
+    def test_default_store_writes_to_a_puzzle_specific_file(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            base = Path(temporary_directory) / 'ai-experiments.jsonl'
+            with patch.dict(os.environ, {'TWISTY_EXPERIMENT_LOG_PATH': str(base)}):
+                store = ExperimentLogStore()
+                store.append(self._record('search2', 3, 1.0, True, False))
+
+            self.assertFalse(base.exists())
+            self.assertTrue((base.parent / 'ai-experiments-rubiks-7x7.jsonl').exists())
+            self.assertTrue((base.parent / 'ai-experiments-rubiks-7x7.csv').exists())
+
     def test_effect_band_counts_only_probed_failure_terminals(self):
         rows = [
             {
@@ -88,6 +101,41 @@ class ExperimentLogStoreTests(unittest.TestCase):
                 1,
             )
 
+    def test_partitioned_logs_keep_legacy_history_and_read_all_puzzles(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory)
+            jsonl_path = output_directory / 'runs.jsonl'
+            csv_path = output_directory / 'runs.csv'
+            legacy = ExperimentLogStore(jsonl_path, csv_path)
+            legacy.append(self._record('search2', 3, 1.0, True, False))
+            legacy_jsonl = jsonl_path.read_bytes()
+            legacy_csv = csv_path.read_bytes()
+
+            store = ExperimentLogStore(
+                jsonl_path, csv_path, partition_by_puzzle = True,
+            )
+            store.append(self._record(
+                'search3', 4, 2.0, True, False,
+                puzzle_type = 'cube', cube_size = 4,
+            ))
+            store.append(self._record('search2', 5, 3.0, False, True))
+
+            self.assertEqual(jsonl_path.read_bytes(), legacy_jsonl)
+            self.assertEqual(csv_path.read_bytes(), legacy_csv)
+            self.assertEqual(len((output_directory / 'runs-cube-4x4.jsonl').read_text().splitlines()), 1)
+            self.assertEqual(len((output_directory / 'runs-rubiks-7x7.jsonl').read_text().splitlines()), 1)
+            self.assertTrue((output_directory / 'runs-cube-4x4.csv').exists())
+            self.assertTrue((output_directory / 'runs-rubiks-7x7.csv').exists())
+            summary = store.summarize()
+            self.assertEqual(summary['totalRuns'], 3)
+            self.assertEqual(store.summarize('csv')['groups'], summary['groups'])
+            self.assertEqual(store.recent_ai_results(0, puzzle = 'cube-4x4')['runCount'], 1)
+            self.assertEqual(store.recent_ai_results(0, puzzle = 'rubiks-7x7')['runCount'], 2)
+
+            original, retained = store.compact()
+            self.assertEqual((original, retained), (2, 2))
+            self.assertEqual(jsonl_path.read_bytes(), legacy_jsonl)
+
     def test_records_orientation_normalized_cube_effect_metrics(self):
         record = completed_experiment_record(
             puzzle_type = "cube", cube_size = 3, search_mode = "search2",
@@ -100,6 +148,52 @@ class ExperimentLogStoreTests(unittest.TestCase):
         self.assertEqual(record.setup_effect["movedPieceCount"], 0)
         self.assertEqual(record.setup_effect["orientationCount"], 0)
         self.assertEqual(record.setup_effect["orientationNormalizationMoveCount"], 1)
+
+    def test_4x4_effect_ignores_whole_cube_orientation(self):
+        from core.experiment_log import setup_effect_metrics
+
+        rotated = setup_effect_metrics("cube-4x4", 4, ("x",))
+        ordinary = setup_effect_metrics("cube-4x4", 4, ("R",))
+        rotated_move = setup_effect_metrics("cube-4x4", 4, ("x", "R"))
+
+        self.assertEqual(rotated["movedPieceCount"], 0)
+        self.assertEqual(rotated["orientationNormalizationMoveCount"], 1)
+        self.assertEqual(ordinary["movedPieceCount"], 12)
+        self.assertEqual(rotated_move["movedPieceCount"], ordinary["movedPieceCount"])
+        self.assertEqual(rotated_move["orientationCount"], ordinary["orientationCount"])
+        self.assertEqual(rotated_move["effectClass"], ordinary["effectClass"])
+
+    def test_4x4_effect_class_records_components_without_routes(self):
+        from ai.paired_solve_benchmark import make_4x4_algorithm_fixtures
+        from core.experiment_log import _setup_effect
+
+        fixtures = {row['fixtureId']: row for row in make_4x4_algorithm_fixtures()}
+        self.assertEqual(fixtures['wing-2-swap']['setupEffect']['effectClass'], 'W2-2s')
+        self.assertEqual(fixtures['corner-2-swap']['setupEffect']['effectClass'], 'C2[2]')
+        self.assertEqual(
+            fixtures['wing-2-plus-corner-2-swap']['setupEffect']['effectClass'],
+            'C2[2]+W2-2s',
+        )
+        self.assertEqual(
+            _setup_effect(fixtures['wing-2-plus-corner-2-swap']['setupEffect']),
+            fixtures['wing-2-plus-corner-2-swap']['setupEffect'],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'runs.jsonl'
+            store = ExperimentLogStore(path)
+            fixture = fixtures['wing-2-plus-corner-2-swap']
+            store.append(completed_experiment_record(
+                puzzle_type='cube', cube_size=4, search_mode='search3',
+                ai_index=2, solve_index=1, stage=0, succeeded=False,
+                search_succeeded=False, fallback_used=True,
+                elapsed_seconds=1.0, setup=fixture['scramble'], moves=(),
+                root_score=0.0, best_score=0.0, end_reason='budget',
+            ))
+            store.compact()
+            stored = json.loads(path.read_text(encoding='utf-8'))
+            self.assertEqual(stored['setup'], [])
+            self.assertEqual(stored['setupEffect']['effectClass'], 'C2[2]+W2-2s')
 
     def test_compact_bounds_each_ai_search_mode_window(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -418,11 +512,13 @@ class ExperimentLogStoreTests(unittest.TestCase):
         ai_settings = None,
         setup_length = 1,
         direct_search = None,
+        puzzle_type = 'rubiks',
+        cube_size = 7,
     ):
         succeeded = search_succeeded or fallback_used
         return completed_experiment_record(
-            puzzle_type = "rubiks",
-            cube_size = 7,
+            puzzle_type = puzzle_type,
+            cube_size = cube_size,
             search_mode = search_mode,
             ai_index = ai_index,
             solve_index = move_count,

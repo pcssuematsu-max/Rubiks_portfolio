@@ -98,6 +98,7 @@ class FrameConfig:
     hard_effect_direct_min_ratios: Optional[Sequence[float]] = None
     steps_to_goal_value_max_route_efficiencies: Optional[Sequence[float]] = None
     steps_to_goal_value_batch_band_max_copies: Optional[Sequence[int]] = None
+    steps_to_goal_exclude_conflicting_value_states: Optional[Sequence[bool]] = None
     pairwise_fallback_max_ratios: Optional[Sequence[float]] = None
     search2_rank_loss_mixes: Optional[Sequence[float]] = None
     search2_rank_loss_apply_types: Optional[Sequence[str]] = None
@@ -140,6 +141,7 @@ class FrameConfig:
     # Extra bootstrap training data appended at startup.
     bootstrap_datas: Optional[Sequence[MoveSequence]] = None
     bootstrap_search3_datas: Optional[Sequence[MoveSequence]] = None
+    supplemental_myperm_composites: bool = False
 
     def __post_init__(self):
         """AI 数に依存する設定長の整合性を確認する。"""
@@ -203,6 +205,7 @@ class FrameConfig:
         self._validate_ai_sequence_length('hard_effect_direct_min_ratios', self.hard_effect_direct_min_ratios, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_value_max_route_efficiencies', self.steps_to_goal_value_max_route_efficiencies, ai_count)
         self._validate_ai_sequence_length('steps_to_goal_value_batch_band_max_copies', self.steps_to_goal_value_batch_band_max_copies, ai_count)
+        self._validate_ai_sequence_length('steps_to_goal_exclude_conflicting_value_states', self.steps_to_goal_exclude_conflicting_value_states, ai_count)
         self._validate_ai_sequence_length('pairwise_fallback_max_ratios', self.pairwise_fallback_max_ratios, ai_count)
         self._validate_ai_sequence_length('search2_rank_loss_mixes', self.search2_rank_loss_mixes, ai_count)
         self._validate_ai_sequence_length('search2_rank_loss_apply_types', self.search2_rank_loss_apply_types, ai_count)

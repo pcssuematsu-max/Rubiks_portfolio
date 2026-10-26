@@ -7,7 +7,7 @@ correct route; other moves are not labeled as failures. Failed Transformer
 states are also re-solved by Linear to measure multi-step Value valleys.
 
 Examples:
-  python3.14 tools/compare_linear_transformer_routes.py --pairs 20:22 --fixture-set palms
+  python3.14 tools/compare_linear_transformer_routes.py --pairs 20:22 --fixture-set perms
   python3.14 tools/compare_linear_transformer_routes.py --pairs 2:10,20:22,21:23 \
       --fixtures-per-band 1 --branches
 """
@@ -29,7 +29,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ai.paired_solve_benchmark import (
-    fixture_set_id, make_paired_fixtures, make_palm_fixtures,
+    fixture_set_id, make_paired_fixtures, make_perm_fixtures,
     probe_position_neighborhood, run_direct_solve_case,
 )
 from configs.profiles import build_experiment_frame_config
@@ -360,7 +360,7 @@ def summarize_points(linear_points, transformer_points, action_count):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pairs', default='20:22', help='Matching Linear:Transformer indices')
-    parser.add_argument('--fixture-set', choices=('generated', 'palms', 'all'), default='all')
+    parser.add_argument('--fixture-set', choices=('generated', 'perms', 'palms', 'all'), default='all')
     parser.add_argument('--fixtures-per-band', type=int, default=1)
     parser.add_argument('--seed', type=int, default=20261017)
     parser.add_argument('--max-probe-points', type=int, default=12)
@@ -386,8 +386,8 @@ def main(argv=None):
         fixtures = []
         if args.fixture_set in ('generated', 'all'):
             fixtures.extend(make_paired_fixtures(args.fixtures_per_band, args.seed))
-        if args.fixture_set in ('palms', 'all'):
-            fixtures.extend(make_palm_fixtures())
+        if args.fixture_set in ('perms', 'palms', 'all'):
+            fixtures.extend(make_perm_fixtures())
     except (ValueError, RuntimeError) as exc:
         parser.error(str(exc))
     run_id = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')

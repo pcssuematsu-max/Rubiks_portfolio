@@ -5,6 +5,7 @@ import hashlib
 import math
 import random
 from collections import Counter, OrderedDict
+from weakref import WeakKeyDictionary
 
 import numpy as np
 
@@ -24,6 +25,10 @@ from ai.fixed_validation import evaluate_fixed_validation
 from ai.transformer_variance import transformer_parameter_target_variance
 from core.experiment_log import setup_effect_metrics
 
+
+# The 4x4 orientation-normalized Effect calculation is costly. Replay items
+# are shared across learning passes; weak keys avoid retaining discarded data.
+_hard_effect_moved_piece_cache = WeakKeyDictionary()
 
 
 class Rubiks_3_AI:
@@ -109,6 +114,8 @@ class Rubiks_3_AI:
         self.original_long_direct_min_ratio = 0.0
         self.hard_effect_direct_min_ratio = 0.0
         self.steps_to_goal_value_batch_band_max_copies = 1
+        # Experimental Value-only treatment; Policy keeps every route.
+        self.steps_to_goal_exclude_conflicting_value_states = False
         # Absolute remaining-step targets are trustworthy only when the
         # completed route is not an obvious detour from its scramble.  Zero
         # leaves this guard disabled for backwards-compatible profiles.
@@ -418,6 +425,10 @@ class Rubiks_3_AI:
     def set_steps_to_goal_value_batch_band_max_copies(self, copies):
         """Bound within-batch oversampling used to equalize Value step bands."""
         self.steps_to_goal_value_batch_band_max_copies = max(1,int(copies))
+
+    def set_steps_to_goal_exclude_conflicting_value_states(self, enabled):
+        """Omit ambiguous exact states from absolute remaining-step Value loss."""
+        self.steps_to_goal_exclude_conflicting_value_states = bool(enabled)
 
     def set_pairwise_fallback_max_ratio(self, ratio):
         """Limit fallback-origin replay only for sampled pairwise training."""
@@ -1552,10 +1563,10 @@ class Rubiks_3_AI:
         return np.asarray(columns,dtype = 'i'), value_indices, trajectory_origins
 
     def _filter_conflicting_steps_to_goal_states(self, route_columns, d_lis, indices, x, selection):
-        """Use the shortest observed label for an exact state across replay.
+        """Filter inconsistent absolute labels for exact states across replay.
 
-        Only Value columns are filtered.  Policy retains every move, and the
-        The replay-wide index is built once per training pass; the batch
+        Only Value columns are filtered; Policy retains every move.  The
+        replay-wide index is built once per training pass, while the batch
         minimum also protects callers that build a selection independently.
         """
         shortest = {}
@@ -1578,16 +1589,27 @@ class Rubiks_3_AI:
             key for key,target in shortest.items()
             if longest[key] > target or replay_shortest.get(key,target) < longest[key]
         }
+        replay_conflicts = getattr(self,'_steps_to_goal_conflicting_states',None) or ()
+        conflicts.update(set(state_keys.values()).intersection(replay_conflicts))
+        exclude_conflicts = bool(getattr(
+            self,'steps_to_goal_exclude_conflicting_value_states',False,
+        ))
+        excluded_ambiguous = 0
         for data_index,columns in route_columns:
             start,end = indices[data_index:data_index + 2]
             steps = self._steps_to_goal_for_search2_data(d_lis[data_index],end - start)
             kept = [
                 column for column in columns
-                if float(steps[column - start]) <= min(
+                if (not exclude_conflicts or state_keys[column] not in conflicts)
+                and float(steps[column - start]) <= min(
                     shortest[state_keys[column]],
                     replay_shortest.get(state_keys[column],shortest[state_keys[column]]),
                 )
             ]
+            if exclude_conflicts:
+                excluded_ambiguous += sum(
+                    state_keys[column] in conflicts for column in columns
+                )
             discarded += len(columns) - len(kept)
             if kept:
                 filtered.append((data_index,kept))
@@ -1596,6 +1618,7 @@ class Rubiks_3_AI:
         if selection is not None:
             selection['conflicting_intermediate_state_count'] = len(conflicts)
             selection['discarded_nonshortest_state_count'] = discarded
+            selection['excluded_ambiguous_value_state_count'] = excluded_ambiguous
         return filtered
 
     def _new_steps_to_goal_value_selection_summary(self):
@@ -1609,6 +1632,7 @@ class Rubiks_3_AI:
             'longer_duplicate_excluded_route_count': 0,
             'conflicting_intermediate_state_count': 0,
             'discarded_nonshortest_state_count': 0,
+            'excluded_ambiguous_value_state_count': 0,
             'candidate_state_bands': {'0-10': 0, '11-30': 0, '31+': 0},
             'selected_state_bands': {'0-10': 0, '11-30': 0, '31+': 0},
             'oversampled_state_count': 0,
@@ -2490,6 +2514,7 @@ class Rubiks_3_AI:
             transformation = transformation,
             flip_inside = flip_inside,
             progress_callback = progress_callback,
+            summarize_search3_weights = True,
         )
         err, err2, new_indices, original_len, epoch_num, l1_max = training_result
 
@@ -2539,6 +2564,7 @@ class Rubiks_3_AI:
             'retainedDataCount': max(0,int(retained_len)),
             'trainingSample': self._training_sample_history_metrics(),
             'trainingDataSources': self._training_data_source_history_metrics(),
+            'search3TrainingWeights': getattr(self, '_last_search3_training_weights', None),
             'gradientMetrics': self._gradient_history_metrics(),
             'stepsToGoalRegression': self._steps_to_goal_history_metrics(),
             'search2BaseLossPerItem': (
@@ -2587,6 +2613,7 @@ class Rubiks_3_AI:
                 'longerDuplicateExcludedRouteCount': int(selection.get('longer_duplicate_excluded_route_count',0) or 0),
                 'conflictingIntermediateStateCount': int(selection.get('conflicting_intermediate_state_count',0) or 0),
                 'discardedNonshortestStateCount': int(selection.get('discarded_nonshortest_state_count',0) or 0),
+                'excludedAmbiguousValueStateCount': int(selection.get('excluded_ambiguous_value_state_count',0) or 0),
                 'oversampledStateCount': int(selection.get('oversampled_state_count',0) or 0),
                 'candidateStateBands': {
                     label: int(count or 0)
@@ -2637,9 +2664,11 @@ class Rubiks_3_AI:
         if getattr(self,'search2_value_loss_type',None) != 'steps_to_goal':
             self._steps_to_goal_shortest_target_by_start = None
             self._steps_to_goal_shortest_target_by_state = None
+            self._steps_to_goal_conflicting_states = None
             return
         shortest = {}
         shortest_by_state = {}
+        conflicting_states = set()
         cube = getattr(self,'cube',None)
         original_state = cube.state.copy() if cube is not None else None
         try:
@@ -2663,6 +2692,9 @@ class Rubiks_3_AI:
                 for offset in range(len(moves) + 1):
                     state_key = self._steps_to_goal_state_key(cube.makedata())
                     remaining = float(targets[offset])
+                    previous = shortest_by_state.get(state_key)
+                    if previous is not None and previous != remaining:
+                        conflicting_states.add(state_key)
                     shortest_by_state[state_key] = min(
                         shortest_by_state.get(state_key,remaining),remaining,
                     )
@@ -2673,6 +2705,7 @@ class Rubiks_3_AI:
                 cube.state[:] = original_state
         self._steps_to_goal_shortest_target_by_start = shortest
         self._steps_to_goal_shortest_target_by_state = shortest_by_state
+        self._steps_to_goal_conflicting_states = conflicting_states
 
     @staticmethod
     def _steps_to_goal_start_state_key(data_item):
@@ -2882,7 +2915,7 @@ class Rubiks_3_AI:
             return None
         return float(quality.get(numerator_key,0.0)) / denominator
 
-    def _run_training_epochs(self, indices, data_source, train_batch, state_count_fn, transformation, flip_inside, progress_callback = None):
+    def _run_training_epochs(self, indices, data_source, train_batch, state_count_fn, transformation, flip_inside, progress_callback = None, summarize_search3_weights = False):
         """index 列を batch 学習して、残す index と誤差集計を返す。"""
         batch_size = max(1,int(getattr(self,'train_batch_size',100)))
         state_batch_size = max(0,int(getattr(self,'train_state_batch_size',0)))
@@ -2911,6 +2944,10 @@ class Rubiks_3_AI:
             selected_indices = self._flatten_batches(batches),
             data_source = data_source,
             state_count_fn = state_count_fn,
+        )
+        self._last_search3_training_weights = (
+            self._search3_training_weight_summary(self._flatten_batches(batches), data_source)
+            if summarize_search3_weights else None
         )
         self._last_steps_to_goal_replay_metrics = self._steps_to_goal_replay_history_metrics(
             available_indices = indices,
@@ -2953,6 +2990,7 @@ class Rubiks_3_AI:
         # columns in this training pass; do not retain it in the live AI.
         self._steps_to_goal_shortest_target_by_start = None
         self._steps_to_goal_shortest_target_by_state = None
+        self._steps_to_goal_conflicting_states = None
         return (
             epoch_state['err'],
             epoch_state['err2'],
@@ -2988,6 +3026,50 @@ class Rubiks_3_AI:
             'available': collect(available_indices),
             'selected': collect(selected_indices),
         }
+
+    @staticmethod
+    def _search3_training_weight_summary(selected_indices, data_source):
+        """Sum the Policy CE and Value BCE sample weights of selected items.
+
+        This distinguishes the full-weight Search3 fallback prefix from the
+        0.2-weight greedy continuation, which the older source counts merge.
+        No state tensors or per-route details are retained in the history.
+        """
+        result = {}
+        for data_index in selected_indices:
+            item = data_source[data_index]
+            move_count = len(item.moves)
+            if move_count <= 0:
+                continue
+            objective = str(getattr(item, 'source_objective', '') or 'legacy')
+            origin = str(getattr(item, 'trajectory_source', 'legacy') or 'legacy').replace('-', '_')
+            if origin in ('direct', 'direct_search'):
+                origin = 'direct_search'
+            elif origin == 'search3_fallback_prefix':
+                origin = 'fallback_prefix'
+            elif origin == 'greedy_fallback':
+                origin = 'greedy_fallback'
+            source = f'{objective}:{origin}'
+            row = result.setdefault(source, {
+                'trajectoryCount': 0,
+                'stateCount': 0,
+                'policyWeightSum': 0.0,
+                'valueWeightSum': 0.0,
+            })
+            sample_weight = float(getattr(item, 'sample_weight', 1.0))
+            # _search3_step_weight applies 0.7 after the first Search3 move;
+            # all other modes use sample_weight for every move.  The final
+            # state contributes only to Value at the unscaled sample weight.
+            policy_weight = sample_weight * (
+                1.0 + 0.7 * (move_count - 1)
+                if getattr(item, 'search_mode', None) == 'search3'
+                else move_count
+            )
+            row['trajectoryCount'] += 1
+            row['stateCount'] += move_count + 1
+            row['policyWeightSum'] += policy_weight
+            row['valueWeightSum'] += policy_weight + sample_weight
+        return result
 
     def _training_pack_state_batch_size(self, state_batch_size):
         """Torch piece-token training uses state_batch_size as a micro-batch limit."""
@@ -3161,6 +3243,7 @@ class Rubiks_3_AI:
                 'longer_duplicate_excluded_route_count': 0,
                 'conflicting_intermediate_state_count': 0,
                 'discarded_nonshortest_state_count': 0,
+                'excluded_ambiguous_value_state_count': 0,
                 'candidate_state_bands': {'0-10': 0, '11-30': 0, '31+': 0},
                 'selected_state_bands': {'0-10': 0, '11-30': 0, '31+': 0},
                 'oversampled_state_count': 0,
@@ -3170,6 +3253,7 @@ class Rubiks_3_AI:
             'source_excluded_route_count','detour_excluded_route_count',
             'longer_duplicate_excluded_route_count','oversampled_state_count',
             'conflicting_intermediate_state_count','discarded_nonshortest_state_count',
+            'excluded_ambiguous_value_state_count',
         ):
             current[key] += int(incoming.get(key,0) or 0)
         for band_key in ('candidate_state_bands','selected_state_bands'):
@@ -3563,18 +3647,39 @@ class Rubiks_3_AI:
             'selected_item_count': 0,
             'oversampled_item_count': 0,
         }
-        if ratio <= 0.0 or not items or self.cube_size != 3:
+        if ratio <= 0.0 or not items:
+            return summary
+        # Roughly the same moved-piece fraction: 14/26 on 3x3, 30/56 on 4x4.
+        effect_thresholds = {3: 14, 4: 30}
+        effect_threshold = effect_thresholds.get(getattr(self, 'cube_size', None))
+        if effect_threshold is None:
             return summary
         qualifies_cache = {}
 
         def qualifies(data_index):
             if data_index not in qualifies_cache:
                 item = data_source[data_index]
-                effect = None
+                moved_piece_count = None
                 if self._training_trajectory_origin(item) == 'direct_search':
-                    effect = setup_effect_metrics('cube-3x3',3,getattr(item,'scramble',()))
+                    try:
+                        cached_size, moved_piece_count = _hard_effect_moved_piece_cache[item]
+                        if cached_size != self.cube_size:
+                            raise KeyError('Effect was cached for another puzzle size')
+                    except (KeyError, TypeError):
+                        effect = setup_effect_metrics(
+                            f'cube-{self.cube_size}x{self.cube_size}',
+                            self.cube_size,
+                            getattr(item,'scramble',()),
+                        )
+                        moved_piece_count = effect['movedPieceCount'] if effect else None
+                        try:
+                            _hard_effect_moved_piece_cache[item] = (
+                                self.cube_size, moved_piece_count,
+                            )
+                        except TypeError:
+                            pass
                 qualifies_cache[data_index] = bool(
-                    effect is not None and effect['movedPieceCount'] >= 14
+                    moved_piece_count is not None and moved_piece_count >= effect_threshold
                 )
             return qualifies_cache[data_index]
 

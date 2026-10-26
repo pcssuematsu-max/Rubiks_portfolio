@@ -1,4 +1,4 @@
-"""Compare saved experiment AIs on identical held-out 3x3 positions.
+"""Compare saved experiment AIs on identical held-out positions.
 
 Run separately from the GUI's 200-trial training loop. No learning, greedy
 fallback, replay insertion, or parameter saving occurs here. Save the GUI's
@@ -7,6 +7,8 @@ parameters before running if its latest in-memory state should be compared.
 Examples:
   python3.14 tools/compare_ai_same_positions.py --list-fixtures
   python3.14 tools/compare_ai_same_positions.py --ai-indices 0,3,10,20,21,22,23,24
+  python3.14 tools/compare_ai_same_positions.py --fixture-set 4x4-algorithms --ai-indices 9,10,20,21,22,23
+  python3.14 tools/compare_ai_same_positions.py --fixture-set 4x4-algorithms --reference-route-ai 9 --ai-indices 9,2,10,20,21,22,23
 """
 
 from __future__ import annotations
@@ -26,10 +28,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ai.paired_solve_benchmark import (
-    fixture_set_id, make_paired_fixtures, make_palm_fixtures, probe_position_neighborhood,
+    fixture_set_id, make_4x4_algorithm_fixtures, make_paired_fixtures, make_perm_fixtures,
+    probe_position_neighborhood, probe_reference_route,
     run_direct_solve_case,
     summarize_direct_cases,
 )
+from ai.myperm_composites import make_4x4_myperm_fixtures
 from ai.rubiks_ai import Rubiks_3_AI
 from configs.profiles import build_experiment_frame_config
 from cube.rubiks_cube import Rubiks_3
@@ -137,6 +141,9 @@ def _settings(ai, config, index):
         'plateauFallbackMinRatio': float(config.steps_to_goal_plateau_fallback_min_ratios[index]),
         'plateauEscapeRankMix': float(config.steps_to_goal_plateau_escape_rank_mixes[index]),
         'plateauEscapePrefixSteps': int(config.steps_to_goal_plateau_escape_prefix_steps[index]),
+        'stepsToGoalExcludeConflictingValueStates': bool(
+            config.steps_to_goal_exclude_conflicting_value_states[index]
+        ) if config.steps_to_goal_exclude_conflicting_value_states is not None else False,
         'search3RankLossMix': float(config.search3_rank_loss_mixes[index]),
         'trainRecentRatio': float(config.original_train_recent_ratios[index]),
         'trainBatchMixMode': str(config.original_train_batch_mix_modes[index]),
@@ -212,8 +219,9 @@ def main(argv=None):
     parser.add_argument('--ai-indices', default='all', help='Comma-separated AI indices; default: all 25')
     parser.add_argument('--fixtures-per-band', type=int, default=2)
     parser.add_argument(
-        '--fixture-set', choices=('generated', 'palms', 'all'), default='generated',
-        help='Use the original fixed set, the T/Y palm setups, or both',
+        '--fixture-set', choices=('auto', 'generated', 'perms', 'palms', 'all', '4x4-algorithms', '4x4-myperm-composites'),
+        default='auto',
+        help='Use the set for the configured puzzle, 3x3 generated/T/Y Perm setups, or 4x4 algorithms',
     )
     parser.add_argument('--seed', type=int, default=20261017)
     parser.add_argument('--max-search-calls', type=int, default=200)
@@ -223,15 +231,25 @@ def main(argv=None):
     parser.add_argument('--list-fixtures', action='store_true', help='Print the fixed setups without loading AIs')
     parser.add_argument('--neighbor-probe', action='store_true',
                         help='Record read-only root Policy/Value ranks and failure-state neighborhoods')
+    parser.add_argument('--reference-route-ai', type=int,
+                        help='Compare every decision with this AI\'s directly solved routes')
     args = parser.parse_args(argv)
     if args.max_search_calls < 1 or args.max_moves < 1:
         parser.error('max-search-calls and max-moves must be positive')
+    config = build_experiment_frame_config()
+    fixture_set = args.fixture_set
+    if fixture_set == 'auto':
+        fixture_set = '4x4-algorithms' if config.cube_size == 4 else 'generated'
     try:
         fixtures = []
-        if args.fixture_set in ('generated', 'all'):
+        if fixture_set in ('generated', 'all'):
             fixtures.extend(make_paired_fixtures(args.fixtures_per_band, args.seed))
-        if args.fixture_set in ('palms', 'all'):
-            fixtures.extend(make_palm_fixtures())
+        if fixture_set in ('perms', 'palms', 'all'):
+            fixtures.extend(make_perm_fixtures())
+        if fixture_set == '4x4-algorithms':
+            fixtures.extend(make_4x4_algorithm_fixtures())
+        if fixture_set == '4x4-myperm-composites':
+            fixtures.extend(make_4x4_myperm_fixtures())
     except (ValueError, RuntimeError) as exc:
         parser.error(str(exc))
     fixture_id = fixture_set_id(fixtures)
@@ -239,21 +257,69 @@ def main(argv=None):
         print(json.dumps({'fixtureSetId': fixture_id, 'fixtures': fixtures}, ensure_ascii=False, indent=2))
         return 0
 
-    config = build_experiment_frame_config()
-    if config.cube_size != 3:
-        parser.error('The paired fixture set is only defined for the 3x3 cube')
+    if fixture_set in ('4x4-algorithms', '4x4-myperm-composites'):
+        if config.cube_size != 4:
+            parser.error('The 4x4 algorithm fixtures require a 4x4 experiment profile')
+    elif config.cube_size != 3:
+        parser.error('Generated and Perm fixtures require a 3x3 experiment profile')
+
     try:
         indices = _indices(args.ai_indices, len(config.ai_search_modes))
     except ValueError as exc:
         parser.error(str(exc))
+    reference_cases = None
+    reference_checkpoint = None
+    if args.reference_route_ai is not None:
+        if not 0 <= args.reference_route_ai < len(config.ai_search_modes):
+            parser.error('The reference-route AI index is outside the configured AI range')
+        reference_ai, reference_checkpoint = _load_ai(
+            args.reference_route_ai, config, args.checkpoint_root,
+        )
+        reference_cases = []
+        for fixture in fixtures:
+            reference_case = run_direct_solve_case(
+                reference_ai, fixture,
+                max_search_calls=args.max_search_calls,
+                max_moves=args.max_moves,
+                record_route=True,
+            )
+            if not reference_case['directSolved']:
+                parser.error(
+                    f"Reference AI {args.reference_route_ai} did not directly solve "
+                    f"{fixture['fixtureId']}: {reference_case['terminalReason']}"
+                )
+            reference_cases.append(reference_case)
+        del reference_ai
+        gc.collect()
     run_id = datetime.now(timezone.utc).isoformat(timespec='microseconds')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     print(f'fixtureSet={fixture_id}; run={run_id}; AI count={len(indices)}', flush=True)
+    if reference_cases is not None:
+        reference_record = {
+            'schemaVersion': 1,
+            'recordType': 'reference_routes',
+            'runId': run_id,
+            'fixtureSetId': fixture_id,
+            'completedAt': datetime.now(timezone.utc).isoformat(),
+            'aiIndex': args.reference_route_ai,
+            'checkpoint': reference_checkpoint,
+            'cases': reference_cases,
+        }
+        with args.output.open('a', encoding='utf-8') as handle:
+            handle.write(json.dumps(reference_record, ensure_ascii=False, separators=(',', ':'), allow_nan=False) + '\n')
+        print(
+            f'Reference AI {args.reference_route_ai}: '
+            + ', '.join(
+                f"{case['fixtureId']}={case['moveCount']} moves"
+                for case in reference_cases
+            ),
+            flush=True,
+        )
     records = []
     for index in indices:
         ai, checkpoint = _load_ai(index, config, args.checkpoint_root)
         cases = []
-        for fixture in fixtures:
+        for fixture_index, fixture in enumerate(fixtures):
             root_probe = None
             if args.neighbor_probe:
                 ai.cube.reset()
@@ -268,6 +334,10 @@ def main(argv=None):
             )
             if root_probe is not None:
                 case['initialNeighborhood'] = root_probe
+            if reference_cases is not None:
+                case['referenceRouteProbe'] = probe_reference_route(
+                    ai, fixture, reference_cases[fixture_index]['routeMoves'],
+                )
             cases.append(case)
             print(
                 f'AI {index:02d} {fixture["fixtureId"]:>3} '

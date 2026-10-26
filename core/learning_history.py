@@ -117,6 +117,7 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "fixedValidation": _fixed_validation(metrics.get("fixedValidation")),
         "trainingSample": _training_sample(metrics.get("trainingSample")),
         "trainingDataSources": _training_data_sources(metrics.get("trainingDataSources")),
+        "search3TrainingWeights": _search3_training_weights(metrics.get("search3TrainingWeights")),
         "gradientMetrics": _gradient_metrics(metrics.get("gradientMetrics")),
         "stepsToGoalRegression": _steps_to_goal_regression(metrics.get("stepsToGoalRegression")),
         "search2BaseLossPerItem": _finite_number(metrics.get("search2BaseLossPerItem")),
@@ -178,7 +179,7 @@ def _validate_record(record: Any) -> None:
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
-        "valueSequenceCount", "fixedValidation", "trainingSample", "trainingDataSources", "gradientMetrics", "stepsToGoalRegression", "search3RankLossMix",
+        "valueSequenceCount", "fixedValidation", "trainingSample", "trainingDataSources", "search3TrainingWeights", "gradientMetrics", "stepsToGoalRegression", "search3RankLossMix",
         "search2BaseLossPerItem", "search2RankLossPerItem", "search2PlateauEscapeLossPerItem", "search2ValueLossMargin", "search2RankLossMix", "search2RankLossApplyType",
     }
     if not isinstance(record, dict) or not required.issubset(record) or set(record) - required - optional:
@@ -208,6 +209,7 @@ def _validate_record(record: Any) -> None:
     _validate_fixed_validation(record.get("fixedValidation"))
     _validate_training_sample(record.get("trainingSample"))
     _validate_training_data_sources(record.get("trainingDataSources"))
+    _validate_search3_training_weights(record.get("search3TrainingWeights"))
     _validate_gradient_metrics(record.get("gradientMetrics"))
     _validate_steps_to_goal_regression(record.get("stepsToGoalRegression"))
     for field in ("search2BaseLossPerItem", "search2RankLossPerItem", "search2PlateauEscapeLossPerItem", "search2ValueLossMargin", "search2RankLossMix"):
@@ -356,6 +358,40 @@ def _validate_training_data_sources(value: Any) -> None:
         raise ValueError("Invalid learning history trainingDataSources")
 
 
+def _search3_training_weights(value: Any) -> dict[str, dict[str, int | float]] | None:
+    """Keep only aggregate selected-route weights; no individual states."""
+    if not isinstance(value, dict):
+        return None
+    result = {}
+    for source, metrics in value.items():
+        if not isinstance(source, str) or not source or not isinstance(metrics, dict):
+            return None
+        if set(metrics) != {"trajectoryCount", "stateCount", "policyWeightSum", "valueWeightSum"}:
+            return None
+        trajectories = _safe_optional_int(metrics["trajectoryCount"])
+        states = _safe_optional_int(metrics["stateCount"])
+        policy_weight = _finite_number(metrics["policyWeightSum"])
+        value_weight = _finite_number(metrics["valueWeightSum"])
+        if (trajectories is None or states is None or policy_weight is None
+                or value_weight is None or policy_weight < 0 or value_weight < 0):
+            return None
+        result[source] = {
+            "trajectoryCount": trajectories,
+            "stateCount": states,
+            "policyWeightSum": policy_weight,
+            "valueWeightSum": value_weight,
+        }
+    return result
+
+
+def _validate_search3_training_weights(value: Any) -> None:
+    if value is None:
+        return
+    normalized = _search3_training_weights(value)
+    if normalized is None or normalized != value:
+        raise ValueError("Invalid learning history search3TrainingWeights")
+
+
 _GRADIENT_METRIC_NUMBER_FIELDS = frozenset({
     "globalL2Mean", "globalL2Max", "globalRmsMean",
     "policyHeadL2Mean", "valueHeadL2Mean", "trunkL2Mean",
@@ -387,6 +423,7 @@ _STEPS_TO_GOAL_VALUE_SELECTION_INT_FIELDS = frozenset({
 
 _STEPS_TO_GOAL_VALUE_SELECTION_OPTIONAL_INT_FIELDS = frozenset({
     "conflictingIntermediateStateCount", "discardedNonshortestStateCount",
+    "excludedAmbiguousValueStateCount",
 })
 
 

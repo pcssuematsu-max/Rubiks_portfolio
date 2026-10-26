@@ -334,6 +334,35 @@ class StepsToGoalValueTests(unittest.TestCase):
         self.assertEqual(ai._last_steps_to_goal_value_selection['conflicting_intermediate_state_count'],1)
         self.assertEqual(ai._last_steps_to_goal_value_selection['discarded_nonshortest_state_count'],1)
 
+    def test_experimental_conflict_policy_removes_both_absolute_labels(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search2_value_loss_type = 'steps_to_goal'
+        ai.steps_to_goal_states_per_band = 0
+        ai.steps_to_goal_value_batch_band_max_copies = 1
+        ai.steps_to_goal_value_max_route_efficiency = 0.0
+        ai.steps_to_goal_exclude_conflicting_value_states = True
+        ai._steps_to_goal_shortest_target_by_start = None
+        routes = [
+            SimpleNamespace(moves=('a','b','c'), steps_to_goal=(3,2,1,0), trajectory_origin='direct_search'),
+            SimpleNamespace(moves=('d',), steps_to_goal=(1,0), trajectory_origin='direct_search'),
+        ]
+        states = np.asarray([[1,2,3,4,2,4]], dtype='f')
+        columns,_,_ = ai._build_search2_value_loss_selection(routes,[0,4,6],x=states)
+        self.assertNotIn(1, columns.tolist())
+        self.assertNotIn(4, columns.tolist())
+        summary = ai._last_steps_to_goal_value_selection
+        self.assertEqual(summary['excluded_ambiguous_value_state_count'], 2)
+        self.assertEqual(summary['conflicting_intermediate_state_count'], 1)
+
+    def test_myperm_auxiliary_route_does_not_set_absolute_steps_target(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.search2_value_loss_type = 'steps_to_goal'
+        item = SimpleNamespace(
+            source_search2_value_loss_type='myperm_composite_bootstrap',
+            plateau_escape=False,
+        )
+        self.assertFalse(ai._uses_search2_value_loss_for_sample(item))
+
     def test_replay_wide_shortest_target_applies_across_batches_and_restores_cube(self):
         ai = Rubiks_3_AI([8],cube_size = 3,search_mode = 'search2')
         ai.set_search2_value_loss_type('steps_to_goal')

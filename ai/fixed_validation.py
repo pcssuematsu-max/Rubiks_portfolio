@@ -233,7 +233,8 @@ def _fixture_tensors(ai):
                 # The inverse of the remaining solution reconstructs this
                 # state from the goal; it never enters replay or training.
                 effect = setup_effect_metrics(
-                    "cube-3x3", getattr(ai, "cube_size", 3),
+                    f"cube-{getattr(ai, 'cube_size', 3)}x{getattr(ai, 'cube_size', 3)}",
+                    getattr(ai, "cube_size", 3),
                     cube.invert_moves(solution[move_index:]),
                 )
                 effect_counts.append(None if effect is None else effect["movedPieceCount"])

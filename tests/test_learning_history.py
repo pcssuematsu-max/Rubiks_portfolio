@@ -266,6 +266,34 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['available']['search3:direct_search']['trajectoryCount'], 8)
             self.assertEqual(saved['selected']['steps_to_goal:fallback']['stateCount'], 10)
 
+    def test_search3_weight_log_separates_direct_prefix_and_greedy(self):
+        data = [
+            SimpleNamespace(moves=(0, 1), search_mode='search3', sample_weight=1.0,
+                            source_objective='search3', trajectory_source='direct-search'),
+            SimpleNamespace(moves=(0, 1, 2), search_mode='search3', sample_weight=1.0,
+                            source_objective='search3', trajectory_source='search3-fallback-prefix'),
+            SimpleNamespace(moves=(0, 1), search_mode='myval', sample_weight=0.2,
+                            source_objective='search3', trajectory_source='greedy-fallback'),
+        ]
+        summary = Rubiks_3_AI._search3_training_weight_summary([0, 1, 2], data)
+        self.assertEqual(summary['search3:direct_search']['trajectoryCount'], 1)
+        self.assertEqual(summary['search3:direct_search']['stateCount'], 3)
+        self.assertAlmostEqual(summary['search3:direct_search']['policyWeightSum'], 1.7)
+        self.assertAlmostEqual(summary['search3:direct_search']['valueWeightSum'], 2.7)
+        self.assertAlmostEqual(summary['search3:fallback_prefix']['policyWeightSum'], 2.4)
+        self.assertAlmostEqual(summary['search3:fallback_prefix']['valueWeightSum'], 3.4)
+        self.assertAlmostEqual(summary['search3:greedy_fallback']['policyWeightSum'], 0.4)
+        self.assertAlmostEqual(summary['search3:greedy_fallback']['valueWeightSum'], 0.6)
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'learning.json'
+            ai = _FakeAI()
+            ai.last_training_metrics = dict(ai.last_training_metrics)
+            ai.last_training_metrics['search3TrainingWeights'] = summary
+            LearningHistoryStore(path).append(completed_learning_record(10, ai, 1.0))
+            saved = LearningHistoryStore(path).records()[0]['search3TrainingWeights']
+            self.assertEqual(saved, summary)
+
     def test_training_source_summary_separates_objective_and_fallback(self):
         direct = SimpleNamespace(source_objective='search3', trajectory_source='direct-search', moves=(0, 1))
         fallback = SimpleNamespace(source_objective='steps_to_goal', trajectory_origin='fallback', moves=(0,))

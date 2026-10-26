@@ -1,0 +1,7301 @@
+{
+  "method": "minimize mean hinge slack per source algorithm plus lambda/2 times squared L2 norm, with nonnegative coefficients summing to 1",
+  "margin": 0.1,
+  "candidate_count": 8,
+  "models": {
+    "single_moves": [
+      {
+        "lambda": 0.01,
+        "feature_count": 27,
+        "nonzero_coefficient_count": 16,
+        "coefficients": [
+          {
+            "feature": "move:B",
+            "weight": 0.114384466
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.114384466
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.107137206
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.107137167
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.085467811
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.064395231
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.064390731
+          },
+          {
+            "feature": "move:U",
+            "weight": 0.057121681
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.053569936
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.053569316
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.050006527
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.050006527
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.046427109
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.01773214
+          },
+          {
+            "feature": "move:U'",
+            "weight": 0.007142563
+          },
+          {
+            "feature": "move:R2",
+            "weight": 0.007127123
+          },
+          {
+            "feature": "move:D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:E",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:R",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:S",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:U2",
+            "weight": 0.0
+          }
+        ],
+        "top_coefficients": [
+          {
+            "feature": "move:B",
+            "weight": 0.114384
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.114384
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.107137
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.107137
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.085468
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.064395
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.064391
+          },
+          {
+            "feature": "move:U",
+            "weight": 0.057122
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.05357
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.053569
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.050007
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.050007
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.046427
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.017732
+          },
+          {
+            "feature": "move:U'",
+            "weight": 0.007143
+          },
+          {
+            "feature": "move:R2",
+            "weight": 0.007127
+          },
+          {
+            "feature": "move:D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:E",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M",
+            "weight": 0.0
+          }
+        ],
+        "training": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 45,
+            "mean_gap": 0.563735,
+            "minimum_gap": 0.099974,
+            "mean_slack": 1e-06
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 45,
+            "mean_gap": 0.563735,
+            "minimum_gap": 0.099974,
+            "mean_slack": 1e-06
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.663395,
+            "minimum_gap": 0.057248,
+            "mean_slack": 0.00091
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 44,
+            "mean_gap": 0.285892,
+            "minimum_gap": -0.099958,
+            "mean_slack": 0.007599
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.387977,
+            "minimum_gap": 0.099958,
+            "mean_slack": 1e-06
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 36,
+            "mean_gap": 0.210333,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.002133
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 22,
+            "mean_gap": 0.289437,
+            "minimum_gap": 0.099958,
+            "mean_slack": 2e-06
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 44,
+            "mean_gap": 0.383019,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.002128
+          }
+        ],
+        "leave_one_algorithm_out": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 45,
+            "mean_gap": 0.567312,
+            "minimum_gap": 0.093999,
+            "mean_slack": 0.000128
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 45,
+            "mean_gap": 0.567312,
+            "minimum_gap": 0.093999,
+            "mean_slack": 0.000128
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.652877,
+            "minimum_gap": 0.049991,
+            "mean_slack": 0.001064
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 40,
+            "margin_satisfied": 27,
+            "mean_gap": 0.140264,
+            "minimum_gap": -0.16374,
+            "mean_slack": 0.037512
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 47,
+            "mean_gap": 0.390204,
+            "minimum_gap": 0.100001,
+            "mean_slack": 0.0
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 36,
+            "mean_gap": 0.171999,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.013615
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 22,
+            "mean_gap": 0.289622,
+            "minimum_gap": 0.099985,
+            "mean_slack": 1e-06
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 38,
+            "margin_satisfied": 34,
+            "mean_gap": 0.198334,
+            "minimum_gap": -0.138368,
+            "mean_slack": 0.032202
+          }
+        ],
+        "optimization": {
+          "objective": 0.002003109,
+          "duality_gap": 9.88e-07,
+          "iterations": 217
+        },
+        "max_leave_one_out_duality_gap": 1.564e-06
+      },
+      {
+        "lambda": 0.1,
+        "feature_count": 27,
+        "nonzero_coefficient_count": 24,
+        "coefficients": [
+          {
+            "feature": "move:B",
+            "weight": 0.085796617
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.085795913
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.080894971
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.080894971
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.078763522
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.062721244
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.052743414
+          },
+          {
+            "feature": "move:U",
+            "weight": 0.05210016
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.050646415
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.050646415
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.038329958
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.038019352
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.038017499
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.032604776
+          },
+          {
+            "feature": "move:E",
+            "weight": 0.032346807
+          },
+          {
+            "feature": "move:E'",
+            "weight": 0.032346807
+          },
+          {
+            "feature": "move:S",
+            "weight": 0.032345881
+          },
+          {
+            "feature": "move:S'",
+            "weight": 0.032345881
+          },
+          {
+            "feature": "move:M",
+            "weight": 0.015330099
+          },
+          {
+            "feature": "move:M'",
+            "weight": 0.015330099
+          },
+          {
+            "feature": "move:M2",
+            "weight": 0.003985935
+          },
+          {
+            "feature": "move:D2",
+            "weight": 0.003793857
+          },
+          {
+            "feature": "move:U'",
+            "weight": 0.002100239
+          },
+          {
+            "feature": "move:R2",
+            "weight": 0.002099168
+          },
+          {
+            "feature": "move:R",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:U2",
+            "weight": 0.0
+          }
+        ],
+        "top_coefficients": [
+          {
+            "feature": "move:B",
+            "weight": 0.085797
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.085796
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.080895
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.080895
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.078764
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.062721
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.052743
+          },
+          {
+            "feature": "move:U",
+            "weight": 0.0521
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.050646
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.050646
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.03833
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.038019
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.038017
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.032605
+          },
+          {
+            "feature": "move:E",
+            "weight": 0.032347
+          },
+          {
+            "feature": "move:E'",
+            "weight": 0.032347
+          },
+          {
+            "feature": "move:S",
+            "weight": 0.032346
+          },
+          {
+            "feature": "move:S'",
+            "weight": 0.032346
+          },
+          {
+            "feature": "move:M",
+            "weight": 0.01533
+          },
+          {
+            "feature": "move:M'",
+            "weight": 0.01533
+          }
+        ],
+        "training": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.463425,
+            "minimum_gap": 0.070542,
+            "mean_slack": 0.000627
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.463425,
+            "minimum_gap": 0.070542,
+            "mean_slack": 0.000627
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.534257,
+            "minimum_gap": 0.060621,
+            "mean_slack": 0.000838
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 39,
+            "mean_gap": 0.223759,
+            "minimum_gap": -0.1,
+            "mean_slack": 0.010924
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.325886,
+            "minimum_gap": 0.1,
+            "mean_slack": 0.0
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 36,
+            "mean_gap": 0.194573,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.002128
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 22,
+            "mean_gap": 0.222478,
+            "minimum_gap": 0.1,
+            "mean_slack": 0.0
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 46,
+            "mean_gap": 0.322804,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.002128
+          }
+        ],
+        "leave_one_algorithm_out": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 45,
+            "mean_gap": 0.45164,
+            "minimum_gap": 0.032222,
+            "mean_slack": 0.00182
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 45,
+            "mean_gap": 0.45164,
+            "minimum_gap": 0.032222,
+            "mean_slack": 0.00182
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.552,
+            "minimum_gap": 0.052898,
+            "mean_slack": 0.001002
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 41,
+            "margin_satisfied": 33,
+            "mean_gap": 0.158691,
+            "minimum_gap": -0.115708,
+            "mean_slack": 0.022631
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 47,
+            "mean_gap": 0.331843,
+            "minimum_gap": 0.100003,
+            "mean_slack": 0.0
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 34,
+            "mean_gap": 0.150718,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.015083
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 22,
+            "mean_gap": 0.223636,
+            "minimum_gap": 0.082806,
+            "mean_slack": 0.000748
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 40,
+            "margin_satisfied": 37,
+            "mean_gap": 0.200773,
+            "minimum_gap": -0.079961,
+            "mean_slack": 0.024818
+          }
+        ],
+        "optimization": {
+          "objective": 0.005093458,
+          "duality_gap": 1.24e-07,
+          "iterations": 194
+        },
+        "max_leave_one_out_duality_gap": 5.82e-07
+      },
+      {
+        "lambda": 1.0,
+        "feature_count": 27,
+        "nonzero_coefficient_count": 26,
+        "coefficients": [
+          {
+            "feature": "move:B",
+            "weight": 0.058104128
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.058104128
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.053836276
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.05383623
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.047772046
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.047465831
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.046315103
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.045958936
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.044125105
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.044101437
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.044101437
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.044048995
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.04261484
+          },
+          {
+            "feature": "move:S",
+            "weight": 0.042146682
+          },
+          {
+            "feature": "move:S'",
+            "weight": 0.042146682
+          },
+          {
+            "feature": "move:E",
+            "weight": 0.041571318
+          },
+          {
+            "feature": "move:E'",
+            "weight": 0.041571318
+          },
+          {
+            "feature": "move:R2",
+            "weight": 0.039877287
+          },
+          {
+            "feature": "move:U",
+            "weight": 0.039714117
+          },
+          {
+            "feature": "move:M",
+            "weight": 0.026764599
+          },
+          {
+            "feature": "move:M'",
+            "weight": 0.026764599
+          },
+          {
+            "feature": "move:U2",
+            "weight": 0.024095405
+          },
+          {
+            "feature": "move:D2",
+            "weight": 0.021046359
+          },
+          {
+            "feature": "move:M2",
+            "weight": 0.016701665
+          },
+          {
+            "feature": "move:R",
+            "weight": 0.004903194
+          },
+          {
+            "feature": "move:U'",
+            "weight": 0.002312285
+          },
+          {
+            "feature": "move:R'",
+            "weight": 0.0
+          }
+        ],
+        "top_coefficients": [
+          {
+            "feature": "move:B",
+            "weight": 0.058104
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.058104
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.053836
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.053836
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.047772
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.047466
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.046315
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.045959
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.044125
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.044101
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.044101
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.044049
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.042615
+          },
+          {
+            "feature": "move:S",
+            "weight": 0.042147
+          },
+          {
+            "feature": "move:S'",
+            "weight": 0.042147
+          },
+          {
+            "feature": "move:E",
+            "weight": 0.041571
+          },
+          {
+            "feature": "move:E'",
+            "weight": 0.041571
+          },
+          {
+            "feature": "move:R2",
+            "weight": 0.039877
+          },
+          {
+            "feature": "move:U",
+            "weight": 0.039714
+          },
+          {
+            "feature": "move:M",
+            "weight": 0.026765
+          }
+        ],
+        "training": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.303412,
+            "minimum_gap": 0.014165,
+            "mean_slack": 0.00308
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.303412,
+            "minimum_gap": 0.014165,
+            "mean_slack": 0.00308
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.358423,
+            "minimum_gap": 0.043647,
+            "mean_slack": 0.001848
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 36,
+            "mean_gap": 0.150425,
+            "minimum_gap": -0.074804,
+            "mean_slack": 0.015531
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 42,
+            "mean_gap": 0.22682,
+            "minimum_gap": 0.074804,
+            "mean_slack": 0.000949
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 36,
+            "mean_gap": 0.146127,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.003528
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 20,
+            "mean_gap": 0.170305,
+            "minimum_gap": 0.074804,
+            "mean_slack": 0.001096
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 39,
+            "mean_gap": 0.199731,
+            "minimum_gap": -0.009806,
+            "mean_slack": 0.005548
+          }
+        ],
+        "leave_one_algorithm_out": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.287078,
+            "minimum_gap": 0.003695,
+            "mean_slack": 0.00429
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.287078,
+            "minimum_gap": 0.003695,
+            "mean_slack": 0.00429
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.351607,
+            "minimum_gap": 0.041856,
+            "mean_slack": 0.002582
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 42,
+            "margin_satisfied": 26,
+            "mean_gap": 0.098766,
+            "minimum_gap": -0.099998,
+            "mean_slack": 0.030409
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 40,
+            "mean_gap": 0.221532,
+            "minimum_gap": 0.059996,
+            "mean_slack": 0.002155
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 28,
+            "mean_gap": 0.11496,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.012876
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 19,
+            "mean_gap": 0.174048,
+            "minimum_gap": 0.061055,
+            "mean_slack": 0.001693
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 43,
+            "margin_satisfied": 27,
+            "mean_gap": 0.110788,
+            "minimum_gap": -0.058592,
+            "mean_slack": 0.025618
+          }
+        ],
+        "optimization": {
+          "objective": 0.026270124,
+          "duality_gap": 3.8e-08,
+          "iterations": 84
+        },
+        "max_leave_one_out_duality_gap": 1.81e-07
+      }
+    ],
+    "single_moves_and_adjacent_pairs": [
+      {
+        "lambda": 0.01,
+        "feature_count": 459,
+        "nonzero_coefficient_count": 30,
+        "coefficients": [
+          {
+            "feature": "pair:U2 R",
+            "weight": 0.066779488
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.06663103
+          },
+          {
+            "feature": "move:B",
+            "weight": 0.054132517
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.054132517
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.050017031
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.049994795
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.049956151
+          },
+          {
+            "feature": "pair:R' D2",
+            "weight": 0.045757239
+          },
+          {
+            "feature": "pair:U R2",
+            "weight": 0.045757239
+          },
+          {
+            "feature": "pair:R2 U",
+            "weight": 0.041689261
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.033405073
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.033401269
+          },
+          {
+            "feature": "pair:R F",
+            "weight": 0.033365346
+          },
+          {
+            "feature": "pair:F' U'",
+            "weight": 0.03335084
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.03331929
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.03331929
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.033298044
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.033292234
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.025014434
+          },
+          {
+            "feature": "pair:U' R2",
+            "weight": 0.0249102
+          },
+          {
+            "feature": "pair:B U2",
+            "weight": 0.019474767
+          },
+          {
+            "feature": "pair:U' B",
+            "weight": 0.019474767
+          },
+          {
+            "feature": "pair:U' B'",
+            "weight": 0.019474767
+          },
+          {
+            "feature": "pair:M2 U",
+            "weight": 0.01667709
+          },
+          {
+            "feature": "pair:U M2",
+            "weight": 0.01667709
+          },
+          {
+            "feature": "pair:M' U2",
+            "weight": 0.016665236
+          },
+          {
+            "feature": "pair:U2 M",
+            "weight": 0.016665236
+          },
+          {
+            "feature": "move:U",
+            "weight": 0.016634269
+          },
+          {
+            "feature": "pair:U' L2",
+            "weight": 0.016620459
+          },
+          {
+            "feature": "move:R2",
+            "weight": 0.000113031
+          },
+          {
+            "feature": "move:D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:E",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:R",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:S",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 S2",
+            "weight": 0.0
+          }
+        ],
+        "top_coefficients": [
+          {
+            "feature": "pair:U2 R",
+            "weight": 0.066779
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.066631
+          },
+          {
+            "feature": "move:B",
+            "weight": 0.054133
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.054133
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.050017
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.049995
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.049956
+          },
+          {
+            "feature": "pair:R' D2",
+            "weight": 0.045757
+          },
+          {
+            "feature": "pair:U R2",
+            "weight": 0.045757
+          },
+          {
+            "feature": "pair:R2 U",
+            "weight": 0.041689
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.033405
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.033401
+          },
+          {
+            "feature": "pair:R F",
+            "weight": 0.033365
+          },
+          {
+            "feature": "pair:F' U'",
+            "weight": 0.033351
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.033319
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.033319
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.033298
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.033292
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.025014
+          },
+          {
+            "feature": "pair:U' R2",
+            "weight": 0.02491
+          }
+        ],
+        "training": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.348243,
+            "minimum_gap": 0.099935,
+            "mean_slack": 2e-06
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.348243,
+            "minimum_gap": 0.099935,
+            "mean_slack": 2e-06
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 45,
+            "mean_gap": 0.391644,
+            "minimum_gap": 0.09997,
+            "mean_slack": 1e-06
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 42,
+            "mean_gap": 0.183096,
+            "minimum_gap": 0.033511,
+            "mean_slack": 0.003983
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.217073,
+            "minimum_gap": 0.079139,
+            "mean_slack": 0.000444
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 40,
+            "mean_gap": 0.150329,
+            "minimum_gap": 0.03333,
+            "mean_slack": 0.002131
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 21,
+            "mean_gap": 0.22313,
+            "minimum_gap": 0.099977,
+            "mean_slack": 1e-06
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 42,
+            "mean_gap": 0.233091,
+            "minimum_gap": 0.091514,
+            "mean_slack": 0.000184
+          }
+        ],
+        "leave_one_algorithm_out": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.289727,
+            "minimum_gap": 0.012163,
+            "mean_slack": 0.002097
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.298406,
+            "minimum_gap": 0.017955,
+            "mean_slack": 0.001746
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.332173,
+            "minimum_gap": 2e-06,
+            "mean_slack": 0.00559
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 21,
+            "mean_gap": 0.096025,
+            "minimum_gap": -0.091787,
+            "mean_slack": 0.027433
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 35,
+            "mean_gap": 0.167581,
+            "minimum_gap": 0.017871,
+            "mean_slack": 0.008656
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 32,
+            "mean_gap": 0.108509,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.017022
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 21,
+            "mean_gap": 0.22315,
+            "minimum_gap": 0.099991,
+            "mean_slack": 0.0
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 40,
+            "margin_satisfied": 22,
+            "mean_gap": 0.101683,
+            "minimum_gap": -0.09093,
+            "mean_slack": 0.042512
+          }
+        ],
+        "optimization": {
+          "objective": 0.001049034,
+          "duality_gap": 1.164e-06,
+          "iterations": 318
+        },
+        "max_leave_one_out_duality_gap": 1.324e-06
+      },
+      {
+        "lambda": 0.1,
+        "feature_count": 459,
+        "nonzero_coefficient_count": 52,
+        "coefficients": [
+          {
+            "feature": "move:B'",
+            "weight": 0.053752035
+          },
+          {
+            "feature": "move:B",
+            "weight": 0.05028313
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.049999588
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.049997428
+          },
+          {
+            "feature": "pair:U2 R",
+            "weight": 0.044580905
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.044518559
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.039450579
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.039447376
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.039300238
+          },
+          {
+            "feature": "pair:R2 U",
+            "weight": 0.033789399
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.02984055
+          },
+          {
+            "feature": "pair:R F",
+            "weight": 0.028736956
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.027796719
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.027739993
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.027737767
+          },
+          {
+            "feature": "pair:R' D2",
+            "weight": 0.027304352
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.024371442
+          },
+          {
+            "feature": "pair:R' U2",
+            "weight": 0.024371442
+          },
+          {
+            "feature": "pair:U R2",
+            "weight": 0.024371442
+          },
+          {
+            "feature": "pair:U' R2",
+            "weight": 0.020422809
+          },
+          {
+            "feature": "move:U",
+            "weight": 0.01765697
+          },
+          {
+            "feature": "pair:F' U'",
+            "weight": 0.017055265
+          },
+          {
+            "feature": "pair:M2 U",
+            "weight": 0.016174716
+          },
+          {
+            "feature": "pair:U M2",
+            "weight": 0.016174716
+          },
+          {
+            "feature": "pair:M' U2",
+            "weight": 0.016173953
+          },
+          {
+            "feature": "pair:U2 M",
+            "weight": 0.016173953
+          },
+          {
+            "feature": "pair:B U2",
+            "weight": 0.015772731
+          },
+          {
+            "feature": "pair:U' B",
+            "weight": 0.015772731
+          },
+          {
+            "feature": "pair:U' B'",
+            "weight": 0.015772731
+          },
+          {
+            "feature": "pair:U' L2",
+            "weight": 0.014004199
+          },
+          {
+            "feature": "pair:U F",
+            "weight": 0.011648196
+          },
+          {
+            "feature": "pair:U F'",
+            "weight": 0.011648196
+          },
+          {
+            "feature": "move:R2",
+            "weight": 0.010477474
+          },
+          {
+            "feature": "pair:D R",
+            "weight": 0.00882806
+          },
+          {
+            "feature": "pair:R' D",
+            "weight": 0.00882806
+          },
+          {
+            "feature": "pair:F' R'",
+            "weight": 0.007303111
+          },
+          {
+            "feature": "pair:R U'",
+            "weight": 0.007299805
+          },
+          {
+            "feature": "pair:F U'",
+            "weight": 0.00728372
+          },
+          {
+            "feature": "pair:R B2",
+            "weight": 0.006937297
+          },
+          {
+            "feature": "pair:F R'",
+            "weight": 0.006566273
+          },
+          {
+            "feature": "move:E",
+            "weight": 0.005315266
+          },
+          {
+            "feature": "move:E'",
+            "weight": 0.005315266
+          },
+          {
+            "feature": "move:S",
+            "weight": 0.005313664
+          },
+          {
+            "feature": "move:S'",
+            "weight": 0.005313664
+          },
+          {
+            "feature": "pair:S2 U'",
+            "weight": 0.005239224
+          },
+          {
+            "feature": "pair:U' S2",
+            "weight": 0.005239224
+          },
+          {
+            "feature": "pair:L2 U2",
+            "weight": 0.003872818
+          },
+          {
+            "feature": "pair:D' R",
+            "weight": 0.003648449
+          },
+          {
+            "feature": "pair:R D'",
+            "weight": 0.003648449
+          },
+          {
+            "feature": "pair:D2 R",
+            "weight": 0.000708607
+          },
+          {
+            "feature": "pair:L U'",
+            "weight": 0.000510251
+          },
+          {
+            "feature": "pair:U' L",
+            "weight": 0.000510251
+          },
+          {
+            "feature": "move:D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:R",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 S2",
+            "weight": 0.0
+          }
+        ],
+        "top_coefficients": [
+          {
+            "feature": "move:B'",
+            "weight": 0.053752
+          },
+          {
+            "feature": "move:B",
+            "weight": 0.050283
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.05
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.049997
+          },
+          {
+            "feature": "pair:U2 R",
+            "weight": 0.044581
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.044519
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.039451
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.039447
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.0393
+          },
+          {
+            "feature": "pair:R2 U",
+            "weight": 0.033789
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.029841
+          },
+          {
+            "feature": "pair:R F",
+            "weight": 0.028737
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.027797
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.02774
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.027738
+          },
+          {
+            "feature": "pair:R' D2",
+            "weight": 0.027304
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.024371
+          },
+          {
+            "feature": "pair:R' U2",
+            "weight": 0.024371
+          },
+          {
+            "feature": "pair:U R2",
+            "weight": 0.024371
+          },
+          {
+            "feature": "pair:U' R2",
+            "weight": 0.020423
+          }
+        ],
+        "training": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.307406,
+            "minimum_gap": 0.099998,
+            "mean_slack": 0.0
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 45,
+            "mean_gap": 0.307406,
+            "minimum_gap": 0.099997,
+            "mean_slack": 0.0
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 46,
+            "mean_gap": 0.349501,
+            "minimum_gap": 0.09178,
+            "mean_slack": 0.000175
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 35,
+            "mean_gap": 0.165046,
+            "minimum_gap": 0.040938,
+            "mean_slack": 0.004763
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.193656,
+            "minimum_gap": 0.062863,
+            "mean_slack": 0.000855
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 33,
+            "mean_gap": 0.14134,
+            "minimum_gap": 0.032348,
+            "mean_slack": 0.002128
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 19,
+            "mean_gap": 0.19236,
+            "minimum_gap": 0.099994,
+            "mean_slack": 1e-06
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.208982,
+            "minimum_gap": 0.055317,
+            "mean_slack": 0.000951
+          }
+        ],
+        "leave_one_algorithm_out": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.29888,
+            "minimum_gap": 0.027434,
+            "mean_slack": 0.001915
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.295591,
+            "minimum_gap": 0.024931,
+            "mean_slack": 0.002136
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.311155,
+            "minimum_gap": 0.011681,
+            "mean_slack": 0.005675
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 19,
+            "mean_gap": 0.090367,
+            "minimum_gap": -0.086318,
+            "mean_slack": 0.028749
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 42,
+            "mean_gap": 0.17186,
+            "minimum_gap": 0.020217,
+            "mean_slack": 0.004263
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 24,
+            "mean_gap": 0.106072,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.015274
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 21,
+            "mean_gap": 0.198847,
+            "minimum_gap": 0.099991,
+            "mean_slack": 0.0
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 40,
+            "margin_satisfied": 23,
+            "mean_gap": 0.10323,
+            "minimum_gap": -0.051361,
+            "mean_slack": 0.028494
+          }
+        ],
+        "optimization": {
+          "objective": 0.002646461,
+          "duality_gap": 4.71e-07,
+          "iterations": 251
+        },
+        "max_leave_one_out_duality_gap": 4e-07
+      },
+      {
+        "lambda": 1.0,
+        "feature_count": 459,
+        "nonzero_coefficient_count": 201,
+        "coefficients": [
+          {
+            "feature": "move:B",
+            "weight": 0.034267304
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.033993691
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.02888917
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.028889038
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.026230864
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.026064074
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.023705875
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.022125105
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.020336835
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.019687402
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.018933704
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.018933694
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.015961424
+          },
+          {
+            "feature": "pair:R F",
+            "weight": 0.014782164
+          },
+          {
+            "feature": "pair:M2 U",
+            "weight": 0.014599521
+          },
+          {
+            "feature": "pair:U M2",
+            "weight": 0.014599521
+          },
+          {
+            "feature": "move:R2",
+            "weight": 0.013699424
+          },
+          {
+            "feature": "move:S",
+            "weight": 0.01223744
+          },
+          {
+            "feature": "move:S'",
+            "weight": 0.01223744
+          },
+          {
+            "feature": "pair:U2 R",
+            "weight": 0.010511412
+          },
+          {
+            "feature": "move:U",
+            "weight": 0.010222307
+          },
+          {
+            "feature": "pair:R2 U",
+            "weight": 0.009902009
+          },
+          {
+            "feature": "move:E",
+            "weight": 0.009049104
+          },
+          {
+            "feature": "move:E'",
+            "weight": 0.009049104
+          },
+          {
+            "feature": "pair:R B",
+            "weight": 0.009049104
+          },
+          {
+            "feature": "pair:R B'",
+            "weight": 0.009049104
+          },
+          {
+            "feature": "pair:R' D2",
+            "weight": 0.009049104
+          },
+          {
+            "feature": "pair:U F",
+            "weight": 0.009049104
+          },
+          {
+            "feature": "pair:U F'",
+            "weight": 0.009049104
+          },
+          {
+            "feature": "pair:D' M2",
+            "weight": 0.00880984
+          },
+          {
+            "feature": "pair:M2 D'",
+            "weight": 0.00880984
+          },
+          {
+            "feature": "pair:D M2",
+            "weight": 0.008809709
+          },
+          {
+            "feature": "pair:M2 D",
+            "weight": 0.008809709
+          },
+          {
+            "feature": "pair:U' R2",
+            "weight": 0.008095339
+          },
+          {
+            "feature": "pair:F U'",
+            "weight": 0.007884012
+          },
+          {
+            "feature": "pair:F' U'",
+            "weight": 0.007884012
+          },
+          {
+            "feature": "pair:R D'",
+            "weight": 0.007851838
+          },
+          {
+            "feature": "pair:R' D",
+            "weight": 0.007851838
+          },
+          {
+            "feature": "pair:F R'",
+            "weight": 0.007064204
+          },
+          {
+            "feature": "pair:U' B",
+            "weight": 0.006892502
+          },
+          {
+            "feature": "pair:F' M2",
+            "weight": 0.006823458
+          },
+          {
+            "feature": "pair:M2 F'",
+            "weight": 0.006823458
+          },
+          {
+            "feature": "pair:R' U2",
+            "weight": 0.006654571
+          },
+          {
+            "feature": "pair:U' B'",
+            "weight": 0.006551593
+          },
+          {
+            "feature": "pair:L U'",
+            "weight": 0.006408968
+          },
+          {
+            "feature": "pair:B R'",
+            "weight": 0.00638953
+          },
+          {
+            "feature": "pair:B' R'",
+            "weight": 0.00638953
+          },
+          {
+            "feature": "pair:D R",
+            "weight": 0.00638953
+          },
+          {
+            "feature": "pair:D' R",
+            "weight": 0.00638953
+          },
+          {
+            "feature": "pair:D2 R",
+            "weight": 0.00638953
+          },
+          {
+            "feature": "pair:R B2",
+            "weight": 0.00638953
+          },
+          {
+            "feature": "pair:U L2",
+            "weight": 0.00638953
+          },
+          {
+            "feature": "pair:U' L2",
+            "weight": 0.00638953
+          },
+          {
+            "feature": "pair:F M2",
+            "weight": 0.006034206
+          },
+          {
+            "feature": "pair:M2 F",
+            "weight": 0.006034206
+          },
+          {
+            "feature": "pair:F' R'",
+            "weight": 0.005879194
+          },
+          {
+            "feature": "pair:U' L",
+            "weight": 0.00567271
+          },
+          {
+            "feature": "pair:U L'",
+            "weight": 0.005439768
+          },
+          {
+            "feature": "pair:L' U",
+            "weight": 0.005383452
+          },
+          {
+            "feature": "pair:F' U2",
+            "weight": 0.005224437
+          },
+          {
+            "feature": "pair:U' F",
+            "weight": 0.005224437
+          },
+          {
+            "feature": "pair:D R'",
+            "weight": 0.005192263
+          },
+          {
+            "feature": "pair:D' R'",
+            "weight": 0.005192263
+          },
+          {
+            "feature": "pair:L' U'",
+            "weight": 0.004815797
+          },
+          {
+            "feature": "pair:U' L'",
+            "weight": 0.004759475
+          },
+          {
+            "feature": "pair:U L",
+            "weight": 0.004526543
+          },
+          {
+            "feature": "pair:B U",
+            "weight": 0.004232927
+          },
+          {
+            "feature": "pair:B' U",
+            "weight": 0.003892018
+          },
+          {
+            "feature": "pair:U R2",
+            "weight": 0.003850606
+          },
+          {
+            "feature": "pair:L U",
+            "weight": 0.003790281
+          },
+          {
+            "feature": "pair:B U2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:B' R2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:B2 R'",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:D2 M",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:D2 M'",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:E R2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:E' R2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:E2 R",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:E2 R'",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:F2 M",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:F2 M'",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:F2 R'",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:L2 U",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:L2 U'",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:L2 U2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:M D2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:M F2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:M' D2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:M' F2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:M' U2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:R D",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:R E2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:R F2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:R' B",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:R' D'",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:R' E2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:R2 E",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:R2 E'",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:S2 U'",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:U' S2",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:U2 M",
+            "weight": 0.003729955
+          },
+          {
+            "feature": "pair:D2 M2",
+            "weight": 0.003490626
+          },
+          {
+            "feature": "pair:M2 D2",
+            "weight": 0.003490626
+          },
+          {
+            "feature": "pair:R' B2",
+            "weight": 0.003234165
+          },
+          {
+            "feature": "pair:B' M2",
+            "weight": 0.002919172
+          },
+          {
+            "feature": "pair:M2 B'",
+            "weight": 0.002919172
+          },
+          {
+            "feature": "pair:B M2",
+            "weight": 0.002781572
+          },
+          {
+            "feature": "pair:M2 B",
+            "weight": 0.002781572
+          },
+          {
+            "feature": "pair:U' F'",
+            "weight": 0.002564863
+          },
+          {
+            "feature": "pair:U2 R2",
+            "weight": 0.002532689
+          },
+          {
+            "feature": "pair:B2 M",
+            "weight": 0.002430152
+          },
+          {
+            "feature": "pair:M' B2",
+            "weight": 0.002430152
+          },
+          {
+            "feature": "pair:B2 M'",
+            "weight": 0.002430152
+          },
+          {
+            "feature": "pair:M B2",
+            "weight": 0.002430152
+          },
+          {
+            "feature": "pair:R2 S",
+            "weight": 0.002257601
+          },
+          {
+            "feature": "pair:S' R2",
+            "weight": 0.002257601
+          },
+          {
+            "feature": "pair:R' S2",
+            "weight": 0.002257601
+          },
+          {
+            "feature": "pair:S2 R'",
+            "weight": 0.002257601
+          },
+          {
+            "feature": "pair:R S2",
+            "weight": 0.002257601
+          },
+          {
+            "feature": "pair:S2 R",
+            "weight": 0.002257601
+          },
+          {
+            "feature": "pair:R2 S'",
+            "weight": 0.002257601
+          },
+          {
+            "feature": "pair:S R2",
+            "weight": 0.002257601
+          },
+          {
+            "feature": "pair:F2 R",
+            "weight": 0.002255391
+          },
+          {
+            "feature": "pair:R' F2",
+            "weight": 0.002255391
+          },
+          {
+            "feature": "pair:B2 R",
+            "weight": 0.002152273
+          },
+          {
+            "feature": "pair:B2 R2",
+            "weight": 0.002152273
+          },
+          {
+            "feature": "pair:R2 F",
+            "weight": 0.002137727
+          },
+          {
+            "feature": "pair:S U2",
+            "weight": 0.001477329
+          },
+          {
+            "feature": "pair:S' U2",
+            "weight": 0.001477329
+          },
+          {
+            "feature": "pair:U2 S",
+            "weight": 0.001477329
+          },
+          {
+            "feature": "pair:U2 S'",
+            "weight": 0.001477329
+          },
+          {
+            "feature": "pair:L U2",
+            "weight": 0.001303318
+          },
+          {
+            "feature": "pair:U2 L'",
+            "weight": 0.001303318
+          },
+          {
+            "feature": "pair:U B'",
+            "weight": 0.001232444
+          },
+          {
+            "feature": "pair:F2 M2",
+            "weight": 0.001109683
+          },
+          {
+            "feature": "pair:M2 F2",
+            "weight": 0.001109683
+          },
+          {
+            "feature": "pair:B R",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:B' R",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:D M",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:D M'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:D' M",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:D' M'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:E R",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:E R'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:E' R",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:E' R'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:F M",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:F M'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:F U",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:F' M",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:F' M'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:F' U",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:F2 U",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:F2 U'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:L' U2",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M D",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M D'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M F",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M F'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M U",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M U'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M' D",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M' D'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M' F",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M' F'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:M' U",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:R E",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:R E'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:R' B'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:R' E",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:R' E'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:S U'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:S' U'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:U F2",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:U M",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:U M'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:U' F2",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:U' M'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:U' S",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:U' S'",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:U2 L",
+            "weight": 0.001070381
+          },
+          {
+            "feature": "pair:B' M'",
+            "weight": 0.000488131
+          },
+          {
+            "feature": "pair:M B'",
+            "weight": 0.000488131
+          },
+          {
+            "feature": "pair:B' M",
+            "weight": 0.000488131
+          },
+          {
+            "feature": "pair:M' B'",
+            "weight": 0.000488131
+          },
+          {
+            "feature": "pair:B M",
+            "weight": 0.000352828
+          },
+          {
+            "feature": "pair:M' B",
+            "weight": 0.000352828
+          },
+          {
+            "feature": "pair:B M'",
+            "weight": 0.000352828
+          },
+          {
+            "feature": "pair:M B",
+            "weight": 0.000352828
+          },
+          {
+            "feature": "pair:R' S'",
+            "weight": 0.000334204
+          },
+          {
+            "feature": "pair:S R'",
+            "weight": 0.000334204
+          },
+          {
+            "feature": "pair:R S'",
+            "weight": 0.000334204
+          },
+          {
+            "feature": "pair:S R",
+            "weight": 0.000334204
+          },
+          {
+            "feature": "pair:R' S",
+            "weight": 0.000334204
+          },
+          {
+            "feature": "pair:S' R'",
+            "weight": 0.000334204
+          },
+          {
+            "feature": "pair:R S",
+            "weight": 0.000334204
+          },
+          {
+            "feature": "pair:S' R",
+            "weight": 0.000334204
+          },
+          {
+            "feature": "pair:R2 F'",
+            "weight": 0.000299281
+          },
+          {
+            "feature": "pair:L D2",
+            "weight": 3.983e-06
+          },
+          {
+            "feature": "pair:D2 L2",
+            "weight": 3.978e-06
+          },
+          {
+            "feature": "pair:L' D2",
+            "weight": 3.973e-06
+          },
+          {
+            "feature": "move:D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:R",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "move:U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B' U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:B2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D' S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:D2 S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:E2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F' R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:F2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L' S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 E",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 E'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:L2 S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:M2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R' U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 E2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 U'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:R2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S' U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 D",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 D'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 D2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 L",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 L'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 R2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 U",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:S2 U2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U S",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U S'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U S2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' M",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' R",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U' R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 B",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 B'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 B2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 F",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 F'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 F2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 L2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 M'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 M2",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 R'",
+            "weight": 0.0
+          },
+          {
+            "feature": "pair:U2 S2",
+            "weight": 0.0
+          }
+        ],
+        "top_coefficients": [
+          {
+            "feature": "move:B",
+            "weight": 0.034267
+          },
+          {
+            "feature": "move:B'",
+            "weight": 0.033994
+          },
+          {
+            "feature": "move:D'",
+            "weight": 0.028889
+          },
+          {
+            "feature": "move:D",
+            "weight": 0.028889
+          },
+          {
+            "feature": "move:F2",
+            "weight": 0.026231
+          },
+          {
+            "feature": "move:S2",
+            "weight": 0.026064
+          },
+          {
+            "feature": "move:F",
+            "weight": 0.023706
+          },
+          {
+            "feature": "move:F'",
+            "weight": 0.022125
+          },
+          {
+            "feature": "move:B2",
+            "weight": 0.020337
+          },
+          {
+            "feature": "move:E2",
+            "weight": 0.019687
+          },
+          {
+            "feature": "move:L",
+            "weight": 0.018934
+          },
+          {
+            "feature": "move:L'",
+            "weight": 0.018934
+          },
+          {
+            "feature": "move:L2",
+            "weight": 0.015961
+          },
+          {
+            "feature": "pair:R F",
+            "weight": 0.014782
+          },
+          {
+            "feature": "pair:M2 U",
+            "weight": 0.0146
+          },
+          {
+            "feature": "pair:U M2",
+            "weight": 0.0146
+          },
+          {
+            "feature": "move:R2",
+            "weight": 0.013699
+          },
+          {
+            "feature": "move:S",
+            "weight": 0.012237
+          },
+          {
+            "feature": "move:S'",
+            "weight": 0.012237
+          },
+          {
+            "feature": "pair:U2 R",
+            "weight": 0.010511
+          }
+        ],
+        "training": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.202807,
+            "minimum_gap": 0.025905,
+            "mean_slack": 0.003599
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.202807,
+            "minimum_gap": 0.029797,
+            "mean_slack": 0.003231
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.240938,
+            "minimum_gap": 0.060334,
+            "mean_slack": 0.001784
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 28,
+            "mean_gap": 0.116434,
+            "minimum_gap": -0.003279,
+            "mean_slack": 0.009523
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 39,
+            "mean_gap": 0.137313,
+            "minimum_gap": 0.037611,
+            "mean_slack": 0.004492
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 28,
+            "mean_gap": 0.10589,
+            "minimum_gap": 0.009601,
+            "mean_slack": 0.007022
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 17,
+            "mean_gap": 0.127527,
+            "minimum_gap": 0.078843,
+            "mean_slack": 0.00092
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 38,
+            "mean_gap": 0.140882,
+            "minimum_gap": 0.024488,
+            "mean_slack": 0.004354
+          }
+        ],
+        "leave_one_algorithm_out": [
+          {
+            "id": "pll_t",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 44,
+            "mean_gap": 0.203196,
+            "minimum_gap": 0.015337,
+            "mean_slack": 0.004289
+          },
+          {
+            "id": "pll_jb",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 43,
+            "mean_gap": 0.200705,
+            "minimum_gap": 0.016556,
+            "mean_slack": 0.004315
+          },
+          {
+            "id": "pll_y",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 40,
+            "mean_gap": 0.213734,
+            "minimum_gap": 0.028805,
+            "mean_slack": 0.006232
+          },
+          {
+            "id": "oll_sune",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 7,
+            "mean_gap": 0.061752,
+            "minimum_gap": -0.05862,
+            "mean_slack": 0.039859
+          },
+          {
+            "id": "oll_antisune",
+            "variants": 47,
+            "strictly_preferred": 47,
+            "margin_satisfied": 36,
+            "mean_gap": 0.129185,
+            "minimum_gap": 0.027033,
+            "mean_slack": 0.006334
+          },
+          {
+            "id": "pll_u",
+            "variants": 47,
+            "strictly_preferred": 46,
+            "margin_satisfied": 4,
+            "mean_gap": 0.074345,
+            "minimum_gap": 0.0,
+            "mean_slack": 0.026765
+          },
+          {
+            "id": "pll_h",
+            "variants": 23,
+            "strictly_preferred": 23,
+            "margin_satisfied": 16,
+            "mean_gap": 0.126614,
+            "minimum_gap": 0.033196,
+            "mean_slack": 0.006593
+          },
+          {
+            "id": "pll_a",
+            "variants": 47,
+            "strictly_preferred": 43,
+            "margin_satisfied": 18,
+            "mean_gap": 0.073511,
+            "minimum_gap": -0.060527,
+            "mean_slack": 0.033816
+          }
+        ],
+        "optimization": {
+          "objective": 0.010657277,
+          "duality_gap": 9.4e-08,
+          "iterations": 95
+        },
+        "max_leave_one_out_duality_gap": 1.26e-07
+      }
+    ]
+  }
+}

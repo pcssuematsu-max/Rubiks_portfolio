@@ -22,7 +22,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ai.paired_solve_benchmark import (
-    fixture_set_id, make_paired_fixtures, make_palm_fixtures,
+    fixture_set_id, make_paired_fixtures, make_perm_fixtures,
     probe_position_neighborhood, run_direct_solve_case, summarize_direct_cases,
 )
 from configs.profiles import build_experiment_frame_config
@@ -55,7 +55,7 @@ def main(argv=None):
     parser.add_argument('--shallow-widths', default='3,5')
     parser.add_argument('--fixtures-per-band', type=int, default=1)
     parser.add_argument('--seed', type=int, default=20261017)
-    parser.add_argument('--fixture-set', choices=('generated','palms','all'), default='all')
+    parser.add_argument('--fixture-set', choices=('generated','perms','palms','all'), default='all')
     parser.add_argument('--max-search-calls', type=int, default=200)
     parser.add_argument('--max-moves', type=int, default=300)
     parser.add_argument('--checkpoint-root', type=Path, default=ROOT)
@@ -78,8 +78,8 @@ def main(argv=None):
     fixtures = []
     if args.fixture_set in ('generated','all'):
         fixtures.extend(make_paired_fixtures(args.fixtures_per_band,args.seed))
-    if args.fixture_set in ('palms','all'):
-        fixtures.extend(make_palm_fixtures())
+    if args.fixture_set in ('perms','palms','all'):
+        fixtures.extend(make_perm_fixtures())
     set_id = fixture_set_id(fixtures)
     run_id = datetime.now(timezone.utc).isoformat(timespec='microseconds')
     args.output.parent.mkdir(parents=True,exist_ok=True)
