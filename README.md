@@ -26,15 +26,17 @@ python3 -m ruff check .
 
 ## 同一局面の独立比較（実験用）
 
-保存済みの実験用AIを、全員同じ固定3×3局面から直接解かせる比較です。通常の1周200試行、学習データ、GUIの成功カウンタには追加しません。Effect数別に各2局面（うち2局面は reducedMoveCount 40以上）を固定し、Search2は複数回の探索を連結して完成まで判定します。Search3は通常の探索予算・progressive設定を使い、greedy fallbackが必要になった時点で直接失敗とします。
+保存済みの実験用AIを、同じ固定局面から直接解かせる独立比較です。現在の `experiment` プロファイルは4×4キューブ・25体で、既定の局面群は `4x4-algorithms` です。通常の200試行、学習データ、GUIの成功カウンタには追加しません。Search2は複数回の探索を連結して完成まで判定し、Search3はプロファイルの探索条件（現在は固定10,000 playout）を使います。greedy fallbackが必要になった時点で直接失敗とします。
 
 ```bash
 python3.14 tools/compare_ai_same_positions.py --list-fixtures
-python3.14 tools/compare_ai_same_positions.py --ai-indices 0,3,10,11,12,18,19,20,21,22,23,24
-python3.14 tools/compare_ai_same_positions.py --fixture-set perms --ai-indices 0,3,10,11,12,18,19,20,21,22,23,24
+python3.14 tools/compare_ai_same_positions.py --fixture-set 4x4-algorithms --ai-indices 0,2,10,20,22
+python3.14 tools/compare_ai_same_positions.py --fixture-set 4x4-myperm-composites --ai-indices 0,2,10,20,22
 ```
 
-`--fixture-set perms` は、ユーザー提供のT-Perm（Effect 4・14手）とY-Perm（Effect 4・17手）だけを同一局面として比較します。`--fixture-set all` なら元の固定10局面と合わせて比較できます。4×4では `--fixture-set 4x4-algorithms` でWing、Corner、Centerの固定6局面を比較できます。追加した局面はWing 2 SwapとCorner 2 Swapを連結したEffect 4・37手の手順です。`--ai-indices` を省略すると実験用25体すべてを比較します。結果は通常の実験ログと別の `exports/ai-paired-benchmark.jsonl` に追記され、各AI・各局面の直接成功、探索量、深さ、保存済みパラメータの識別子を残します。比較前にGUIのパラメータを保存し、保存処理中の実行は避けてください。GUIで交互に使うSearch3の浅い探索幅は、この比較では設定値側に固定します。局面は再現可能な固定サンプルであり、通常の200試行の出題分布そのものを代表するわけではありません。
+`4x4-algorithms` はWing、Corner、Centerの固定局面を、`4x4-myperm-composites` はmypermを組み合わせた別の固定局面を使います。`--ai-indices` を省略すると25体すべてを比較します。結果は通常の実験ログと別の `exports/ai-paired-benchmark.jsonl` に追記され、各AI・各局面の直接成功、探索量、深さ、保存済みパラメータの識別子を残します。比較前にGUIのパラメータを保存してください。これらは再現可能な固定サンプルであり、通常の200試行の出題分布そのものを代表するものではありません。
+
+3×3用の `generated`、`perms`、`palms`、`all` は、実験プロファイルを3×3に切り替えた場合に使えます。現在の4×4設定のまま指定するとエラーになります。
 
 4×4の通常ソルブログは、Effect数の計算時に得られる `setupEffect.effectClass` も短い文字列として保存します。手順そのものは引き続き保存しません。次のコマンドでEffect Type・設定手数帯・AI種別ごとの直接成功率を後から集計できます。旧ログには手順とEffect Typeが残っていないため、旧試行は分類不能として件数を表示します。固定比較ログには手順があるので、旧形式でもオフラインで分類できます。
 
@@ -47,13 +49,13 @@ python3.14 tools/analyze_effect_type_success.py AI_logs_storage/Rubiks_4x4/bench
 
 4×4のmypermsから作った別のWing＋Corner連結3例と高Effect短手順2例は、`--fixture-set 4x4-myperm-composites` で検証できます。元のEffect 4・37手は引き続き検証専用です。学習側には異なるmypermの組み合わせとその対称変換から、同じ開始局面を重複排除した少量の補助手順を起動時に追加します。これは200試行の出題回数には含まれず、Search3では低い重みで使います。steps_to_goalの絶対Valueには、逆手順が最短とは限らないこの補助データを使いません。
 
-同じ保存済みSearch3重みでFixedとProgressiveの完全な直接ソルブを比較するには `python3.14 tools/compare_search3_budgets.py --ai-indices 2,10 --fixture-ids wing-2-plus-corner-2-swap,myperm-wing-corner-a` を使います。直接成功率に加え、実際の総playout数と探索回数を記録します。Original Search2が解いた経路の最初の数手についてPolicy/Value順位とSearch3のPUCT訪問比を調べるには `python3.14 tools/probe_success_routes.py --reference-ai-indices 0,9 --target-ai-indices 2,10 --max-probe-steps 5 --trace-search3-root` を使います。出力には、成功経路上の手が枝幅内に入った探索回、初訪問回、初回の分岐先Value、探索回数別の累積訪問数が含まれます。`--fixture-id myperm-wing-corner-a` のようにmyperm連結局面も指定できます。どちらも学習や保存済みパラメータには触れません。
+同じ保存済みSearch3重みでFixedとProgressiveの完全な直接ソルブを比較するには `python3.14 tools/compare_search3_budgets.py --ai-indices 2,10 --fixture-ids wing-2-plus-corner-2-swap,myperm-wing-corner-a` を使います。これは現在の固定予算設定から探索方式だけを変える比較で、直接成功率、総playout数、探索回数を記録します。Original Search2が解いた経路の最初の数手についてPolicy/Value順位とSearch3のPUCT訪問比を調べるには `python3.14 tools/probe_success_routes.py --reference-ai-indices 0,9 --target-ai-indices 2,10 --max-probe-steps 5 --trace-search3-root` を使います。どちらも学習や保存済みパラメータには触れません。
 
 複数回の固定比較結果から、同じfixture setだけで難しい手順の成功を優先してcheckpointを並べるには `python3.14 tools/rank_fixed_checkpoints.py 比較結果1.jsonl 比較結果2.jsonl` を使います。異なる固定局面群やパズル設定の結果は同列に比較しません。選択結果は一覧のみで、パラメータの自動置換は行いません。
 
 steps_to_goalの学習MAE、固定手数帯別MAE、gradient、同一局面の目標衝突率は `python3.14 tools/analyze_steps_to_goal_drift.py` で直近20回とその前20回を比較できます。4×4実験ではAI20を従来どおり最短観測ラベル採用の対照群とし、AI22だけ衝突した局面を絶対Value学習から除きます。Policyの学習例は維持し、除いた件数を学習履歴の `stepsToGoalRegression.valueSelection.excludedAmbiguousValueStateCount` に残します。
 
-Search3 の C と「浅い探索で使う枝幅」だけを同一チェックポイント・同一局面で比較するには、`python3.14 tools/sweep_search3_inference.py --ai-indices 10,18 --c-values 0.2,0.5,1.0 --shallow-widths 3,5 --fixtures-per-band 1` を使います。通常の探索budget、学習率、保存済み重みは変更せず、結果を別の JSONL に保存します。GUI実験中に使う場合は、先にパラメータを保存してください。
+3×3プロファイルへ切り替えた場合は、`tools/sweep_search3_inference.py` でCと枝幅、`tools/sweep_search3_policy_temperature.py` でPolicy温度、`tools/compare_linear_transformer_routes.py` でLinearの成功経路に対するTransformerのPolicy/Valueを比較できます。これらは3×3固定局面用で、現在の4×4プロファイルのままでは実行できません。各結果は独立したファイルへ書き込み、学習率や保存済み重みは変更しません。実行前にGUI側でパラメータを保存してください。
 
 AI22 の steps_to_goal には、直接探索が止まった後に成功したfallback経路のreplay採用比5%以上を目標にし（1経路の再採用は最大2回）、開始から3手の相対Value順位を補助学習します。候補不足なら無理に比率を満たさず、絶対手数のHuber目標も維持します。学習履歴には採用件数と追加損失を残し、既存の保存データには新しい停止印がないため、新たな成功fallbackから徐々に効き始めます。
 
@@ -61,10 +63,10 @@ AI22 の steps_to_goal には、直接探索が止まった後に成功したfal
 
 実験プロファイルのAI22は、従来の `steps_to_goal` の絶対手数目標を維持したまま、選別済み成功経路の後続局面を高く評価する相対順位損失を追加します（margin 1.0、経路ごとに平均、係数1.0）。AI20およびpairwise群の設定・データ件数は変更せず、学習履歴には絶対損失と相対損失の内訳を別々に残します。
 
-Transformer Search3 の replay 比較では、探索条件（C=0.5、progressive、幅と予算）を AI10/11/18/19 で揃えています。各ペア内ではデータ変換と優先順も揃えます。AI10/11 は同じ rank loss 0.1 と recent 比率 0.5 のまま、従来の「recent→old の順に別バッチ」対「各バッチで新旧を混合」を比較します。AI18/19 は rank loss なし・混合バッチのまま、recent 比率 0.5 対 0.25 を比較します。後者の 0.25 設定では、中手数・長手数の予約枠を保ち、残りをランダムな旧データへ渡します。学習履歴の `trainingSample` に設定比率、実際に選ばれたrecent件数、混合バッチ数、ユニーク件数を記録します。バッチ数上限は変わりません。
+Transformer Search3 の replay 比較では、AI10/11/18/19 の探索条件（C=0.5、固定10,000 playout、枝幅）を揃えています。AI10/11 は rank loss 0.1 と recent 比率0.5のまま、recentと旧データを別バッチにする方式と混合する方式を比較します。AI18/19 は rank loss なしで、recent 比率0.5対0.25を比較します。短・中・長手数のreplay枠や実際の採用件数は学習履歴の `trainingSample` に記録します。
 
 ```bash
-python3.14 tools/compare_ai_same_positions.py --fixture-set all --ai-indices 10,11,18,19
+python3.14 tools/compare_ai_same_positions.py --fixture-set 4x4-algorithms --ai-indices 10,11,18,19
 ```
 
 既存のパラメータは自動初期化しません。4体の過去の重み・学習履歴は異なるため、現在の成功率の絶対値だけでサンプラーの因果効果を判断せず、設定変更前後の同一AIの推移も確認してください。厳密な同一初期値実験には、別途チェックポイントを複製して学習を開始する必要があります。
@@ -98,13 +100,15 @@ Webでは効果タイプとEffectNameを選び、同じ型の中で `effectCount
 
 ![Twisty Puzzle AI Lab のGUI画面](assets/gui-overview2.png)
 
-*7×7 Rubik's Cube の状態、Search3の探索候補、Policy / Value、Grad解析、Success Viewer、実験ログを同時に表示した最新版の実験用画面。*
+*7×7 Rubik's Cube を使ったGUIの表示例。現在の `experiment` プロファイルの既定値は4×4です。*
 
 ## GUI画面の見方
 
-メイン画面では、現在のパズル状態、探索で選ばれた手順、AIの出力、解析結果、実行ログを同時に追跡できます。公開用の `public` プロファイルは初期状態で **Simple** 表示になり、リセット・AIによるsolve・停止・手動操作だけを表示します。`Advanced を表示` を選ぶと、AI設定、解析方法、対象layer、ツールを開けます。以下の画像は7×7 Rubik's Cubeと複数AIを使った実験構成の例です。既定の `public` プロファイルは3×3・Search2 1体の軽量構成ですが、各パネルの役割は同じです。
+メイン画面では、現在のパズル状態、探索で選ばれた手順、AIの出力、解析結果、実行ログを同時に追跡できます。公開用の `public` プロファイルは初期状態で **Simple** 表示になり、リセット・AIによるsolve・停止・手動操作を表示します。`Advanced を表示` を選ぶと、AI設定、解析方法、対象layer、ツールを開けます。以下の画像は7×7 Rubik's Cubeと複数AIを使った表示例です。既定の `public` は3×3・Search2 1体、現在の `experiment` は4×4・25体です。
 
-Success Viewerは、既定で **自力成功のみ** を表示します。ここで数えるのはSearch2 / Search3が探索そのもので完成へ到達した結果だけで、既知手順を使うfallbackによる完了は混ぜません。プルダウンで `すべて`、`Fallbackのみ`、`失敗のみ` に切り替えられ、`実験ログ` から直近10件の結果区分・setup・movesを確認できます。対応するパズルでは、選んだ記録を `Webで再生` して開始局面と手順をブラウザ上で追えます。
+Success Viewerは、既定で **自力成功のみ** を表示します。ここで数えるのはSearch2 / Search3が探索そのもので完成へ到達した結果だけで、既知手順を使うfallbackによる完了は混ぜません。AIごとの `成功数/Lv` も表示します。プルダウンで `すべて`、`Fallbackのみ`、`失敗のみ` に切り替えられ、`履歴` から直近10件の結果区分・setup・movesを確認できます。対応するパズルでは、選んだ記録を `Webで再生` して開始局面と手順をブラウザ上で追えます。
+
+200試行の区切りでは、各AIがその区間で担当したplayを**すべて直接探索で成功**させた場合だけ、そのAIの該当stageのレベルが1上がります。fallback完了はレベル判定の直接成功には含めません。
 
 ### State Viewer
 
@@ -122,7 +126,7 @@ Success Viewerは、既定で **自力成功のみ** を表示します。ここ
 
 ![Policy確率とAIごとの成功状況](assets/gui-prob_and_success_viewer2.png)
 
-左側は現在状態に対するPolicy出力で、各moveの選択確率をパーセント表示します。色によって確率の大小を素早く比較できます。Policyの下のSuccess Viewerは `AI自力成功` を明示し、現在の試行番号・AIごとの自力成功数・累計を表示します。`実験ログ` では直近10件を、`集計` では探索成功・Fallback完了・失敗を別々に比較できます。右側は探索・学習のログです。3つを同じ行へ収めることで、7×7など大きいパズルでも画面に収まりやすくしています。
+左側は現在状態に対するPolicy出力で、各moveの選択確率をパーセント表示します。色によって確率の大小を素早く比較できます。Policyの下のSuccess Viewerは、現在の試行番号・AIごとの自力成功数とレベル・累計を表示します。`履歴` では直近10件を、`集計` では探索成功・Fallback完了・失敗を別々に比較できます。右側は探索・学習のログです。
 
 ### Grad Viewer
 
@@ -134,11 +138,11 @@ Success Viewerは、既定で **自力成功のみ** を表示します。ここ
 
 ![探索・学習・メモリ状況を表示するLog Viewer](assets/gui-log2.png)
 
-探索結果、学習指標、パラメータ統計、データ件数、PyTorch利用状況、メモリ使用量などを時系列で表示します。長時間の実験でも最新行へ自動スクロールし、表示行数を制限してGUI側のログが増え続けないようにしています。
+探索結果、学習指標、パラメータ統計、データ件数、PyTorch利用状況、メモリ使用量などを時系列で表示します。上部の固定欄には `待機中`・`探索中`・`フォールバック中` など現在の処理段階を1行で表示します。長時間の実験でも最新行へ自動スクロールし、表示行数を制限してGUI側のログが増え続けないようにしています。
 
 ## 設計と実装の見どころ
 
-- **複数パズルへの対応:** Rubik's Cube 系だけでなく、Megaminx、Pyraminx、Skewb、Square-1、FTO、CTO、有限群パズルを共通のGUIと探索処理へ接続
+- **複数パズルへの対応:** Rubik's Cube 系、Megaminx、Pyraminx、Skewb、Square-1、FTO、CTOを `PuzzleAdapter` の登録情報から生成し、有限群パズルも共通GUIに接続
 - **探索方式の比較:** Policy / Value を使う優先度探索の Search2 と、PUCT 型探索木を使う Search3 を実装
 - **学習過程の可視化:** Grad、Integrated Gradients、Occlusion、Attention、Embedding などをGUIから解析
 - **実験条件の分離:** 閲覧者向けの `public` と、探索・学習用の `experiment` を同じ起動入口から切り替え可能
@@ -152,7 +156,7 @@ Success Viewerは、既定で **自力成功のみ** を表示します。ここ
 
 ## 公開版について
 
-`python3 main.py` は、ポートフォリオ閲覧者向けの軽量な `public` プロファイルを既定で起動します。従来の `cube_size = 7`, `puzzle_type = 'cto'`, AI 20体の構成は `experiment` プロファイルとして残しています。
+`python3 main.py` は、ポートフォリオ閲覧者向けの軽量な `public` プロファイルを既定で起動します。現在の `experiment` プロファイルは `cube_size = 4`, `puzzle_type = 'cube'`, AI 25体です。設定は [`configs/profiles.py`](configs/profiles.py) で変更できます。
 
 公開版では、3×3キューブをSearch2がどのように学習し、解けるようになっていくかを確認できます。このリポジトリには学習済みパラメータを含めていないため、起動直後のAIはランダムなパラメータから始まり、はじめは見当違いな動きをします。学習が進むにつれて、どのような手順を良いものとして評価するかを自動的に獲得していきます。
 
@@ -195,6 +199,7 @@ Codexによる提案・実装内容は作者が確認し、既存設計との整
 
 各パズルの状態遷移は `cube/`, `megaminx/`, `pyraminx/`, `skewb/`, `square1/`, `fto/`, `cto/` に分かれています。
 パズル固有の StateViewer は `ui/<puzzle>/state_viewer.py` にあります。
+`core/puzzle_registry.py` の `PuzzleAdapter` が状態モデル生成、Viewer生成、手順表示、Effect解析の入口をまとめています。有限群パズルは `group_main.py` の設定から生成します。
 
 ## 実行方法
 
@@ -252,7 +257,7 @@ config = build_group_frame_config(
 `group` mode は myperms を登録・利用せず、level `L` のスクランブルを生成元集合 `X` の長さ `L` のランダム word で作ります。探索器へ渡るのは結果の群要素の状態表現です。
 学習パラメータは生成元設定ごとにローカルの `GroupAIdatas/` 以下へ保存され、cube 用の `AIdatas*` とは分離されます。これらの生成データはリポジトリには含めません。
 
-`SL_2(F_7)` の編集可能な実験例は `group_experiment.py` にあります。
+`SL_2(F_43)` の編集可能な実験例は `group_experiment.py` にあります。
 
 ```bash
 python3 group_experiment.py
@@ -305,18 +310,19 @@ GitHub Actions では Python 3.10 と3.14の両方で同じテストを実行し
 
 - `cube_size`: Rubik's Cube 系のサイズ
 - `puzzle_type`: 起動するパズル種別
-- `ai_search_modes`: 各 AI の探索方式 (`search2`, `search3`, `transformer`)
+- `ai_search_modes`: 各 AI の探索方式 (`search2`, `search3`。Transformerは別の設定で有効化)
 - `search3_progress`: Search3 budget 時に fallback prefix へ進めるか
-- `search3_cs`: Search3 PUCT の C
+- `search3_cs`, `search3_budget_modes`, `search3_budget_stage_playouts`: Search3 の C・予算方式・段階別playout数（現在の実験版は固定10,000 playout）
 - `lrs`, `wdlrs`, `adam`, `weight_decay`: optimizer 設定
+- `activations`, `silu_beta_initials`: 活性化関数とAIごとのSiLU Beta初期値（現在の実験版は0.2）
 - `update_scales`: shared / policy / value head の更新スケール
 - `residuals`: Original AI の residual block 有効化
-- `original_transformer_attention`: Original AI に attention block を入れるか
+- `original_transformer_attention`, `original_transformer_linear_skips`: attention blockと直接線形branchを使うか
 - `transform_idx`, `flip_inside_idx`: 変換・鏡映を固定するか
 - `priority_list`: Greedy fallback で注目する group の順序
 - `bootstrap_datas`, `bootstrap_search3_datas`: 起動時に追加する初期データ
 
-GUI 起動後は Tools から parameter editor / dataset inspector / attention analysis などを開けます。
+GUI 起動後は Tools から parameter editor / dataset inspector / attention analysis などを開けます。`Frame.initialize(N)` は対象AIのSiLU Betaを設定値へ戻し、`Frame.initialize(N, beta=1.0)` のように明示値も渡せます。GUIの `選択AIを正規化…` はパラメータとoptimizer状態を変更するため、先に `設定を保存` で復元点を作ってください。
 
 ## 探索と学習データ
 
@@ -331,6 +337,7 @@ Search3 は PUCT 型探索です。
 各ノードは Policy prior と Value backup を使って選択されます。
 Search3 の学習データは solve 履歴から作られ、move sequence は簡約後に登録されます。
 Value target は残り手数と `value_target_gamma` を使って再計算されます。
+現在の実験プロファイルはSearch3を固定10,000 playoutで動かし、浅い枝幅から訪問数に応じて候補手を増やします。段階的な予算配分と早期停止の設定は比較実験用に残しています。
 
 Search3 データには以下の区別があります。
 
@@ -346,10 +353,12 @@ Search が解を見つけない場合でも、myperms を評価して Greedy に
 発見した短い手順は `last_perms` としてログ・表示されます。
 
 全パズルの `myperms` key は `MypermKey(name, transform_index)` で統一されています。
-登録手順の `name` は代表変換の効果名を使い、画面・ログでは `name#NN` と表示します。
+登録手順の `name` は代表変換の効果名を使い、画面・ログでは `name#NN` と表示します。`#00` は `myperms_point` が最大の対称変換で、残りはその代表手順を基準に対称変換の番号順へ割り当てます（点数順ではありません）。
 旧手順名はaliasとして解決できます。
 単一 move は `SingleMove-<move>` という名前を使います。
 効果ベースの命名規則と向きの表現は [`docs/myperm_naming.md`](docs/myperm_naming.md) にまとめています。
+
+Greedy fallback では各AIのPolicyから手ごとの `-log(確率)` を求め、myperm内の合計が小さい候補から評価します。Transformerでも実際のPolicyを使います。`lp show` のkey選択は登録mypermを優先し、Effect数、発見済み最短手数の順に並べ、候補欄にも最短手数を表示します。
 
 ## 解析ツール
 
@@ -381,7 +390,7 @@ configs/                 公開用・実験用の起動設定
 group_main.py            有限群パズルの起動入口
 group_experiment.py      有限群の編集可能な実験例
 ai/                      Original AI、layer、loss
-core/                    共通定数、scramble selector
+core/                    PuzzleAdapter registry、Effect解析、scramble selector
 cube/                    Rubik's Cube 系、Search2/Search3 engine、myperm analyzer
 megaminx/                Megaminx の状態・操作
 pyraminx/                Pyraminx / Master Pyraminx
