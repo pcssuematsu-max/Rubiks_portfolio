@@ -230,8 +230,8 @@ def _finite_float(value):
     return result if np.isfinite(result) else None
 
 
-def probe_position_neighborhood(ai, reference_move=None):
-    """Read-only Policy/Value ranks for every legal successor of one state.
+def probe_position_neighborhood(ai, reference_move=None, include_successors=False):
+    """Read-only Policy/Value ranks for every successor of one state.
 
     The reference move is only a reproducible inverse-scramble comparison,
     not a claim that it is the unique or shortest good move. Raw Value scales
@@ -248,11 +248,13 @@ def probe_position_neighborhood(ai, reference_move=None):
         policy = output[:-1,0]
         current_value = float(output[-1,0])
         columns = []
+        legal = []
         for move in moves:
             if hasattr(cube,'_restore'):
                 cube._restore(snapshot)
             else:
                 cube.state[:] = snapshot
+            legal.append(not hasattr(cube, 'is_legal_move') or bool(cube.is_legal_move(move)))
             cube.make_move(move)
             columns.append(cube.makedata())
         values = []
@@ -266,12 +268,26 @@ def probe_position_neighborhood(ai, reference_move=None):
             raise ValueError('Non-finite Policy/Value in fixed-position neighborhood probe')
         policy_order = np.argsort(-policy,kind='stable')
         value_order = np.argsort(-values,kind='stable')
+        legal_mask = np.asarray(legal, dtype=bool)
+        legal_indices = np.flatnonzero(legal_mask)
+        legal_policy_order = sorted(legal_indices, key=lambda index: -float(policy[index]))
+        legal_value_order = sorted(legal_indices, key=lambda index: -float(values[index]))
         result = {
             'valueDomain': 'raw_logit' if ai.search_mode == 'search3' else 'raw',
             'currentValue': current_value,
             'goalValue': _finite_float(getattr(ai,'perfect_val',None)),
             'improvingSuccessorCount': int(np.count_nonzero(values > current_value)),
             'bestSuccessorDelta': float(np.max(values) - current_value),
+            'legalSuccessorCount': int(np.count_nonzero(legal_mask)),
+            'legalImprovingSuccessorCount': int(np.count_nonzero(
+                (values > current_value) & legal_mask,
+            )),
+            'bestLegalSuccessorDelta': (
+                float(np.max(values[legal_mask]) - current_value)
+                if legal_indices.size else None
+            ),
+            'topLegalPolicyMoves': [moves[int(index)] for index in legal_policy_order[:3]],
+            'topLegalValueMoves': [moves[int(index)] for index in legal_value_order[:3]],
             'topPolicyMoves': [moves[int(index)] for index in policy_order[:3]],
             'topValueMoves': [moves[int(index)] for index in value_order[:3]],
             'policyValueTop3Overlap': len(set(policy_order[:3]) & set(value_order[:3])),
@@ -286,6 +302,48 @@ def probe_position_neighborhood(ai, reference_move=None):
                 for index,move in enumerate(moves)
             },
         }
+        if include_successors:
+            root_policy_probabilities = None
+            root_enqueue_threshold = None
+            if ai.search_mode == 'search2' and legal_indices.size:
+                masked_logits = policy.astype('d', copy=True)
+                masked_logits[~legal_mask] = -np.inf
+                shifted = masked_logits - np.max(masked_logits[legal_mask])
+                exponentials = np.exp(shifted)
+                exponentials[~legal_mask] = 0.0
+                root_policy_probabilities = exponentials / np.sum(exponentials)
+                budget = max(1, int(getattr(ai, 'search_num2', 10000)))
+                # Search2's initial heap priority is -2*N, and it enqueues
+                # a root child only if softmax(policy)*2*N >= 1.
+                root_enqueue_threshold = 1.0 / (2 * budget)
+                result['search2RootEnqueueProbabilityThreshold'] = root_enqueue_threshold
+            result['successors'] = [
+                {
+                    'move': move,
+                    'isLegal': bool(legal[index]),
+                    'policyScore': float(policy[index]),
+                    'policyProbability': (
+                        float(root_policy_probabilities[index])
+                        if root_policy_probabilities is not None else None
+                    ),
+                    'search2RootEnqueueEligible': (
+                        bool(root_policy_probabilities[index] >= root_enqueue_threshold)
+                        if root_policy_probabilities is not None and legal[index] else False
+                    ) if ai.search_mode == 'search2' else None,
+                    'policyRank': result['policyRankByMove'][move],
+                    'value': float(values[index]),
+                    'valueDelta': float(values[index] - current_value),
+                    'valueRank': result['valueRankByMove'][move],
+                }
+                for index, move in enumerate(moves)
+            ]
+            if ai.search_mode == 'search2':
+                result['search2RootEligibleImprovingSuccessorCount'] = sum(
+                    successor['isLegal']
+                    and successor['valueDelta'] > 0
+                    and successor['search2RootEnqueueEligible']
+                    for successor in result['successors']
+                )
         if reference_move in moves:
             index = moves.index(reference_move)
             result.update({
@@ -305,6 +363,67 @@ def probe_position_neighborhood(ai, reference_move=None):
             cube.state[:] = snapshot
 
 
+def probe_two_step_escape(ai, root_probe=None, top_each=3):
+    """Check whether likely first moves can climb above a stopped Search2 root.
+
+    This deliberately inspects only the union of top Policy and top Value
+    legal first moves. It is a bounded diagnostic, not an exhaustive proof
+    that no two-step escape exists.
+    """
+    if not 1 <= top_each <= 3:
+        raise ValueError('top_each must be in 1..3')
+    cube = ai.cube
+    snapshot = cube._snapshot() if hasattr(cube, '_snapshot') else cube.state.copy()
+    root = root_probe or probe_position_neighborhood(ai, include_successors=True)
+    first_moves = list(dict.fromkeys(
+        root['topLegalPolicyMoves'][:top_each]
+        + root['topLegalValueMoves'][:top_each]
+    ))
+    rows = []
+    try:
+        for first_move in first_moves:
+            if hasattr(cube, '_restore'):
+                cube._restore(snapshot)
+            else:
+                cube.state[:] = snapshot
+            cube.make_move(first_move)
+            next_probe = probe_position_neighborhood(ai, include_successors=True)
+            inverse = cube.invert_str(first_move)
+            candidates = [
+                successor for successor in next_probe['successors']
+                if successor['isLegal'] and successor['move'] != inverse
+            ]
+            if not candidates:
+                continue
+            best = max(candidates, key=lambda successor: successor['value'])
+            first = next(
+                successor for successor in root['successors']
+                if successor['move'] == first_move
+            )
+            rows.append({
+                'firstMove': first_move,
+                'firstPolicyRank': first['policyRank'],
+                'firstPolicyProbability': first['policyProbability'],
+                'firstRootEnqueueEligible': first['search2RootEnqueueEligible'],
+                'firstValueDelta': first['valueDelta'],
+                'bestSecondMove': best['move'],
+                'bestSecondValueDeltaFromRoot': best['value'] - root['currentValue'],
+            })
+    finally:
+        if hasattr(cube, '_restore'):
+            cube._restore(snapshot)
+        else:
+            cube.state[:] = snapshot
+    return {
+        'sampledFirstMoveCount': len(rows),
+        'sampledFirstMoves': first_moves,
+        'bestTwoStepDeltaFromRoot': max(
+            (row['bestSecondValueDeltaFromRoot'] for row in rows), default=None,
+        ),
+        'candidates': rows,
+    }
+
+
 def _probe_search3_root_for_reference_move(ai, move, playouts, trace_root=False):
     """Measure PUCT allocation at one route state without advancing the cube."""
     engine = ai.search3_engine
@@ -322,6 +441,9 @@ def _probe_search3_root_for_reference_move(ai, move, playouts, trace_root=False)
         priors = np.asarray(root.P, dtype='f').reshape(-1)
         backed = np.asarray(root.val, dtype='f').reshape(-1)
         total = float(np.sum(visits))
+        top_policy_index = int(np.argmax(priors))
+        top_visit_index = int(np.argmax(visits)) if total else None
+        move_keys = ai.cube.move_keys
         diagnostics = result.search_diagnostics or {}
         probe = {
             'playouts': int(result.stats[1]),
@@ -333,6 +455,15 @@ def _probe_search3_root_for_reference_move(ai, move, playouts, trace_root=False)
                 float(backed[index] / visits[index]) if visits[index] else None
             ),
             'topVisitShare': float(np.max(visits) / total) if total else 0.0,
+            'topPolicyMove': move_keys[top_policy_index],
+            'topPolicyPrior': float(priors[top_policy_index]),
+            'topPolicyVisitShare': float(visits[top_policy_index] / total) if total else 0.0,
+            'topVisitedMove': move_keys[top_visit_index] if top_visit_index is not None else None,
+            'topVisitedPrior': float(priors[top_visit_index]) if top_visit_index is not None else None,
+            'topVisitedBackedMean': (
+                float(backed[top_visit_index] / visits[top_visit_index])
+                if top_visit_index is not None and visits[top_visit_index] else None
+            ),
             'playoutDepthMean': _finite_float(diagnostics.get('playoutDepthMean')),
             'playoutDepthMax': int(diagnostics.get('playoutDepthMax') or 0),
         }
@@ -344,7 +475,8 @@ def _probe_search3_root_for_reference_move(ai, move, playouts, trace_root=False)
 
 
 def probe_reference_route(ai, fixture, route_moves, max_probe_steps=None,
-                          search3_probe_playouts=0, trace_search3_root=False):
+                          search3_probe_playouts=0, trace_search3_root=False,
+                          include_successors=False):
     """Evaluate every decision on one solved reference route without learning.
 
     The route is a comparison path, not a claim that its moves are uniquely
@@ -372,7 +504,9 @@ def probe_reference_route(ai, fixture, route_moves, max_probe_steps=None,
             if move not in cube.move_keys:
                 raise ValueError(f'Invalid reference move at step {step_index}: {move!r}')
             if max_probe_steps is None or step_index <= max_probe_steps:
-                probe = probe_position_neighborhood(ai, move)
+                probe = probe_position_neighborhood(
+                    ai, move, include_successors=include_successors,
+                )
                 if route_start_value is None:
                     route_start_value = probe['currentValue']
                 step = {
@@ -392,6 +526,8 @@ def probe_reference_route(ai, fixture, route_moves, max_probe_steps=None,
                     'topPolicyMoves': probe['topPolicyMoves'],
                     'topValueMoves': probe['topValueMoves'],
                 }
+                if include_successors:
+                    step['successors'] = probe['successors']
                 if ai.search_mode == 'search3' and search3_probe_playouts:
                     step['search3Root'] = _probe_search3_root_for_reference_move(
                         ai, move, search3_probe_playouts,
@@ -649,6 +785,96 @@ def run_direct_solve_case(ai, fixture, max_search_calls=200, max_moves=300,
     if deep20_count:
         result_row['deep20Rate'] = deep20_weighted / deep20_count
     return result_row
+
+
+def run_staged_search3_case(ai, fixture, stage_playouts, max_commit_moves=8):
+    """Offline multi-root Search3 probe with a fixed *total* playout budget.
+
+    On a budget result, commit a bounded principal variation and search again
+    from its endpoint. This is an inference experiment only: it never updates
+    parameters or inserts the route into replay. Compare it with one root
+    search using the sum of ``stage_playouts``.
+    """
+    if ai.search_mode != 'search3':
+        raise ValueError('Staged Search3 requires a Search3 AI')
+    limits = tuple(int(value) for value in stage_playouts)
+    if not limits or any(value < 1 for value in limits) or max_commit_moves < 1:
+        raise ValueError('Stages and max_commit_moves must be positive')
+    cube = ai.cube
+    snapshot = cube._snapshot() if hasattr(cube, '_snapshot') else cube.state.copy()
+    row = {
+        'fixtureId': fixture['fixtureId'],
+        'initialStateHash': fixture['initialStateHash'],
+        'stagePlayouts': list(limits),
+        'maxCommitMoves': int(max_commit_moves),
+        'directSolved': False,
+        'terminalReason': None,
+        'consumedPlayouts': 0,
+        'routeMoves': [],
+        'stages': [],
+    }
+    started = perf_counter()
+    try:
+        cube.reset()
+        cube.scramble(0, Move=tuple(fixture['scramble']))
+        state_hash = hashlib.sha256(''.join(cube.state).encode('ascii')).hexdigest()[:16]
+        if state_hash != fixture['initialStateHash']:
+            raise ValueError(f"Initial state differs for {fixture['fixtureId']}")
+        seen_states = {state_hash}
+        ai.search3_engine.reset_tree()
+        for limit in limits:
+            result = ai.search3(limit)
+            used = max(0, int(result.stats[1]))
+            row['consumedPlayouts'] += used
+            proposed = tuple(result.moves)
+            accepted = proposed if result.succeeded else proposed[:max_commit_moves]
+            stage = {
+                'rootStateHash': state_hash,
+                'requestedPlayouts': limit,
+                'consumedPlayouts': used,
+                'endReason': str(result.end_reason),
+                'rootValue': _finite_float(result.root_value),
+                'bestValue': _finite_float(result.best_value),
+                'proposedMoveCount': len(proposed),
+                'acceptedMoves': [],
+                'playoutDepthMax': int((result.search_diagnostics or {}).get('playoutDepthMax') or 0),
+            }
+            row['stages'].append(stage)
+            for move in accepted:
+                if hasattr(cube, 'is_legal_move') and not cube.is_legal_move(move):
+                    row['terminalReason'] = 'illegal_proposal'
+                    break
+                cube.make_move(move)
+                ai.search3_engine.advance_root(move)
+                state_hash = hashlib.sha256(''.join(cube.state).encode('ascii')).hexdigest()[:16]
+                stage['acceptedMoves'].append(move)
+                row['routeMoves'].append(move)
+                if cube.is_perfect():
+                    row['directSolved'] = True
+                    row['terminalReason'] = 'solved'
+                    break
+                if state_hash in seen_states:
+                    row['terminalReason'] = 'revisited_state'
+                    break
+                seen_states.add(state_hash)
+            if row['terminalReason'] is not None:
+                break
+            if not stage['acceptedMoves']:
+                row['terminalReason'] = 'no_progress'
+                break
+        if row['terminalReason'] is None:
+            row['terminalReason'] = 'total_budget_exhausted'
+        row['terminalStateHash'] = state_hash
+    finally:
+        row['elapsedSeconds'] = round(perf_counter() - started, 6)
+        if hasattr(cube, '_restore'):
+            cube._restore(snapshot)
+        else:
+            cube.state[:] = snapshot
+        ai.search3_engine.reset_tree()
+        if hasattr(ai, 'clear_training_cache'):
+            ai.clear_training_cache(collect=False)
+    return row
 
 
 def summarize_direct_cases(cases):

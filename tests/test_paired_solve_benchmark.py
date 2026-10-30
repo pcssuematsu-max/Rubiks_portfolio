@@ -11,7 +11,8 @@ import numpy as np
 from ai.paired_solve_benchmark import (
     EFFECT_BANDS, fixture_set_id, make_4x4_algorithm_fixtures,
     make_paired_fixtures, make_palm_fixtures, make_perm_fixtures,
-    probe_position_neighborhood, probe_reference_route, run_direct_solve_case,
+    probe_position_neighborhood, probe_reference_route, probe_two_step_escape,
+    run_direct_solve_case, run_staged_search3_case,
     summarize_direct_cases,
 )
 from cube.rubiks_cube import Rubiks_3
@@ -73,6 +74,33 @@ class PairedSolveBenchmarkTests(unittest.TestCase):
         for key,value in weights.items():
             np.testing.assert_array_equal(ai.params[key],value)
 
+        detailed = probe_position_neighborhood(ai, reference, include_successors=True)
+        self.assertEqual(len(detailed['successors']), len(ai.cube.move_keys))
+        self.assertEqual(
+            detailed['legalSuccessorCount'],
+            sum(successor['isLegal'] for successor in detailed['successors']),
+        )
+        self.assertLessEqual(
+            detailed['legalImprovingSuccessorCount'],
+            detailed['improvingSuccessorCount'],
+        )
+        self.assertAlmostEqual(
+            sum(successor['policyProbability'] for successor in detailed['successors']),
+            1.0,
+        )
+        self.assertEqual(
+            detailed['search2RootEligibleImprovingSuccessorCount'],
+            sum(
+                successor['isLegal'] and successor['valueDelta'] > 0
+                and successor['policyProbability']
+                >= detailed['search2RootEnqueueProbabilityThreshold']
+                for successor in detailed['successors']
+            ),
+        )
+        two_step = probe_two_step_escape(ai, detailed)
+        self.assertLessEqual(two_step['sampledFirstMoveCount'], 6)
+        np.testing.assert_array_equal(ai.cube.state, original)
+
     def test_reference_route_probe_finds_each_step_and_restores_cube(self):
         ai = Rubiks_3_AI([8], cube_size=3, search_mode='search2')
         scramble = (' U ', ' R ')
@@ -103,6 +131,23 @@ class PairedSolveBenchmarkTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'does not solve'):
             probe_reference_route(ai, fixture, (' U ',))
         np.testing.assert_array_equal(ai.cube.state, original)
+
+    def test_search3_fixed_route_probe_reports_prior_and_visit_leaders(self):
+        ai = Rubiks_3_AI([8], cube_size=3, search_mode='search3')
+        scramble = (' U ', ' R ')
+        fixture = _fixture(scramble, ai.cube)
+        route = tuple(ai.cube.invert_moves(scramble))
+        probe = probe_reference_route(
+            ai, fixture, route, max_probe_steps=1,
+            search3_probe_playouts=12, trace_search3_root=True,
+        )['steps'][0]['search3Root']
+        self.assertIn(probe['topPolicyMove'], ai.cube.move_keys)
+        self.assertIn(probe['topVisitedMove'], ai.cube.move_keys)
+        self.assertGreaterEqual(probe['topPolicyPrior'], probe['referencePrior'])
+        self.assertGreaterEqual(probe['topVisitShare'], probe['referenceVisitShare'])
+        self.assertGreaterEqual(probe['topVisitShare'], probe['topPolicyVisitShare'])
+        self.assertIsNotNone(probe['topVisitedPrior'])
+        self.assertIsNotNone(probe['topVisitedBackedMean'])
 
     def test_fixtures_are_balanced_unique_and_deterministic(self):
         before = random.getstate()
@@ -211,6 +256,25 @@ class PairedSolveBenchmarkTests(unittest.TestCase):
         self.assertEqual(row['playouts'], 10)
         self.assertEqual(row['playoutDepthMean'], 4.0)
         self.assertTrue(ai.cube.is_perfect())
+
+    def test_staged_search3_re_roots_without_changing_saved_cube(self):
+        ai = _FakeAI([], mode='search3')
+        results = iter([
+            SearchResult(False, (" R'",), 0.2, [0.2, 0.4], 0.4,
+                         [1, 7], search_mode='search3', end_reason='budget'),
+            SearchResult(True, (" U'",), 0.4, [0.4, 1.0], 1.0,
+                         [1, 5], search_mode='search3', end_reason='solved'),
+        ])
+        ai.search3 = lambda _limit: next(results)
+        fixture = _fixture((' U ', ' R '), ai.cube)
+        ai.cube.scramble(0, Move=(' F ',))
+        original = ai.cube.state.copy()
+        row = run_staged_search3_case(ai, fixture, (7, 7, 7))
+        self.assertTrue(row['directSolved'])
+        self.assertEqual(row['consumedPlayouts'], 12)
+        self.assertEqual(row['routeMoves'], [" R'", " U'"])
+        self.assertEqual(len(row['stages']), 2)
+        np.testing.assert_array_equal(ai.cube.state, original)
 
     def test_summary_and_index_selection(self):
         rows = [

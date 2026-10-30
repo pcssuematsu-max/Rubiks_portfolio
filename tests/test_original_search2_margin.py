@@ -40,3 +40,23 @@ class OriginalSearch2MarginTests(unittest.TestCase):
         np.testing.assert_allclose(
             tensor.grad.detach().numpy(), expected.backward().reshape(-1), rtol=1e-6,
         )
+
+    @unittest.skipIf(torch is None, 'PyTorch unavailable')
+    def test_search3_rank_loss_uses_the_value_weight_of_each_route(self):
+        values = np.array([[1.0, 2.0, 3.0, 0.0, 4.0]], dtype='f')
+        indices = [0, 3, 5]
+        weights = np.array([[0.2, 0.2, 0.2, 0.8, 0.8]], dtype='f')
+        numpy_rank = Myloss()
+        numpy_loss = numpy_rank.forward(values, indices, weights)
+        tensor = torch.tensor(values.reshape(-1), requires_grad=True)
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+
+        torch_loss = ai._torch_search2_value_loss_softmax(
+            tensor, indices, state_weights=torch.tensor(weights.reshape(-1)),
+        )
+        torch_loss.backward()
+
+        self.assertAlmostEqual(float(torch_loss.detach()), numpy_loss, places=6)
+        np.testing.assert_allclose(
+            tensor.grad.detach().numpy(), numpy_rank.backward().reshape(-1), rtol=1e-6,
+        )

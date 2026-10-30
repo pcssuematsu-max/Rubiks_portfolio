@@ -232,21 +232,6 @@ def _default_initial_scramble_groups(size,puzzle_type):
     elif size == 4:
         return (
             [
-                (" R ","2U "," R'"),
-                ("2R ","2F'","2R'"),
-                ("2R "," U ","2R'"),
-                (" R "," U "," R'"),
-                ("2F ","2R2"," R2"),
-                ("2F ","2U2"," U2"),
-                (" F "," R ","2U "," R'"," F'"),
-                (" R'"," F ","2U "," F'"," R "),
-                (" F2"," R ","2U "," R'"," F2"),
-                (" R2"," F ","2U "," F'"," R2"),
-                (" F "," R ","2U2"," R'"," F'"),
-                (" R'"," F ","2U2"," F'"," R "),
-                (" F2"," R ","2U2"," R'"," F2"),
-                (" R2"," F ","2U2"," F'"," R2"),
-                ("2U "," R "," U'"," R'","2U'"),
                 (" R "," U2"," R'"," L'"," U2"," L ","2R2"," F2","2R'"," B2","2R "," F2","2R'"," B2","2R'"),
                 (" U2"," R "," U2"," R'"," L'"," U2"," L "," U2","2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2"),
                 (" F "," R "," F'","2U "," F "," R'"," F'"),
@@ -269,12 +254,18 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
                 (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'") + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
                 (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'") + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
-
-
-
-
-                (" L2", " F2", " U2", " L'", " U2", " L2", " F2", " L'", " U2", " L2", " U2", " F2", " L'", " F2"),
-
+                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" R'"," F "," R "," U "," R'"," U'"," F'"," U "," R "),
+                (" R'"," F "," R "," U "," R'"," U'"," F'"," U "," R ") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
+                (" R'"," F "," R "," U "," R'"," U'"," F'"," U "," R ") + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
+                (" R'"," F "," R "," U "," R'"," U'"," F'"," U "," R ") + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
+                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" R'"," U'"," F "," U "," R "," U'"," R'"," F'"," R "),
+                (" R'"," U'"," F "," U "," R "," U'"," R'"," F'"," R ") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
+                (" R'"," U'"," F "," U "," R "," U'"," R'"," F'"," R ") + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
+                (" R'"," U'"," F "," U "," R "," U'"," R'"," F'"," R ") + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
+                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" R "," U "," R'"," F "," R'"," F'"," R "),
+                (" R "," U "," R'"," F "," R'"," F'"," R ") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
+                (" R "," U "," R'"," F "," R'"," F'"," R ") + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
+                (" R "," U "," R'"," F "," R'"," F'"," R ") + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
                 (" R "," B'"," R'"," F "," R "," B "," R'"," F'","2R2"," F2","2R'"," B2","2R "," F2","2R'"," B2","2R'","2F "," R2","2F "," L2","2F'"," R2","2F "," L2","2F2"),
                 (" L2", " F2", " U2", " L'", " U2", " L2", " F2", " L'", " U2", " L2", " U2", " F2", " L'", " F2","2R2"," B2","2R "," F2","2R'"," B2","2R "," F2","2R ","2F'"," L2","2F'"," R2","2F "," L2","2F'"," R2","2F2"),
                 (" R "," U "," R'"," U'"," F'"," U "," F ") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'),
@@ -293,10 +284,35 @@ def _default_initial_scramble_groups(size,puzzle_type):
                 ("2R2","2F2","2U2","2F2","2R2"," F ","2R2","2U ","2R2","2U'"," F'"),
                 (" F2","2U "," F2","2U "," F2","2U "," F2","2U "," F2","2U2","2R2","2U ","2R2"," F2"),
 
+                ("2R ","2U ","2R'"," F ","2R ","2U'","2R'"),
+                ("2R ","2U'","2R'"," F ","2R ","2U ","2R'"),
+                ("2R ","2U2","2R'"," F ","2R ","2U2","2R'"),
+                ("2R ","2U ","2R'"," F2","2R ","2U'","2R'"),
+                ("2R ","2U'","2R'"," F2","2R ","2U ","2R'"),
+                ("2R ","2U2","2R'"," F2","2R ","2U2","2R'"),
+
+                (" R ","2U2"," R'"," U2"," R ","2U2"," R'"," U2"),
+                (" U "," R ","2U2"," R'"," U2"," R ","2U2"," R'"," U "),
+                (" U'"," R ","2U2"," R'"," U2"," R ","2U2"," R'"," U'"),
+                (" U2"," R ","2U2"," R'"," U2"," R ","2U2"," R'"),
+
+                ("2R "," U ","2R'"," D ","2R "," U'","2R'"," D'"),
+                ("2R'"," U ","2R'"," D ","2R "," U'","2R'"," D'","2R2"),
+                ("2R2"," U ","2R'"," D ","2R "," U'","2R'"," D'","2R'"),
+                (" U ","2R'"," D ","2R "," U'","2R'"," D'","2R "),
+
+                ('2U2', "2F'", ' L ', '2F ', ' R ', "2F'", " L'", '2F ', " R'", '2U2'),
+                ('2U2', ' R ', "2F'", ' L ', '2F ', " R'", "2F'", " L'", '2F ', '2U2'),
+                ('2D2', "2B'", ' R ', '2B ', ' L ', "2B'", " R'", '2B ', " L'", '2D2'),
+                ('2D2', ' L ', "2B'", ' R ', '2B ', " L'", "2B'", " R'", '2B ', '2D2'),
+
+
+
 
 
             ],
             [
+                (" L2", " F2", " U2", " L'", " U2", " L2", " F2", " L'", " U2", " L2", " U2", " F2", " L'", " F2","2F2"," R2"," U2","2F2"," U2"," R2","2F2"),
             ],
             [
             ],
@@ -479,11 +495,12 @@ def build_experiment_frame_config():
     # route-wise relative ordering objective. AI20 and pairwise AIs are controls.
     search2_rank_loss_mixes = [1.0 if index == 22 else 0.0 for index in range(ai_count)]
     search2_rank_loss_apply_types = ['all'] * 20 + ['none','none','steps_pairwise','none','none']
-    # Transformer Search3: fixed validation shows the rank-loss pair (10/11)
-    # orders value states more reliably than its no-rank baseline (18/19).
-    # Raise only that treatment to 0.10 while retaining the latter as control.
-    search3_rank_loss_mixes = [
-        0.10 if ai_index in (10,11) else 0.0
+    # The experimental pairwise Value objective is complete on its own.
+    search3_rank_loss_mixes = [0.0] * ai_count
+    # Experiment: train every Search3 Value head from adjacent successful
+    # route comparisons and search with its raw output.
+    search3_value_loss_types = [
+        'absolute' if is_search2_ai[ai_index] else 'pairwise'
         for ai_index in range(ai_count)
     ]
     # Use one fixed 10k-playout budget for every Search3 AI.  Branches start
@@ -687,11 +704,11 @@ def build_experiment_frame_config():
         # spreading its ten AIs evenly across five fixed thresholds.  The
         # connected-route objectives instead search nearly to their budget.
         search2_skip_differences = [
-            1.0, 5.0,                  # Original Linear: AI0-1
+            30.0, 50.0,                  # Original Linear: AI0-1
             *([1.0] * 6),             # Search3: AI2-7 (unused)
-            20.0, 100.0,              # Original Linear: AI8-9
+            70.0, 100.0,              # Original Linear: AI8-9
             1.0, 1.0,                 # Search3: AI10-11 (unused)
-            1.0, 5.0, 10.0, 10.0, 20.0, 100.0,  # Original Transformer: AI12-17
+            30.0, 30.0, 50.0, 50.0, 70.0, 70.0,  # Original Transformer: AI12-17
             1.0, 1.0,                 # Search3: AI18-19 (unused)
             *([1000.0] * 5),          # steps_to_goal / pairwise: AI20-24
         ],
@@ -718,6 +735,7 @@ def build_experiment_frame_config():
         search2_rank_loss_mixes = search2_rank_loss_mixes,
         search2_rank_loss_apply_types = search2_rank_loss_apply_types,
         search3_rank_loss_mixes = search3_rank_loss_mixes,
+        search3_value_loss_types = search3_value_loss_types,
         torch_training_devices = [
             'cpu' if original_transformer_attention[ai_index] else 'auto'
             for ai_index in range(ai_count)

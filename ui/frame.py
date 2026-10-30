@@ -195,6 +195,7 @@ class Frame(Tk.Frame):
             search2_rank_loss_mixes = config.search2_rank_loss_mixes,
             search2_rank_loss_apply_types = config.search2_rank_loss_apply_types,
             search3_rank_loss_mixes = config.search3_rank_loss_mixes,
+            search3_value_loss_types = config.search3_value_loss_types,
             torch_training_devices = config.torch_training_devices,
             use_torch = config.use_torch,
             use_torch_predict = config.use_torch_predict,
@@ -664,6 +665,7 @@ class Frame(Tk.Frame):
                                    search2_rank_loss_mixes = None,
                                    search2_rank_loss_apply_types = None,
                                    search3_rank_loss_mixes = None,
+                                   search3_value_loss_types = None,
                                    torch_training_devices = None,
                                    use_torch = None,
                                    use_torch_predict = None,
@@ -856,6 +858,8 @@ class Frame(Tk.Frame):
                 self.AIs[i].set_search2_rank_loss_apply_type(search2_rank_loss_apply_types[i])
             if search3_rank_loss_mixes is not None:
                 self.AIs[i].set_search3_rank_loss_mix(search3_rank_loss_mixes[i])
+            if search3_value_loss_types is not None:
+                self.AIs[i].set_search3_value_loss_type(search3_value_loss_types[i])
             if torch_training_devices is not None:
                 self.AIs[i].torch_training_device = str(torch_training_devices[i])
             if use_torch is not None:

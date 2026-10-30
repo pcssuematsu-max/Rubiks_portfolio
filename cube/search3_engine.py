@@ -34,6 +34,15 @@ class Search3Engine:
         self.node_cache = {}
         self.prediction_cache = {}
         self.last_move = None
+
+    def _raw_pairwise_value(self):
+        return getattr(self.ai,'search3_value_loss_type','absolute') == 'pairwise'
+
+    def _search_value(self, raw_value):
+        return float(raw_value) if self._raw_pairwise_value() else sigmoid(raw_value)
+
+    def _dead_end_value(self, node):
+        return node.value - 1.0 if self._raw_pairwise_value() else 0.0
     
     def reset_tree(self):
         self.root_node = None
@@ -155,7 +164,7 @@ class Search3Engine:
 
     def _create_node(self, state_key, node_P, node_value=None, C=None):
         node_C = self.ai.search3_C if C is None else C
-        node = Node(node_P, state_key, node_value, C=node_C)
+        node = Node(node_P, state_key, node_value, C=node_C, raw_value=self._raw_pairwise_value())
         self.node_cache[state_key] = node
         return node
 
@@ -270,15 +279,17 @@ class Search3Engine:
             root_P = self._node_policy_from_prediction(root_prediction)
             self.root_node = self._create_node(self._state_key(), root_P, root_value, C=C)
             self.root_state_key = self._state_key()
+        else:
+            self.root_node.set_value_from_logit(root_value)
         return root_value
 
     def _evaluate_move_sequence(self, moves):
         moves = self._legal_prefix(moves)
         if len(moves) == 0:
-            return sigmoid(self._predict_current_state()[-1, 0])
+            return self._search_value(self._predict_current_state()[-1, 0])
         for move in moves:
             self.cube.make_move(move)
-        leaf_value = sigmoid(self._predict_current_state()[-1, 0])
+        leaf_value = self._search_value(self._predict_current_state()[-1, 0])
         for move in self.cube.invert_moves(tuple(moves)):
             self.cube.make_move(move)
         return leaf_value
@@ -290,7 +301,7 @@ class Search3Engine:
             return value_trace
         for move in moves:
             self.cube.make_move(move)
-            value_trace.append(sigmoid(self._predict_current_state()[-1, 0]))
+            value_trace.append(self._search_value(self._predict_current_state()[-1, 0]))
         for move in self.cube.invert_moves(tuple(moves)):
             self.cube.make_move(move)
         return value_trace
@@ -338,7 +349,7 @@ class Search3Engine:
         self.last_move = move
 
     def _backup_path(self, path_nodes, path_indices, node_value):
-        gamma = float(getattr(self.ai, 'value_target_gamma', 1.0))
+        gamma = 1.0 if self._raw_pairwise_value() else float(getattr(self.ai, 'value_target_gamma', 1.0))
         backed_value = float(node_value)
         for depth in range(len(path_indices) - 1, -1, -1):
             backed_value *= gamma
@@ -382,7 +393,7 @@ class Search3Engine:
                     'path_nodes': path_nodes,
                     'path_indices': path_indices,
                     'path_moves': path_moves,
-                    'node_value': 0.0,
+                    'node_value': self._dead_end_value(node),
                     'selectionCs': selection_cs,
                     'wideningLimits': widening_limits,
                 }
@@ -401,7 +412,7 @@ class Search3Engine:
                     'path_nodes': path_nodes,
                     'path_indices': path_indices,
                     'path_moves': path_moves,
-                    'node_value': 0.0,
+                    'node_value': self._dead_end_value(node),
                     'selectionCs': selection_cs,
                     'wideningLimits': widening_limits,
                 }
@@ -417,7 +428,7 @@ class Search3Engine:
                     'path_nodes': path_nodes,
                     'path_indices': path_indices,
                     'path_moves': path_moves,
-                    'node_value': 0.0,
+                    'node_value': self._dead_end_value(node),
                     'selectionCs': selection_cs,
                     'wideningLimits': widening_limits,
                 }
@@ -428,7 +439,7 @@ class Search3Engine:
                     'path_nodes': path_nodes,
                     'path_indices': path_indices,
                     'path_moves': path_moves,
-                    'node_value': 1.0,
+                    'node_value': None if self._raw_pairwise_value() else 1.0,
                     'selectionCs': selection_cs,
                     'wideningLimits': widening_limits,
                 }
@@ -444,7 +455,7 @@ class Search3Engine:
                     'path_moves': path_moves,
                     'selectionCs': selection_cs,
                     'wideningLimits': widening_limits,
-                    'node_value': 0.0,
+                    'node_value': self._dead_end_value(node),
                 }
             if len(path_moves) >= max_depth:
                 return {
@@ -507,7 +518,7 @@ class Search3Engine:
     def search3(self, N, C=0.05, trace_root_move=None):
         """Run PUCT, optionally tracing one root action for an offline comparison."""
         root_value_raw = self._ensure_root_node(C=C)
-        root_value = sigmoid(root_value_raw)
+        root_value = self._search_value(root_value_raw)
         root_node = self.root_node
         solved_move = None
         remaining_playouts = N
@@ -525,7 +536,7 @@ class Search3Engine:
             target_index = self.cube.key_to_num[trace_root_move]
             root_trace = {
                 'targetMove': trace_root_move,
-                'valueDomain': 'sigmoid_0_1',
+                'valueDomain': 'raw_pairwise' if self._raw_pairwise_value() else 'sigmoid_0_1',
                 'targetIndex': target_index,
                 'targetPolicyPrior': float(root_node.P[target_index]),
                 'rootValue': float(root_node.value),
@@ -559,7 +570,8 @@ class Search3Engine:
                 widening_limits.extend(leaf_path.get('wideningLimits',()))
                 self._revert_path(leaf_path['path_moves'])
                 if leaf_path['resolved']:
-                    self._backup_path(leaf_path['path_nodes'], leaf_path['path_indices'], leaf_path['node_value'])
+                    if leaf_path.get('solved_move') is None or not self._raw_pairwise_value():
+                        self._backup_path(leaf_path['path_nodes'], leaf_path['path_indices'], leaf_path['node_value'])
                     if leaf_path.get('solved_move') is not None:
                         solved_move = leaf_path['solved_move']
                         break
@@ -574,10 +586,10 @@ class Search3Engine:
                 if target_child is not None:
                     root_trace['firstChildValue'] = float(target_child.value)
                 elif solved_move is not None and solved_move[0] == trace_root_move:
-                    root_trace['firstChildValue'] = 1.0
+                    root_trace['firstChildValue'] = None if self._raw_pairwise_value() else 1.0
                 if root_trace['firstChildValue'] is not None:
                     root_trace['firstBackedValue'] = (
-                        float(getattr(self.ai, 'value_target_gamma', 1.0))
+                        (1.0 if self._raw_pairwise_value() else float(getattr(self.ai, 'value_target_gamma', 1.0)))
                         * root_trace['firstChildValue']
                     )
 
@@ -606,9 +618,9 @@ class Search3Engine:
 
         if solved_move is not None:
             best_moves = self._legal_prefix(solved_move)
-            best_value = 1.0
             raw_value_trace = self._raw_value_trace_for_moves(root_value_raw, best_moves)
             raw_best_value = raw_value_trace[-1]
+            best_value = raw_best_value if self._raw_pairwise_value() else 1.0
             value_trace = self._value_trace_for_moves(root_value, best_moves)
             if len(value_trace) > 0:
                 value_trace[-1] = best_value
@@ -625,7 +637,7 @@ class Search3Engine:
         best_moves = self._bounded_budget_moves(root_value, best_moves)
         raw_value_trace = self._raw_value_trace_for_moves(root_value_raw, best_moves)
         best_value_raw = raw_value_trace[-1]
-        best_value = sigmoid(best_value_raw)
+        best_value = self._search_value(best_value_raw)
         value_trace = self._value_trace_for_moves(root_value, best_moves)
         result = SearchResult(False, best_moves, root_value, value_trace, best_value, stats, local_visits.copy(), self.ai.search_mode, 'budget', root_value_raw=root_value_raw, value_trace_raw=raw_value_trace, best_value_raw=best_value_raw, search_diagnostics=search_diagnostics)
         if root_trace is not None:
@@ -681,11 +693,12 @@ class Search3Engine:
 
 
 class Node:
-    """PUCT node whose value is a normalized prior for unvisited actions."""
+    """PUCT node with matching Value scales for visited and unvisited actions."""
 
-    def __init__(self, P, state_key=None, value=None, C=0.05):
+    def __init__(self, P, state_key=None, value=None, C=0.05, raw_value=False):
         self.P = P
         self.state_key = state_key
+        self.raw_value = bool(raw_value)
         self.set_value_from_logit(value)
         self.val = np.zeros_like(P, dtype='f')
         self.visited = np.zeros_like(P, dtype='i')
@@ -697,8 +710,8 @@ class Node:
         self.score = None
 
     def set_value_from_logit(self, value_logit):
-        """Keep unvisited-action estimates on the backup value's [0, 1] scale."""
-        self.value = sigmoid(value_logit)
+        """Use the same Value domain for unvisited and visited actions."""
+        self.value = float(value_logit) if self.raw_value else sigmoid(value_logit)
 
     def select_node(self, invalid_index=None, C=None, action_limit=0, selection_trace=None):
         masked = self.blocked.copy()
@@ -725,6 +738,8 @@ class Node:
                 masked |= restricted
         if selection_trace is not None:
             selection_trace['targetAllowed'] = not bool(masked[selection_trace['targetIndex']])
+        # An unvisited action uses this node's own predicted Value. In
+        # pairwise mode it is the raw output, without sigmoid or discount.
         average_value = np.full_like(self.P, self.value, dtype='f')
         np.divide(self.val, self.visited, out=average_value, where=self.visited != 0)
         exploration_c = self.C if C is None else float(C)

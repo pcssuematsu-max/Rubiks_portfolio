@@ -110,6 +110,9 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "policyEffectiveStateCount": _finite_number(metrics.get("policyEffectiveStateCount")),
         "valueBcePerState": _finite_number(metrics.get("valueBcePerState")),
         "valueMae": _finite_number(metrics.get("valueMae")),
+        "search3ValueLossType": str(metrics.get("search3ValueLossType") or getattr(ai,"search3_value_loss_type","absolute")),
+        "valuePairwiseLossPerPair": _finite_number(metrics.get("valuePairwiseLossPerPair")),
+        "valuePairwiseMarginHitRate": _finite_number(metrics.get("valuePairwiseMarginHitRate")),
         "valueStartToEndDelta": _finite_number(metrics.get("valueStartToEndDelta")),
         "valueTargetStartToEndDelta": _finite_number(metrics.get("valueTargetStartToEndDelta")),
         "valueEffectiveStateCount": _finite_number(metrics.get("valueEffectiveStateCount")),
@@ -178,6 +181,7 @@ def _validate_record(record: Any) -> None:
         # so existing local history files stay readable.
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
+        "search3ValueLossType", "valuePairwiseLossPerPair", "valuePairwiseMarginHitRate",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
         "valueSequenceCount", "fixedValidation", "trainingSample", "trainingDataSources", "search3TrainingWeights", "gradientMetrics", "stepsToGoalRegression", "search3RankLossMix",
         "search2BaseLossPerItem", "search2RankLossPerItem", "search2PlateauEscapeLossPerItem", "search2ValueLossMargin", "search2RankLossMix", "search2RankLossApplyType",
@@ -196,10 +200,13 @@ def _validate_record(record: Any) -> None:
     for field in (
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
+        "valuePairwiseLossPerPair", "valuePairwiseMarginHitRate",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
     ):
         _validate_optional_number(record.get(field))
     value_sequence_count = record.get("valueSequenceCount")
+    if "search3ValueLossType" in record and not isinstance(record["search3ValueLossType"],str):
+        raise ValueError("Invalid Search3 Value loss type")
     if value_sequence_count is not None and (
         isinstance(value_sequence_count,bool)
         or not isinstance(value_sequence_count,int)
@@ -284,7 +291,7 @@ _FIXED_VALIDATION_NUMBERS = frozenset({
 # Regression-only metrics were added after the first fixed-validation records.
 # Keep them optional so older histories and non-regression AIs remain readable.
 _FIXED_VALIDATION_OPTIONAL_NUMBERS = frozenset({
-    "valueSignedError", "valueRmse",
+    "valueSignedError", "valueRmse", "valueAdjacentPairLoss", "valueAdjacentMarginHitRate",
 })
 
 

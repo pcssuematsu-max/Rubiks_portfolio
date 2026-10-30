@@ -713,6 +713,7 @@ class SolveSessionManager:
             self.frame.N,
             AI.search_mode,
             getattr(AI,'search2_value_loss_type',None),
+            getattr(AI,'search3_value_loss_type',None),
         )
         if update_state_viewer:
             self.frame.set_color(AI.cube.state)
@@ -721,6 +722,9 @@ class SolveSessionManager:
     def _display_value_deltas(self, search_result):
         """探索結果を表示用のvalue系列へ変換する。"""
         if search_result.search_mode in ('search3', 'transformer'):
+            ai = self.frame.AIs[self.frame.AI_idx]
+            if getattr(ai,'search3_value_loss_type','absolute') == 'pairwise':
+                return [value - ai.perfect_val for value in search_result.value_trace]
             return search_result.value_trace.copy()
         return [value - self.frame.AIs[self.frame.AI_idx].perfect_val for value in search_result.value_trace]
 
@@ -1362,6 +1366,7 @@ class SolveSessionManager:
             self.frame.N,
             AI.search_mode,
             getattr(AI,'search2_value_loss_type',None),
+            getattr(AI,'search3_value_loss_type',None),
         )
         self.frame.set_color(AI.cube.state)
 
@@ -1806,6 +1811,8 @@ class SolveSessionManager:
                 'longMaxRatio': getattr(ai, 'train_long_sequence_max_ratio', None),
             },
             'search3RankLossMix': getattr(ai, 'search3_rank_loss_mix', None),
+            'search3ValueLossType': getattr(ai, 'search3_value_loss_type', 'absolute'),
+            'search3PairwiseMargin': getattr(ai, 'search3_pairwise_margin', None),
             'gradientLogging': bool(getattr(ai, 'gradient_log_enabled', False)),
             'torchPredict': getattr(ai, 'use_torch_predict', None),
             'torchTraining': getattr(ai, 'use_torch_training', None),
@@ -1997,6 +2004,8 @@ class SolveSessionManager:
         loss_type = str(getattr(source_ai, 'search2_value_loss_type', '') or '')
         if loss_type == 'steps_to_goal':
             return 'steps_to_goal'
+        if loss_type == 'myloss2_pairwise':
+            return 'pairwise'
         if str(source_search_mode or '') in ('search3', 'transformer'):
             return 'search3'
         return 'original_search2'

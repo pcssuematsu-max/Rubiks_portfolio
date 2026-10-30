@@ -6,6 +6,7 @@ import numpy as np
 from collections import Counter
 
 from model.search_result import data_search3
+from core.training_weights import SEARCH3_GREEDY_FALLBACK_WEIGHT
 
 
 def sigmoid(x):
@@ -25,6 +26,8 @@ class SearchDataManager:
         loss_type = str(getattr(source_ai, 'search2_value_loss_type', '') or '')
         if loss_type == 'steps_to_goal':
             return 'steps_to_goal'
+        if loss_type == 'myloss2_pairwise':
+            return 'pairwise'
         if mode in ('search3', 'transformer'):
             return 'search3'
         return 'original_search2'
@@ -114,6 +117,7 @@ class SearchDataManager:
         source_ai = self.frame.AIs[self.frame.AI_idx]
         next_index = len(ai.datas_search3)
         sample_cache = self._search3_sample_cache(state)
+        pairwise_segments = []
         for history_index, history_item in enumerate(state.search_history):
             if history_index not in sample_cache:
                 sample_cache[history_index] = self.build_search3_training_sample(
@@ -125,9 +129,61 @@ class SearchDataManager:
             if search_data is None:
                 continue
             search_data.solve_succeeded = True
+            if getattr(ai,'search3_value_loss_type','absolute') == 'pairwise':
+                pairwise_segments.append(search_data)
+                continue
             ai.datas_search3.append(search_data)
             ai.indices_search3.append(next_index)
             next_index += 1
+        if pairwise_segments:
+            connected = self.build_connected_pairwise_search3_sample(pairwise_segments,ai)
+            ai.datas_search3.append(connected)
+            ai.indices_search3.append(next_index)
+
+    def build_connected_pairwise_search3_sample(self, segments, ai):
+        """Keep all successful moves and segment Policy labels in one Value route."""
+        first = segments[0]
+        moves = tuple(move for segment in segments for move in segment.moves)
+        policy_targets_by_step = {}
+        value_step_weights = []
+        policy_step_weights = []
+        offset = 0
+        for segment in segments:
+            if segment.search_mode == 'search3' and segment.policy_target is not None:
+                policy_targets_by_step[offset] = np.asarray(segment.policy_target,dtype='f').copy()
+            for local_index in range(len(segment.moves)):
+                value_step_weights.append(ai._search3_step_weight(segment,local_index))
+                policy_step_weights.append(ai._search3_policy_step_weight(segment,local_index))
+            offset += len(segment.moves)
+        value_step_weights.append(ai._search3_terminal_step_weight(segments[-1]))
+        connected = data_search3(
+            first.scramble,
+            moves,
+            np.zeros(len(moves) + 1,dtype='f'),
+            first.root_value,
+            [],
+            segments[-1].best_value,
+            {'source': 'search3_pairwise_connected'},
+            policy_target = policy_targets_by_step.get(0),
+            search_mode = getattr(ai,'search_mode','search3'),
+            sample_weight = 1.0,
+            value_targets = np.zeros(len(moves) + 1,dtype='f'),
+            root_value_raw = first.root_value_raw,
+            best_value_raw = segments[-1].best_value_raw,
+            perfect_key = first.perfect_key,
+            top_group = first.top_group,
+            end_reason = 'solved',
+            source_succeeded = any(segment.source_succeeded for segment in segments),
+            solve_succeeded = True,
+            steps_to_goal = len(moves),
+            trajectory_source = 'mixed' if len({segment.trajectory_source for segment in segments}) > 1 else first.trajectory_source,
+            source_objective = first.source_objective,
+            training_target = 'search3',
+        )
+        connected.policy_targets_by_step = policy_targets_by_step
+        connected.value_step_weights = tuple(value_step_weights)
+        connected.policy_step_weights = tuple(policy_step_weights)
+        return connected
 
     def store_connected_search3_data(self, source_ai):
         """Store one completed direct route as one Search3 training sample.
@@ -231,7 +287,12 @@ class SearchDataManager:
             segment_moves,
             source_ai,
         )
-        value_trace = [sigmoid(value) for value in value_trace_raw]
+        value_trace = (
+            list(value_trace_raw)
+            if getattr(source_ai,'search3_value_loss_type','absolute') == 'pairwise'
+            and getattr(source_ai,'search_mode',None) in ('search3','transformer')
+            else [sigmoid(value) for value in value_trace_raw]
+        )
         return data_search3(
             history_item['scramble'],
             segment_moves,
@@ -350,7 +411,7 @@ class SearchDataManager:
         if search_result.search_mode == 'search2':
             return 1.0
         if search_result.search_mode == 'myval':
-            return 0.2
+            return SEARCH3_GREEDY_FALLBACK_WEIGHT
         return 1.0
 
     def dataset_summary_text(self, ai_index):

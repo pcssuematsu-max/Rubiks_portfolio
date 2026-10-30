@@ -34,8 +34,8 @@ def evaluate_fixed_validation(ai) -> dict[str, object]:
     the canonical inverse-route length, not necessarily the shortest distance.
     Standard Search2 values are ordinal within
     a path, while ``steps_to_goal`` is calibrated directly in move units and
-    Search3 values are sigmoid probabilities; their calibration metrics are
-    kept separate.
+    Absolute Search3 values are sigmoid probabilities. Pairwise Search3 uses
+    raw ordinal values, so its adjacent-margin quality is reported separately.
     """
     cube = ai.cube
     original_state = cube.state.copy()
@@ -184,7 +184,19 @@ def _quality_metrics(ai, policy_logits, raw_values, policy_targets, value_target
         "valueTargetMean": float(np.mean(value_targets)),
         "valueTargetStd": float(np.std(value_targets)),
     }
-    if getattr(ai, "search_mode", "") == "search3":
+    if getattr(ai, "search_mode", "") == "search3" and getattr(ai,"search3_value_loss_type","absolute") == "pairwise":
+        differences = np.concatenate([
+            raw_values[path_slice.start + 1:path_slice.stop]
+            - raw_values[path_slice.start:path_slice.stop - 1]
+            for path_slice in path_slices if path_slice.stop - path_slice.start > 1
+        ]) if path_slices else np.zeros(0,dtype='f')
+        metrics["valueAdjacentPairLoss"] = (
+            float(np.mean(np.logaddexp(0.0,1.0 - differences))) if differences.size else None
+        )
+        metrics["valueAdjacentMarginHitRate"] = (
+            float(np.mean(differences >= 1.0)) if differences.size else None
+        )
+    elif getattr(ai, "search_mode", "") == "search3":
         predicted_probability = _sigmoid(raw_values)
         metrics["valueMae"] = float(np.mean(np.abs(predicted_probability - value_targets)))
         metrics["valueBce"] = _binary_cross_entropy(predicted_probability, value_targets)

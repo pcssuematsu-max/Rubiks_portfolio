@@ -7,6 +7,8 @@ from types import SimpleNamespace
 import numpy as np
 
 from ai.rubiks_ai import Rubiks_3_AI
+from managers.search_data import SearchDataManager
+from managers.solve_session import SolveSessionManager
 from core.learning_history import (
     LEARNING_HISTORY_RECORDS_PER_AI,
     LearningHistoryStore,
@@ -94,6 +96,22 @@ class _FakeAI:
 
 
 class LearningHistoryTests(unittest.TestCase):
+    def test_search2_source_objective_uses_producer_loss_type(self):
+        for loss_type, expected in (
+            ('myloss2', 'original_search2'),
+            ('steps_to_goal', 'steps_to_goal'),
+            ('myloss2_pairwise', 'pairwise'),
+        ):
+            with self.subTest(loss_type=loss_type):
+                source_ai = SimpleNamespace(
+                    search_mode='search2', search2_value_loss_type=loss_type,
+                )
+                self.assertEqual(SearchDataManager.source_objective(source_ai), expected)
+                self.assertEqual(
+                    SolveSessionManager._training_source_objective(source_ai, 'search2'),
+                    expected,
+                )
+
     def test_compacts_history_per_ai_without_mixing_the_recent_windows(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / 'learning.json'
@@ -274,16 +292,46 @@ class LearningHistoryTests(unittest.TestCase):
                             source_objective='search3', trajectory_source='search3-fallback-prefix'),
             SimpleNamespace(moves=(0, 1), search_mode='myval', sample_weight=0.2,
                             source_objective='search3', trajectory_source='greedy-fallback'),
+            SimpleNamespace(moves=(0, 1), search_mode='search2', sample_weight=1.0,
+                            source_objective='original_search2', trajectory_source='direct-search'),
+            SimpleNamespace(moves=(0, 1), search_mode='search2', sample_weight=1.0,
+                            source_objective='steps_to_goal', trajectory_source='direct-search'),
+            SimpleNamespace(moves=(0, 1), search_mode='search2', sample_weight=1.0,
+                            source_objective='pairwise', trajectory_source='direct-search'),
         ]
-        summary = Rubiks_3_AI._search3_training_weight_summary([0, 1, 2], data)
+        summary = Rubiks_3_AI._search3_training_weight_summary(range(len(data)), data)
         self.assertEqual(summary['search3:direct_search']['trajectoryCount'], 1)
         self.assertEqual(summary['search3:direct_search']['stateCount'], 3)
-        self.assertAlmostEqual(summary['search3:direct_search']['policyWeightSum'], 1.7)
-        self.assertAlmostEqual(summary['search3:direct_search']['valueWeightSum'], 2.7)
-        self.assertAlmostEqual(summary['search3:fallback_prefix']['policyWeightSum'], 2.4)
-        self.assertAlmostEqual(summary['search3:fallback_prefix']['valueWeightSum'], 3.4)
-        self.assertAlmostEqual(summary['search3:greedy_fallback']['policyWeightSum'], 0.4)
-        self.assertAlmostEqual(summary['search3:greedy_fallback']['valueWeightSum'], 0.6)
+        self.assertAlmostEqual(summary['search3:direct_search']['policyWeightSum'], 2.0)
+        self.assertAlmostEqual(summary['search3:direct_search']['valueWeightSum'], 3.0)
+        self.assertAlmostEqual(summary['search3:fallback_prefix']['policyWeightSum'], 3.0)
+        self.assertAlmostEqual(summary['search3:fallback_prefix']['valueWeightSum'], 4.0)
+        self.assertAlmostEqual(summary['search3:greedy_fallback']['policyWeightSum'], 0.1)
+        self.assertAlmostEqual(summary['search3:greedy_fallback']['valueWeightSum'], 0.15)
+        for source in ('original_search2:direct_search', 'steps_to_goal:direct_search',
+                       'pairwise:direct_search'):
+            self.assertAlmostEqual(summary[source]['policyWeightSum'], 1.0)
+        self.assertAlmostEqual(summary['original_search2:direct_search']['valueWeightSum'], 0.6)
+        self.assertAlmostEqual(summary['steps_to_goal:direct_search']['valueWeightSum'], 2.4)
+        self.assertAlmostEqual(summary['pairwise:direct_search']['valueWeightSum'], 2.4)
+
+        search3_ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        self.assertEqual(search3_ai._search3_step_weight(data[0], 0), 1.0)
+        self.assertEqual(search3_ai._search3_step_weight(data[0], 1), 1.0)
+        self.assertEqual(search3_ai._search3_step_weight(data[2], 0), 0.05)
+        self.assertEqual(search3_ai._search3_policy_step_weight(data[2], 0), 0.05)
+        self.assertEqual(search3_ai._search3_terminal_step_weight(data[2]), 0.05)
+        self.assertEqual(
+            SearchDataManager(None).search3_sample_weight(
+                SimpleNamespace(search_mode='myval')
+            ),
+            0.05,
+        )
+        for item, expected_value_weight in zip(data[3:], (0.2, 0.8, 0.8)):
+            self.assertAlmostEqual(search3_ai._search3_step_weight(item, 0), expected_value_weight)
+            self.assertAlmostEqual(search3_ai._search3_step_weight(item, 1), expected_value_weight)
+            self.assertAlmostEqual(search3_ai._search3_terminal_step_weight(item), expected_value_weight)
+            self.assertAlmostEqual(search3_ai._search3_policy_step_weight(item, 0), 0.5)
 
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / 'learning.json'
@@ -294,20 +342,50 @@ class LearningHistoryTests(unittest.TestCase):
             saved = LearningHistoryStore(path).records()[0]['search3TrainingWeights']
             self.assertEqual(saved, summary)
 
+    def test_search3_tensors_keep_policy_uniform_when_value_depends_on_source(self):
+        ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
+        ai.cube = SimpleNamespace(makedata=lambda: np.array([1.0, 2.0], dtype='f'))
+        ai._search3_policy_target = lambda *args: np.array([1.0, 0.0], dtype='f')
+        ai._search3_value_target = lambda *args: 0.75
+        for objective, expected_value_weight in (
+            ('original_search2', 0.2),
+            ('steps_to_goal', 0.8),
+            ('pairwise', 0.8),
+        ):
+            with self.subTest(objective=objective):
+                item = SimpleNamespace(
+                    search_mode='search2', source_objective=objective, sample_weight=1.0,
+                )
+                x = np.zeros((2, 1), dtype='f')
+                policy_targets = np.zeros((2, 1), dtype='f')
+                value_targets = np.zeros((1, 1), dtype='f')
+                value_weights = np.zeros((1, 1), dtype='f')
+                policy_weights = np.zeros((1, 1), dtype='f')
+                ai._write_search3_step_tensors(
+                    item, ('R',), np.array([0.75], dtype='f'), 0,
+                    x, policy_targets, value_targets, value_weights, policy_weights, 0,
+                )
+                self.assertAlmostEqual(float(policy_weights[0, 0]), 0.5)
+                self.assertAlmostEqual(float(value_weights[0, 0]), expected_value_weight)
+
+
     def test_training_source_summary_separates_objective_and_fallback(self):
         direct = SimpleNamespace(source_objective='search3', trajectory_source='direct-search', moves=(0, 1))
         fallback = SimpleNamespace(source_objective='steps_to_goal', trajectory_origin='fallback', moves=(0,))
+        pairwise = SimpleNamespace(source_objective='pairwise', trajectory_source='direct-search', moves=(0, 1, 2))
 
         summary = Rubiks_3_AI._training_data_source_summary(
-            available_indices=[0, 1],
-            selected_indices=[1],
-            data_source=[direct, fallback],
+            available_indices=[0, 1, 2],
+            selected_indices=[1, 2],
+            data_source=[direct, fallback, pairwise],
             state_count_fn=lambda item: len(item.moves) + 1,
         )
 
         self.assertEqual(summary['available']['search3:direct_search']['state_count'], 3)
         self.assertEqual(summary['available']['steps_to_goal:fallback']['trajectory_count'], 1)
         self.assertEqual(summary['selected']['steps_to_goal:fallback']['state_count'], 2)
+        self.assertEqual(summary['available']['pairwise:direct_search']['trajectory_count'], 1)
+        self.assertEqual(summary['selected']['pairwise:direct_search']['state_count'], 4)
 
     def test_writes_fixed_validation_metrics_when_available(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

@@ -173,14 +173,21 @@ class Myloss:
         self.x = np.zeros(0,dtype = 'f')
         self.y = np.zeros(0,dtype = 'f')
         self.t = np.zeros(0,dtype = 'f')
+        self.w = np.ones((1,0),dtype = 'f')
         self.Indices = None
 
-    def forward(self,x,Indices):
+    def forward(self,x,Indices,w = None):
 
         self.y = np.zeros((1,Indices[-1]),dtype = 'f')
         self.t = np.zeros((1,Indices[-1]),dtype = 'f')
+        self.w = np.ones_like(self.y)
+        state_weights = None if w is None else np.asarray(w,dtype = 'f').reshape(1,-1)
+        if state_weights is not None and state_weights.shape[1] != self.y.shape[1]:
+            raise ValueError('rank weights must match the state count')
         for i in range(len(Indices) - 1):
             start,end = Indices[i],Indices[i+1]
+            if state_weights is not None:
+                self.w[:,start:end] = state_weights[:,start:start + 1]
             logits = x[:,start:end].copy()
             # Compare every preceding state with the sequence endpoint.
             # Shifting only nonterminal logits makes a margin of zero exactly
@@ -189,7 +196,7 @@ class Myloss:
             self.y[:,start:end] = softmax_H(logits)
             self.t[0,Indices[i+1]-1] = 1.0
         
-        return cross_entropy(self.y,self.t)
+        return -np.sum(self.w * self.t * np.where(self.y != 0,np.log(self.y),-100))
         
         #self.x = x
         #self.Indices = Indices
@@ -203,7 +210,7 @@ class Myloss:
         
 
     def backward(self):
-        return self.y - self.t
+        return self.w * (self.y - self.t)
         #dO = np.zeros_like(self.x)
         #for i in range(len(self.Indices) - 1):
         #    dO[:,self.Indices[i]:self.Indices[i + 1] - 1] += self.y[:,self.Indices[i] - i:self.Indices[i + 1] - (i + 1)] * (1.0 - self.y[:,self.Indices[i] - i:self.Indices[i + 1] - (i + 1)])
@@ -273,10 +280,13 @@ class MyLoss2Pairwise:
         self.Indices = None
         self.pair_scales = np.zeros((1,0),dtype = 'f')
 
-    def forward(self,x,Indices):
+    def forward(self,x,Indices,w = None):
         self.x = x
         self.Indices = Indices
         self.diffs = np.zeros((1,0),dtype = x.dtype)
+        weights = None if w is None else np.asarray(w,dtype = x.dtype).reshape(-1)
+        if weights is not None and weights.size != x.shape[1]:
+            raise ValueError('pairwise weights must match the state count')
         scales = []
         for i in range(len(Indices) - 1):
             start = Indices[i]
@@ -285,7 +295,10 @@ class MyLoss2Pairwise:
                 continue
             self.diffs = np.c_[self.diffs,self.x[:,start + 1:end] - self.x[:,start:end - 1]]
             scale = 1.0 / (end - start - 1) if self.reduction == 'trajectory_mean' else 1.0
-            scales.extend([scale] * (end - start - 1))
+            if weights is None:
+                scales.extend([scale] * (end - start - 1))
+            else:
+                scales.extend(scale * weights[start:end - 1])
         self.pair_scales = np.asarray(scales,dtype = x.dtype).reshape(1,-1)
         self.y = sigmoid(self.diffs - self.margin)
         return np.sum(self.pair_scales * np.logaddexp(0.0,self.margin - self.diffs))

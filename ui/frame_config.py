@@ -103,6 +103,7 @@ class FrameConfig:
     search2_rank_loss_mixes: Optional[Sequence[float]] = None
     search2_rank_loss_apply_types: Optional[Sequence[str]] = None
     search3_rank_loss_mixes: Optional[Sequence[float]] = None
+    search3_value_loss_types: Optional[Sequence[str]] = None
     torch_training_devices: Optional[Sequence[str]] = None
     use_torch: Optional[Sequence[bool]] = None
     use_torch_predict: Optional[Sequence[bool]] = None
@@ -210,6 +211,7 @@ class FrameConfig:
         self._validate_ai_sequence_length('search2_rank_loss_mixes', self.search2_rank_loss_mixes, ai_count)
         self._validate_ai_sequence_length('search2_rank_loss_apply_types', self.search2_rank_loss_apply_types, ai_count)
         self._validate_ai_sequence_length('search3_rank_loss_mixes', self.search3_rank_loss_mixes, ai_count)
+        self._validate_ai_sequence_length('search3_value_loss_types', self.search3_value_loss_types, ai_count)
         self._validate_ai_sequence_length('torch_training_devices', self.torch_training_devices, ai_count)
         self._validate_ai_sequence_length('use_torch', self.use_torch, ai_count)
         self._validate_ai_sequence_length('use_torch_predict', self.use_torch_predict, ai_count)

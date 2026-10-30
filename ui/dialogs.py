@@ -960,9 +960,13 @@ class LearningHistoryDialog(Tk.Toplevel):
         learning_rate = latest['learningRate']
         update_scales = latest['updateScales']
         recent_result = self._recent_direct_search_result(ai_index,latest)
+        value_objective_label = (
+            f" / Value={latest.get('search3ValueLossType', 'absolute')}"
+            if latest['searchMode'] == 'search3' else ''
+        )
         self.summary_label.configure(
             text = (
-                f"AI {ai_index} / {latest['searchMode']} / {len(records)} 回の学習\n"
+                f"AI {ai_index} / {latest['searchMode']}{value_objective_label} / {len(records)} 回の学習\n"
                 f"実力（直近{recent_result['runCount']}回）: {recent_result['text']}\n"
                 f"局面Effect別: {self._setup_effect_summary_text(effect_bands)}\n"
                 f"最新: P={self._number(latest['policyLoss'])}  V={self._number(latest['valueLoss'])}  "
@@ -991,7 +995,7 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"P={self._number(record['policyLoss'])} V={self._number(record['valueLoss'])}  "
                 f"updates={record['updatesDuringSolve']}  {record['learningSeconds']:.3f}s"
             )
-            if record.get('valueBcePerState') is not None:
+            if record.get('valueBcePerState') is not None or record.get('valuePairwiseLossPerPair') is not None:
                 lines.append(f"  Search3 quality: {self._search3_quality_text(record)}")
             if record.get('trainingSample') is not None:
                 lines.append(f"  学習抽出: {self._training_sample_text(record)}")
@@ -1096,6 +1100,8 @@ class LearningHistoryDialog(Tk.Toplevel):
         value = [record['valueLoss'] for record in visible]
         policy_ce_per_state = [record.get('policyCePerState') for record in visible]
         bce_per_state = [record.get('valueBcePerState') for record in visible]
+        pairwise_per_pair = [record.get('valuePairwiseLossPerPair') for record in visible]
+        pairwise_hit_rate = [record.get('valuePairwiseMarginHitRate') for record in visible]
         mae = [record.get('valueMae') for record in visible]
         delta = [record.get('valueStartToEndDelta') for record in visible]
         target_delta = [record.get('valueTargetStartToEndDelta') for record in visible]
@@ -1124,11 +1130,13 @@ class LearningHistoryDialog(Tk.Toplevel):
             ),
             fill = '#A0A0A0', anchor = 'nw', font = ('Menlo', 9), tags = 'trend',
         )
-        self.chart.create_text(8, 176, text = 'S3 quality  P-CE/state=orange  V-BCE/state=blue  MAE=magenta  Δpred=green  Δtarget=gray（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
-        if any(item is not None for item in policy_ce_per_state + bce_per_state + mae + delta + target_delta):
+        self.chart.create_text(8, 176, text = 'S3 quality  P-CE/state=orange  V-BCE or pair-loss=blue  MAE or margin達成率=magenta  Δpred=green（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if any(item is not None for item in policy_ce_per_state + bce_per_state + pairwise_per_pair + pairwise_hit_rate + mae + delta + target_delta):
             self._draw_loss_series(policy_ce_per_state, '#E68A00', 25, width - 12, 206, 300)
             self._draw_loss_series(bce_per_state, '#49C7D4', 25, width - 12, 206, 300)
+            self._draw_loss_series(pairwise_per_pair, '#49C7D4', 25, width - 12, 206, 300)
             self._draw_loss_series(mae, '#DE5CE6', 25, width - 12, 206, 300)
+            self._draw_loss_series(pairwise_hit_rate, '#DE5CE6', 25, width - 12, 206, 300)
             self._draw_loss_series(delta, '#78C850', 25, width - 12, 206, 300)
             self._draw_loss_series(target_delta, '#A0A0A0', 25, width - 12, 206, 300)
             self.chart.create_text(
@@ -1136,6 +1144,8 @@ class LearningHistoryDialog(Tk.Toplevel):
                 text = (
                     f'Policy CE/state {self._series_range(policy_ce_per_state)}   '
                     f'Value BCE/state {self._series_range(bce_per_state)}   '
+                    f'Pair loss/pair {self._series_range(pairwise_per_pair)}   '
+                    f'Margin達成率 {self._series_range(pairwise_hit_rate)}   '
                     f'MAE {self._series_range(mae)}   '
                     f'Δpred {self._series_range(delta)}   '
                     f'Δtarget {self._series_range(target_delta)}   '
@@ -1257,6 +1267,14 @@ class LearningHistoryDialog(Tk.Toplevel):
         return f'{min(numeric):.4g}–{max(numeric):.4g}'
 
     def _search3_quality_text(self, record):
+        if record.get('valuePairwiseLossPerPair') is not None:
+            return (
+                f"Policy CE/state={self._number(record.get('policyCePerState'))}  "
+                f"pair loss/pair={self._number(record.get('valuePairwiseLossPerPair'))}  "
+                f"margin達成率={self._number(record.get('valuePairwiseMarginHitRate'))}  "
+                f"Δraw={self._number(record.get('valueStartToEndDelta'))}  "
+                f"pairs={self._number(record.get('valueEffectiveStateCount'))}"
+            )
         if record.get('valueBcePerState') is None:
             return '（未記録）'
         return (
@@ -1389,6 +1407,7 @@ class LearningHistoryDialog(Tk.Toplevel):
             return '（未記録）'
         labels = {
             'original_search2': 'Original S2',
+            'pairwise': 'pairwise',
             'search3': 'Search3',
             'steps_to_goal': 'steps_to_goal',
             'bootstrap': 'bootstrap',
