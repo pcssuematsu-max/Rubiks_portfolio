@@ -25,6 +25,7 @@ class _FakeAI:
     update_scale_shared = 1.0
     update_scale_policy = 0.5
     update_scale_value = 2.0
+    wo_v_initial_variance = 0.5
     search2_value_loss_type = 'myloss2'
     search3_rank_loss_mix = 0.05
     last_training_metrics = {
@@ -152,6 +153,7 @@ class LearningHistoryTests(unittest.TestCase):
             self.assertEqual(saved['updatesDuringSolve'], 8)
             self.assertEqual(saved['learningRate']['base'], 0.001)
             self.assertEqual(saved['updateScales']['value'], 2.0)
+            self.assertEqual(saved['woVInitialVariance'], 0.5)
             self.assertEqual(saved['trainingSample']['longReservedItemCount'], 6)
             self.assertEqual(saved['trainingSample']['batchMixMode'], 'mixed')
             self.assertEqual(saved['trainingSample']['mixedBatchCount'], 10)
@@ -306,32 +308,30 @@ class LearningHistoryTests(unittest.TestCase):
         self.assertAlmostEqual(summary['search3:direct_search']['valueWeightSum'], 3.0)
         self.assertAlmostEqual(summary['search3:fallback_prefix']['policyWeightSum'], 3.0)
         self.assertAlmostEqual(summary['search3:fallback_prefix']['valueWeightSum'], 4.0)
-        self.assertAlmostEqual(summary['search3:greedy_fallback']['policyWeightSum'], 0.1)
-        self.assertAlmostEqual(summary['search3:greedy_fallback']['valueWeightSum'], 0.15)
+        self.assertAlmostEqual(summary['search3:greedy_fallback']['policyWeightSum'], 2.0)
+        self.assertAlmostEqual(summary['search3:greedy_fallback']['valueWeightSum'], 3.0)
         for source in ('original_search2:direct_search', 'steps_to_goal:direct_search',
                        'pairwise:direct_search'):
-            self.assertAlmostEqual(summary[source]['policyWeightSum'], 1.0)
-        self.assertAlmostEqual(summary['original_search2:direct_search']['valueWeightSum'], 0.6)
-        self.assertAlmostEqual(summary['steps_to_goal:direct_search']['valueWeightSum'], 2.4)
-        self.assertAlmostEqual(summary['pairwise:direct_search']['valueWeightSum'], 2.4)
+            self.assertAlmostEqual(summary[source]['policyWeightSum'], 2.0)
+            self.assertAlmostEqual(summary[source]['valueWeightSum'], 3.0)
 
         search3_ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         self.assertEqual(search3_ai._search3_step_weight(data[0], 0), 1.0)
         self.assertEqual(search3_ai._search3_step_weight(data[0], 1), 1.0)
-        self.assertEqual(search3_ai._search3_step_weight(data[2], 0), 0.05)
-        self.assertEqual(search3_ai._search3_policy_step_weight(data[2], 0), 0.05)
-        self.assertEqual(search3_ai._search3_terminal_step_weight(data[2]), 0.05)
+        self.assertEqual(search3_ai._search3_step_weight(data[2], 0), 1.0)
+        self.assertEqual(search3_ai._search3_policy_step_weight(data[2], 0), 1.0)
+        self.assertEqual(search3_ai._search3_terminal_step_weight(data[2]), 1.0)
         self.assertEqual(
             SearchDataManager(None).search3_sample_weight(
                 SimpleNamespace(search_mode='myval')
             ),
-            0.05,
+            1.0,
         )
-        for item, expected_value_weight in zip(data[3:], (0.2, 0.8, 0.8)):
-            self.assertAlmostEqual(search3_ai._search3_step_weight(item, 0), expected_value_weight)
-            self.assertAlmostEqual(search3_ai._search3_step_weight(item, 1), expected_value_weight)
-            self.assertAlmostEqual(search3_ai._search3_terminal_step_weight(item), expected_value_weight)
-            self.assertAlmostEqual(search3_ai._search3_policy_step_weight(item, 0), 0.5)
+        for item in data[3:]:
+            self.assertAlmostEqual(search3_ai._search3_step_weight(item, 0), 1.0)
+            self.assertAlmostEqual(search3_ai._search3_step_weight(item, 1), 1.0)
+            self.assertAlmostEqual(search3_ai._search3_terminal_step_weight(item), 1.0)
+            self.assertAlmostEqual(search3_ai._search3_policy_step_weight(item, 0), 1.0)
 
         with tempfile.TemporaryDirectory() as temporary_directory:
             path = Path(temporary_directory) / 'learning.json'
@@ -342,16 +342,12 @@ class LearningHistoryTests(unittest.TestCase):
             saved = LearningHistoryStore(path).records()[0]['search3TrainingWeights']
             self.assertEqual(saved, summary)
 
-    def test_search3_tensors_keep_policy_uniform_when_value_depends_on_source(self):
+    def test_search3_tensors_use_full_weight_for_each_direct_source(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         ai.cube = SimpleNamespace(makedata=lambda: np.array([1.0, 2.0], dtype='f'))
         ai._search3_policy_target = lambda *args: np.array([1.0, 0.0], dtype='f')
         ai._search3_value_target = lambda *args: 0.75
-        for objective, expected_value_weight in (
-            ('original_search2', 0.2),
-            ('steps_to_goal', 0.8),
-            ('pairwise', 0.8),
-        ):
+        for objective in ('original_search2', 'steps_to_goal', 'pairwise'):
             with self.subTest(objective=objective):
                 item = SimpleNamespace(
                     search_mode='search2', source_objective=objective, sample_weight=1.0,
@@ -365,8 +361,8 @@ class LearningHistoryTests(unittest.TestCase):
                     item, ('R',), np.array([0.75], dtype='f'), 0,
                     x, policy_targets, value_targets, value_weights, policy_weights, 0,
                 )
-                self.assertAlmostEqual(float(policy_weights[0, 0]), 0.5)
-                self.assertAlmostEqual(float(value_weights[0, 0]), expected_value_weight)
+                self.assertAlmostEqual(float(policy_weights[0, 0]), 1.0)
+                self.assertAlmostEqual(float(value_weights[0, 0]), 1.0)
 
 
     def test_training_source_summary_separates_objective_and_fallback(self):

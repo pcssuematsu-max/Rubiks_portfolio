@@ -332,6 +332,7 @@ class Frame(Tk.Frame):
                 transformer_attention_dim = self._ai_original_transformer_attention_dim(ai_index),
                 transformer_linear_skip = self._ai_original_transformer_linear_skip_enabled(ai_index),
                 transformer_linear_skip_variance = self._ai_original_transformer_linear_skip_variance(ai_index),
+                wo_v_initial_variance = self._ai_wo_v_initial_variance(ai_index),
                 transformer_attention_token_mode = self._ai_original_transformer_attention_token_mode(ai_index),
                 piece_attention_backward_chunk_size = self._ai_original_piece_attention_backward_chunk_size(ai_index),
                 train_batch_size = self._ai_original_train_batch_size(ai_index),
@@ -362,6 +363,10 @@ class Frame(Tk.Frame):
         if loss_types is None:
             return 'myloss2'
         return loss_types[ai_index]
+
+    def _ai_wo_v_initial_variance(self, ai_index):
+        variances = getattr(self.config, 'wo_v_initial_variances', None)
+        return 2.0 if variances is None else variances[ai_index]
 
     def _ai_search2_value_loss_margin(self, ai_index):
         margins = getattr(self.config, 'search2_value_loss_margins', None)

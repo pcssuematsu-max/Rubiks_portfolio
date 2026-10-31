@@ -113,6 +113,11 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
         "search3ValueLossType": str(metrics.get("search3ValueLossType") or getattr(ai,"search3_value_loss_type","absolute")),
         "valuePairwiseLossPerPair": _finite_number(metrics.get("valuePairwiseLossPerPair")),
         "valuePairwiseMarginHitRate": _finite_number(metrics.get("valuePairwiseMarginHitRate")),
+        "valuePairHuberPerPair": _finite_number(metrics.get("valuePairHuberPerPair")),
+        "valuePairTargetMae": _finite_number(metrics.get("valuePairTargetMae")),
+        "valuePairwiseForm": metrics.get("valuePairwiseForm"),
+        "valueSlopeMae": _finite_number(metrics.get("valueSlopeMae")),
+        "valueSlopeLossWeight": _finite_number(metrics.get("valueSlopeLossWeight")),
         "valueStartToEndDelta": _finite_number(metrics.get("valueStartToEndDelta")),
         "valueTargetStartToEndDelta": _finite_number(metrics.get("valueTargetStartToEndDelta")),
         "valueEffectiveStateCount": _finite_number(metrics.get("valueEffectiveStateCount")),
@@ -142,6 +147,7 @@ def completed_learning_record(ai_index: int, ai, elapsed_seconds: float) -> dict
             "value": _finite_number(getattr(ai, "update_scale_value", None)),
         },
         "search2ValueLossType": str(getattr(ai, "search2_value_loss_type", "")),
+        "woVInitialVariance": _finite_number(getattr(ai, "wo_v_initial_variance", None)),
         "search2ValueLossMargin": _finite_number(getattr(ai, "search2_value_loss_margin", None)),
         "search2RankLossMix": _finite_number(getattr(ai, "search2_rank_loss_mix", None)),
         "search2RankLossApplyType": str(getattr(ai, "search2_rank_loss_apply_type", "")),
@@ -182,9 +188,12 @@ def _validate_record(record: Any) -> None:
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
         "search3ValueLossType", "valuePairwiseLossPerPair", "valuePairwiseMarginHitRate",
+        "valuePairHuberPerPair", "valuePairTargetMae", "valuePairwiseForm",
+        "valueSlopeMae", "valueSlopeLossWeight",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
         "valueSequenceCount", "fixedValidation", "trainingSample", "trainingDataSources", "search3TrainingWeights", "gradientMetrics", "stepsToGoalRegression", "search3RankLossMix",
         "search2BaseLossPerItem", "search2RankLossPerItem", "search2PlateauEscapeLossPerItem", "search2ValueLossMargin", "search2RankLossMix", "search2RankLossApplyType",
+        "woVInitialVariance",
     }
     if not isinstance(record, dict) or not required.issubset(record) or set(record) - required - optional:
         raise ValueError("Invalid learning history record")
@@ -200,13 +209,16 @@ def _validate_record(record: Any) -> None:
     for field in (
         "policyCePerState", "policyEffectiveStateCount",
         "valueBcePerState", "valueMae", "valueStartToEndDelta",
-        "valuePairwiseLossPerPair", "valuePairwiseMarginHitRate",
+        "valuePairwiseLossPerPair", "valuePairwiseMarginHitRate", "valueSlopeMae", "valueSlopeLossWeight",
+        "valuePairHuberPerPair", "valuePairTargetMae",
         "valueTargetStartToEndDelta", "valueEffectiveStateCount",
     ):
         _validate_optional_number(record.get(field))
     value_sequence_count = record.get("valueSequenceCount")
     if "search3ValueLossType" in record and not isinstance(record["search3ValueLossType"],str):
         raise ValueError("Invalid Search3 Value loss type")
+    if record.get("valuePairwiseForm") is not None and not isinstance(record["valuePairwiseForm"],str):
+        raise ValueError("Invalid Value pairwise form")
     if value_sequence_count is not None and (
         isinstance(value_sequence_count,bool)
         or not isinstance(value_sequence_count,int)
@@ -219,7 +231,7 @@ def _validate_record(record: Any) -> None:
     _validate_search3_training_weights(record.get("search3TrainingWeights"))
     _validate_gradient_metrics(record.get("gradientMetrics"))
     _validate_steps_to_goal_regression(record.get("stepsToGoalRegression"))
-    for field in ("search2BaseLossPerItem", "search2RankLossPerItem", "search2PlateauEscapeLossPerItem", "search2ValueLossMargin", "search2RankLossMix"):
+    for field in ("search2BaseLossPerItem", "search2RankLossPerItem", "search2PlateauEscapeLossPerItem", "search2ValueLossMargin", "search2RankLossMix", "woVInitialVariance"):
         _validate_optional_number(record.get(field))
     if "search2RankLossApplyType" in record and not isinstance(record["search2RankLossApplyType"], str):
         raise ValueError("Invalid learning history search2RankLossApplyType")

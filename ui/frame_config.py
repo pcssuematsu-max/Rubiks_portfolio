@@ -114,6 +114,7 @@ class FrameConfig:
     original_transformer_attention_dims: Optional[Sequence[int]] = None
     original_transformer_linear_skips: Optional[Sequence[bool]] = None
     original_transformer_linear_skip_variances: Optional[Sequence[float]] = None
+    wo_v_initial_variances: Optional[Sequence[float]] = None
     original_transformer_attention_token_modes: Optional[Sequence[str]] = None
     original_piece_attention_backward_chunk_sizes: Optional[Sequence[int]] = None
     original_train_batch_sizes: Optional[Sequence[int]] = None
@@ -162,6 +163,12 @@ class FrameConfig:
             not math.isfinite(float(beta)) for beta in self.silu_beta_initials
         ):
             raise ValueError('silu_beta_initials must contain finite values')
+        self._validate_ai_sequence_length('wo_v_initial_variances', self.wo_v_initial_variances, ai_count)
+        if self.wo_v_initial_variances is not None and any(
+            not math.isfinite(float(variance)) or float(variance) < 0
+            for variance in self.wo_v_initial_variances
+        ):
+            raise ValueError('wo_v_initial_variances must contain finite, non-negative values')
         self._validate_ai_sequence_length('lr_vs', self.lr_vs, ai_count)
         self._validate_ai_sequence_length('lr_hs', self.lr_hs, ai_count)
         self._validate_ai_sequence_length('out_cs', self.out_cs, ai_count)

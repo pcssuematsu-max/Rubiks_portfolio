@@ -233,12 +233,12 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual(ai.steps_to_goal_value_batch_band_max_copies, 3)
         self.assertEqual(ai.pairwise_fallback_max_ratio, 0.25)
 
-    def test_experiment_profile_uses_fixed_budget_and_visit_widening_for_search3(self):
+    def test_experiment_profile_uses_progressive_budget_and_visit_widening_for_search3(self):
         config = build_experiment_frame_config()
 
         self.assertEqual(
             [config.search3_budget_modes[index] for index in (3, 5, 7)],
-            ['fixed', 'fixed', 'fixed'],
+            ['progressive', 'progressive', 'progressive'],
         )
         self.assertEqual(config.search3_max_node_caches[3], 10000)
         self.assertEqual(config.search3_max_prediction_caches[3], 10000)
@@ -278,15 +278,15 @@ class Search3DepthScheduleTests(unittest.TestCase):
         self.assertEqual([config.search3_widening_modes[index] for index in (2,3,4,5,6,7,10,11,18,19)], ['fixed'] * 10)
         self.assertEqual(config.lrs[22], 2.0e-6)
         self.assertEqual([config.update_scales[index][2] for index in (0,1,8,9,12,13,14,15,16,17,20,21,22,23,24)], [3.0,3.0,3.0,3.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0])
-        self.assertEqual(config.steps_to_goal_value_loss_weights[20:25], [5.0,5.0,3.0,1.0,1.0])
-        self.assertEqual(config.steps_to_goal_replay_stratified_ratios[20:25], [0.0,0.0,0.75,0.75,0.75])
+        self.assertEqual(config.steps_to_goal_value_loss_weights[20:25], [1.0] * 5)
+        self.assertEqual(config.steps_to_goal_replay_stratified_ratios[20:25], [0.0] * 5)
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(
             [config.search2_value_loss_types[index] for index in range(20, 25)],
-            ['steps_to_goal', 'myloss2_pairwise', 'steps_to_goal', 'myloss2_pairwise', 'myloss2_pairwise'],
+            ['myloss2_pairwise'] * 5,
         )
-        self.assertEqual(config.search2_rank_loss_mixes[20:25], [0.0,0.0,1.0,0.0,0.0])
-        self.assertEqual(config.search2_rank_loss_apply_types[20:25], ['none','none','steps_pairwise','none','none'])
+        self.assertEqual(config.search2_rank_loss_mixes[20:25], [0.0] * 5)
+        self.assertEqual(config.search2_rank_loss_apply_types[20:25], ['none'] * 5)
         self.assertEqual(
             [config.search2_value_loss_margins[index] for index in (0,1,8,9,12,13,14,15,16,17)],
             [1.0] * 10,
@@ -295,7 +295,7 @@ class Search3DepthScheduleTests(unittest.TestCase):
             [config.search2_value_loss_margins[index] for index in (2,3,4,5,6,7,10,11,18,19)],
             [0.0] * 10,
         )
-        self.assertEqual(config.search2_value_loss_margins[20:25], [0.0,1.0,1.0,1.0,1.0])
+        self.assertEqual(config.search2_value_loss_margins[20:25], [1.0] * 5)
         self.assertEqual(config.search2_value_target_scales[20:25], [1.0] * 5)
         self.assertEqual(config.original_transformer_attention[20:25], [False, False, True, True, True])
         self.assertEqual(config.transform_idx[20:25], [0] * 5)

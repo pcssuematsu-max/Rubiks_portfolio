@@ -995,7 +995,9 @@ class LearningHistoryDialog(Tk.Toplevel):
                 f"P={self._number(record['policyLoss'])} V={self._number(record['valueLoss'])}  "
                 f"updates={record['updatesDuringSolve']}  {record['learningSeconds']:.3f}s"
             )
-            if record.get('valueBcePerState') is not None or record.get('valuePairwiseLossPerPair') is not None:
+            if any(record.get(key) is not None for key in (
+                'valueBcePerState','valuePairwiseLossPerPair','valuePairHuberPerPair',
+            )):
                 lines.append(f"  Search3 quality: {self._search3_quality_text(record)}")
             if record.get('trainingSample') is not None:
                 lines.append(f"  学習抽出: {self._training_sample_text(record)}")
@@ -1102,6 +1104,8 @@ class LearningHistoryDialog(Tk.Toplevel):
         bce_per_state = [record.get('valueBcePerState') for record in visible]
         pairwise_per_pair = [record.get('valuePairwiseLossPerPair') for record in visible]
         pairwise_hit_rate = [record.get('valuePairwiseMarginHitRate') for record in visible]
+        pair_huber_per_pair = [record.get('valuePairHuberPerPair') for record in visible]
+        pair_target_mae = [record.get('valuePairTargetMae') for record in visible]
         mae = [record.get('valueMae') for record in visible]
         delta = [record.get('valueStartToEndDelta') for record in visible]
         target_delta = [record.get('valueTargetStartToEndDelta') for record in visible]
@@ -1130,13 +1134,15 @@ class LearningHistoryDialog(Tk.Toplevel):
             ),
             fill = '#A0A0A0', anchor = 'nw', font = ('Menlo', 9), tags = 'trend',
         )
-        self.chart.create_text(8, 176, text = 'S3 quality  P-CE/state=orange  V-BCE or pair-loss=blue  MAE or margin達成率=magenta  Δpred=green（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
-        if any(item is not None for item in policy_ce_per_state + bce_per_state + pairwise_per_pair + pairwise_hit_rate + mae + delta + target_delta):
+        self.chart.create_text(8, 176, text = 'S3 quality  P-CE/state=orange  V-loss=blue  目標誤差・旧margin率=magenta  Δpred=green（各系列は個別スケール）', fill = '#E8E8E8', anchor = 'nw', font = ('Menlo', 10), tags = 'trend')
+        if any(item is not None for item in policy_ce_per_state + bce_per_state + pairwise_per_pair + pairwise_hit_rate + pair_huber_per_pair + pair_target_mae + mae + delta + target_delta):
             self._draw_loss_series(policy_ce_per_state, '#E68A00', 25, width - 12, 206, 300)
             self._draw_loss_series(bce_per_state, '#49C7D4', 25, width - 12, 206, 300)
             self._draw_loss_series(pairwise_per_pair, '#49C7D4', 25, width - 12, 206, 300)
+            self._draw_loss_series(pair_huber_per_pair, '#49C7D4', 25, width - 12, 206, 300)
             self._draw_loss_series(mae, '#DE5CE6', 25, width - 12, 206, 300)
             self._draw_loss_series(pairwise_hit_rate, '#DE5CE6', 25, width - 12, 206, 300)
+            self._draw_loss_series(pair_target_mae, '#DE5CE6', 25, width - 12, 206, 300)
             self._draw_loss_series(delta, '#78C850', 25, width - 12, 206, 300)
             self._draw_loss_series(target_delta, '#A0A0A0', 25, width - 12, 206, 300)
             self.chart.create_text(
@@ -1144,8 +1150,10 @@ class LearningHistoryDialog(Tk.Toplevel):
                 text = (
                     f'Policy CE/state {self._series_range(policy_ce_per_state)}   '
                     f'Value BCE/state {self._series_range(bce_per_state)}   '
-                    f'Pair loss/pair {self._series_range(pairwise_per_pair)}   '
-                    f'Margin達成率 {self._series_range(pairwise_hit_rate)}   '
+                    f'旧pair loss {self._series_range(pairwise_per_pair)}   '
+                    f'Huber/pair {self._series_range(pair_huber_per_pair)}   '
+                    f'旧margin率 {self._series_range(pairwise_hit_rate)}   '
+                    f'目標誤差 {self._series_range(pair_target_mae)}   '
                     f'MAE {self._series_range(mae)}   '
                     f'Δpred {self._series_range(delta)}   '
                     f'Δtarget {self._series_range(target_delta)}   '
@@ -1267,11 +1275,20 @@ class LearningHistoryDialog(Tk.Toplevel):
         return f'{min(numeric):.4g}–{max(numeric):.4g}'
 
     def _search3_quality_text(self, record):
+        if record.get('valuePairHuberPerPair') is not None:
+            return (
+                f"Policy CE/state={self._number(record.get('policyCePerState'))}  "
+                f"Huber/pair={self._number(record.get('valuePairHuberPerPair'))}  "
+                f"目標誤差={self._number(record.get('valuePairTargetMae'))}  "
+                f"Δraw={self._number(record.get('valueStartToEndDelta'))}  "
+                f"pairs={self._number(record.get('valueEffectiveStateCount'))}"
+            )
         if record.get('valuePairwiseLossPerPair') is not None:
             return (
                 f"Policy CE/state={self._number(record.get('policyCePerState'))}  "
                 f"pair loss/pair={self._number(record.get('valuePairwiseLossPerPair'))}  "
                 f"margin達成率={self._number(record.get('valuePairwiseMarginHitRate'))}  "
+                f"坂の誤差={self._number(record.get('valueSlopeMae'))}  "
                 f"Δraw={self._number(record.get('valueStartToEndDelta'))}  "
                 f"pairs={self._number(record.get('valueEffectiveStateCount'))}"
             )

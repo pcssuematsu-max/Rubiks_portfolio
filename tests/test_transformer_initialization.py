@@ -13,6 +13,35 @@ from ai.transformer_variance import (
 
 
 class TransformerInitializationTests(unittest.TestCase):
+    def test_wo_v_initial_variance_is_configurable_for_both_model_types(self):
+        random_state = np.random.get_state()
+        try:
+            for transformer in (False, True):
+                common = dict(
+                    cube_size=3, residual=True,
+                    use_transformer_attention=transformer,
+                    transformer_attention_token_mode='piece',
+                )
+                np.random.seed(9876)
+                baseline = Rubiks_3_AI(
+                    [64, 64], search_mode='search2',
+                    wo_v_initial_variance=2.0, **common,
+                )
+                np.random.seed(9876)
+                search3 = Rubiks_3_AI(
+                    [64, 64], search_mode='search3',
+                    wo_v_initial_variance=2.0, **common,
+                )
+                np.random.seed(9876)
+                smaller = Rubiks_3_AI(
+                    [64, 64], search_mode='search3',
+                    wo_v_initial_variance=0.5, **common,
+                )
+                np.testing.assert_array_equal(search3.params['WO_V'], baseline.params['WO_V'])
+                np.testing.assert_allclose(smaller.params['WO_V'], baseline.params['WO_V'] * 0.5)
+        finally:
+            np.random.set_state(random_state)
+
     def test_model_type_follows_transformer_attention_configuration(self):
         ai = Rubiks_3_AI.__new__(Rubiks_3_AI)
         ai.use_transformer_attention = False

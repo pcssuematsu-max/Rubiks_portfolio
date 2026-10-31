@@ -1,5 +1,5 @@
 import unittest
-from dataclasses import fields
+from dataclasses import fields, replace
 
 from configs import build_frame_config
 from main import parse_args
@@ -27,13 +27,17 @@ class MainProfileTests(unittest.TestCase):
         self.assertEqual(config.cube_size, 4)
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(config.control_panel_mode, "advanced")
-        self.assertEqual(config.steps_to_goal_value_loss_weights[20:], [5.0, 5.0, 3.0, 1.0, 1.0])
+        self.assertEqual(config.search2_value_loss_types[20:], ['myloss2_pairwise'] * 5)
+        self.assertEqual(config.search2_value_loss_margins[20:], [1.0] * 5)
+        self.assertEqual(config.search2_rank_loss_mixes[20:], [0.0] * 5)
+        self.assertEqual(config.search2_rank_loss_apply_types[20:], ['none'] * 5)
+        self.assertEqual(config.steps_to_goal_value_loss_weights[20:], [1.0] * 5)
         self.assertEqual([config.hard_effect_direct_min_ratios[index] for index in (10,18,22)], [0.40] * 3)
         self.assertEqual([config.hard_effect_direct_min_ratios[index] for index in (11,19)], [0.40] * 2)
         self.assertEqual(config.hard_effect_direct_min_ratios[21], 0.0)
-        self.assertEqual(config.steps_to_goal_states_per_bands[20:], [12, 12, 12, 12, 12])
-        self.assertEqual(config.steps_to_goal_replay_stratified_ratios[20:], [0.0, 0.0, 0.75, 0.75, 0.75])
-        self.assertEqual(config.steps_to_goal_long_route_min_ratios[20:], [0.0, 0.0, 0.25, 0.0, 0.0])
+        self.assertEqual(config.steps_to_goal_states_per_bands[20:], [0] * 5)
+        self.assertEqual(config.steps_to_goal_replay_stratified_ratios[20:], [0.0] * 5)
+        self.assertEqual(config.steps_to_goal_long_route_min_ratios[20:], [0.0] * 5)
         self.assertEqual([config.original_long_direct_min_ratios[index] for index in (12,13,14,15,16,17)], [0.10] * 6)
         self.assertEqual(config.original_long_direct_min_ratios[20:], [0.0] * 5)
         self.assertEqual(config.search3_budget_shallow_depth_thresholds[10], 9.0)
@@ -42,17 +46,18 @@ class MainProfileTests(unittest.TestCase):
         self.assertEqual(config.search3_budget_shallow_widening_initial_actions[10], 3)
         self.assertEqual(config.search3_budget_shallow_widening_options[10], (3, 5))
         self.assertEqual(config.search3_budget_shallow_widening_options[18], (3, 5))
-        self.assertEqual(config.steps_to_goal_value_max_route_efficiencies[20:], [2.0, 0.0, 2.0, 0.0, 0.0])
-        self.assertEqual(config.steps_to_goal_value_batch_band_max_copies[20:], [3, 1, 3, 1, 1])
-        self.assertEqual(config.pairwise_fallback_max_ratios[20:], [1.0, 1.0, 1.0, 0.25, 0.25])
+        self.assertEqual(config.steps_to_goal_value_max_route_efficiencies[20:], [0.0] * 5)
+        self.assertEqual(config.steps_to_goal_value_batch_band_max_copies[20:], [1] * 5)
+        self.assertEqual(config.pairwise_fallback_max_ratios[20:], [1.0, 1.0, 0.25, 0.25, 0.25])
         self.assertEqual(config.search2_skip_differences[20:], [1000.0] * 5)
         self.assertEqual(config.search3_budget_rescue_playouts[3], 10000)
         self.assertEqual(config.search3_budget_rescue_playouts[2], 0)
         self.assertEqual(config.original_train_recent_ratios[20:], [0.0, 0.0, 0.25, 0.25, 0.25])
         self.assertEqual(
             [config.original_train_recent_ratios[index] for index in (10,11,18,19)],
-            [0.5,0.5,0.5,0.25],
+            [0.25] * 4,
         )
+        self.assertEqual([config.wdlrs[index] for index in (2,10,21,23,24)], [1.0e-7] * 5)
         self.assertEqual(
             [config.original_train_batch_mix_modes[index] for index in (10,11,18,19)],
             ['ordered','mixed','mixed','mixed'],
@@ -63,7 +68,7 @@ class MainProfileTests(unittest.TestCase):
         )
         self.assertEqual(
             [config.search3_budget_modes[index] for index in (10,11,18,19)],
-            ['fixed'] * 4,
+            ['progressive'] * 4,
         )
         self.assertEqual(
             [config.transform_idx[index] for index in (10,11,18,19)],
@@ -71,7 +76,7 @@ class MainProfileTests(unittest.TestCase):
         )
         for first, second, expected_difference in (
             (10,11,{'original_train_batch_mix_modes', 'transform_idx'}),
-            (18,19,{'original_train_recent_ratios', 'transform_idx'}),
+            (18,19,{'transform_idx'}),
         ):
             differences = {
                 field.name for field in fields(config)
@@ -84,16 +89,24 @@ class MainProfileTests(unittest.TestCase):
         self.assertEqual(config.original_transformer_linear_skip_variances[10], 0.125)
         self.assertEqual(config.original_transformer_linear_skip_variances[22], 0.125)
         self.assertEqual(config.original_transformer_linear_skip_variances[0], 0.0)
+        self.assertEqual(config.wo_v_initial_variances, [2.0] * 25)
+
+    def test_wo_v_initial_variance_rejects_invalid_per_ai_values(self):
+        config = build_frame_config('experiment')
+        values = list(config.wo_v_initial_variances)
+        values[10] = -0.1
+        with self.assertRaisesRegex(ValueError, 'wo_v_initial_variances'):
+            replace(config, wo_v_initial_variances=values)
 
     def test_experiment_search2_skip_differences_are_fixed_per_ai(self):
         config = build_frame_config("experiment")
         original_indices = (0, 1, 8, 9, 12, 13, 14, 15, 16, 17)
         original_thresholds = [config.search2_skip_differences[index] for index in original_indices]
 
-        self.assertEqual(original_thresholds, [1.0, 5.0, 20.0, 100.0, 1.0, 5.0, 10.0, 10.0, 20.0, 100.0])
+        self.assertEqual(original_thresholds, [30.0, 50.0, 70.0, 100.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0])
         self.assertEqual(config.search2_skip_differences[20:], [1000.0] * 5)
         self.assertEqual({threshold: original_thresholds.count(threshold) for threshold in set(original_thresholds)},
-                         {1.0: 2, 5.0: 2, 10.0: 2, 20.0: 2, 100.0: 2})
+                         {30.0: 3, 50.0: 3, 70.0: 3, 100.0: 1})
 
     def test_test_profile_is_an_alias_for_experiment(self):
         config = build_frame_config("test")

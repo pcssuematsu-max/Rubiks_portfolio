@@ -15,17 +15,13 @@ from model.search_result import data
 
 
 class StepsToGoalValueTests(unittest.TestCase):
-    def test_steps_pairwise_treatment_leaves_reference_ais_unchanged(self):
+    def test_experiment_steps_to_goal_ais_now_use_pairwise_without_auxiliary_loss(self):
         config = build_experiment_frame_config()
-        self.assertEqual(config.search2_value_loss_types[22], 'steps_to_goal')
-        self.assertEqual(config.search2_rank_loss_apply_types[22], 'steps_pairwise')
-        self.assertEqual(config.search2_rank_loss_mixes[22], 1.0)
-        self.assertEqual(config.search2_value_loss_margins[22], 1.0)
-        self.assertEqual(config.steps_to_goal_plateau_fallback_min_ratios[22], 0.05)
-        self.assertEqual(config.steps_to_goal_plateau_escape_rank_mixes[22], 1.0)
-        self.assertEqual(config.steps_to_goal_plateau_escape_prefix_steps[22], 3)
-        for index in (20,21,23,24):
+        for index in (20,21,22,23,24):
+            self.assertEqual(config.search2_value_loss_types[index], 'myloss2_pairwise')
+            self.assertEqual(config.search2_value_loss_margins[index], 1.0)
             self.assertEqual(config.search2_rank_loss_mixes[index], 0.0)
+            self.assertEqual(config.search2_rank_loss_apply_types[index], 'none')
             self.assertEqual(config.steps_to_goal_plateau_escape_rank_mixes[index], 0.0)
 
     def test_relative_loss_is_route_normalized_and_has_correct_gradient(self):
@@ -488,6 +484,11 @@ class StepsToGoalValueTests(unittest.TestCase):
                     ),
                     AIs = [pairwise, original, steps], AI_idx = 0, AInum = 3,
                 )
+                frame.search_data_manager = SimpleNamespace(
+                    erase_revisited_states = lambda cube,scramble,moves: (
+                        tuple(moves),tuple(range(len(moves))),
+                    ),
+                )
 
                 self.assertFalse(SolveSessionManager(frame)._store_completed_training_samples())
                 connected_moves = tuple(move for segment in segments for move in segment)
@@ -527,6 +528,11 @@ class StepsToGoalValueTests(unittest.TestCase):
                 ),
             ),
             AIs = [pairwise, original, steps], AI_idx = 0, AInum = 3,
+        )
+        frame.search_data_manager = SimpleNamespace(
+            erase_revisited_states = lambda cube,scramble,moves: (
+                tuple(moves),tuple(range(len(moves))),
+            ),
         )
 
         self.assertFalse(SolveSessionManager(frame)._store_completed_training_samples())
@@ -579,6 +585,11 @@ class StepsToGoalValueTests(unittest.TestCase):
             AI_idx = 0,
             AInum = 4,
         )
+        frame.search_data_manager = SimpleNamespace(
+            erase_revisited_states = lambda cube,scramble,moves: (
+                tuple(moves),tuple(range(len(moves))),
+            ),
+        )
 
         stored = SolveSessionManager(frame)._store_connected_steps_to_goal_training_sample()
 
@@ -593,6 +604,43 @@ class StepsToGoalValueTests(unittest.TestCase):
         self.assertEqual(regression_one.indices, [0])
         self.assertEqual(regression_two.indices, [0])
         self.assertEqual(pairwise.indices, [0])
+
+    def test_connected_route_is_tagged_pairwise_when_all_targets_are_pairwise(self):
+        shared_data = []
+        source = SimpleNamespace(
+            search_mode='search2', search2_value_loss_type='myloss2_pairwise',
+            datas=shared_data, indices=[],
+        )
+        target = SimpleNamespace(
+            search_mode='search2', search2_value_loss_type='myloss2_pairwise',
+            datas=shared_data, indices=[],
+        )
+        frame = SimpleNamespace(
+            solve_state=SimpleNamespace(
+                s=('scramble',), move_lis=[('A', 'B'), ('C',)],
+                search_TF=True, fallback_used=False,
+                last_perfect_key='', last_top_group=None,
+            ),
+            cube=SimpleNamespace(
+                simplify=lambda moves: tuple(moves),
+                make_transformations=lambda scramble, moves: (
+                    (tuple(scramble),), (tuple(moves),)
+                ),
+            ),
+            AIs=[source, target], AI_idx=0, AInum=2,
+            search_data_manager=SimpleNamespace(
+                erase_revisited_states=lambda cube, scramble, moves: (
+                    tuple(moves), tuple(range(len(moves)))
+                ),
+            ),
+        )
+
+        self.assertTrue(SolveSessionManager(frame)._store_connected_steps_to_goal_training_sample())
+        self.assertEqual(len(shared_data), 1)
+        self.assertEqual(shared_data[0].moves, ('A', 'B', 'C'))
+        self.assertEqual(shared_data[0].source_search2_value_loss_type, 'myloss2_pairwise')
+        self.assertEqual(shared_data[0].training_target, 'myloss2_pairwise')
+        self.assertEqual(target.indices, [0])
 
     def test_stalled_steps_fallback_keeps_value_label_and_escape_marker(self):
         shared = []

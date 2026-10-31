@@ -53,6 +53,8 @@ def _indices(value, ai_count):
 
 def _apply_inference_settings(ai, index, config):
     """Mirror Frame's search settings without constructing a GUI or replay."""
+    if ai.search_mode == 'search3':
+        ai.set_search3_value_loss_type(config.search3_value_loss_types[index])
     ai.use_torch_predict = bool(config.use_torch_predict[index])
     ai.skip_search = bool(config.skip_search[index])
     ai.skip_difference = float(config.search2_skip_differences[index])
@@ -134,6 +136,7 @@ def _settings(ai, config, index):
     return {
         'model': 'transformer' if ai.is_transformer else 'linear',
         'searchMode': ai.search_mode,
+        'search3ValueLossType': ai.search3_value_loss_type if ai.search_mode == 'search3' else None,
         'valueLossType': config.search2_value_loss_types[index],
         'valueLossMargin': float(config.search2_value_loss_margins[index]),
         'search2RankLossMix': float(config.search2_rank_loss_mixes[index]),

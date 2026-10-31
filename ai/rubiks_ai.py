@@ -20,11 +20,11 @@ from cube.search2_engine import Search2Engine
 from cube.search3_engine import Search3Engine
 from cube.rubiks_cube import Rubiks_3
 from ai.layers import Affine, Batch_Normalization, Hard_Sigmoid, ReLU, ResidualBlock, Sigmoid, SiLU, Transformer_SelfAttention, PieceTokenSelfAttention
-from ai.losses import BCEWithLogits, Huber, MyLoss2, MyLoss2Pairwise, Myloss, Soft_Target_Cross_Entropy, Softmax_Cross_Entropy
+from ai.losses import BCEWithLogits, Huber, MyLoss2, MyLoss2Pairwise, Myloss, RoutePairHuber, Soft_Target_Cross_Entropy, Softmax_Cross_Entropy, adjacent_mirror_pairs
 from ai.fixed_validation import evaluate_fixed_validation
 from ai.transformer_variance import transformer_parameter_target_variance
 from core.experiment_log import setup_effect_metrics
-from core.training_weights import SEARCH3_GREEDY_FALLBACK_WEIGHT
+from core.training_weights import SEARCH3_GREEDY_FALLBACK_WEIGHT, SEARCH3_SAMPLE_WEIGHT
 
 
 # The 4x4 orientation-normalized Effect calculation is costly. Replay items
@@ -38,7 +38,7 @@ class Rubiks_3_AI:
         """Expose the model type to search and solve-session consumers."""
         return bool(self.use_transformer_attention)
 
-    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_batch_mix_mode = 'ordered',train_short_sequence_max_steps = None,train_short_sequence_min_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_value_target_scale = 1.0,steps_to_goal_value_loss_weight = 1.0,steps_to_goal_states_per_band = 0,steps_to_goal_replay_stratified_ratio = 0.0,steps_to_goal_long_route_min_ratio = 0.0,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None,transformer_linear_skip = False,transformer_linear_skip_variance = 0.125,silu_beta_initial = 0.0):
+    def __init__(self,Mid,cube_size = 3,Activation = 'silu',cube = None,Batch_Normalize = False,search_mode = 'search2',residual = False,use_transformer_attention = False,transformer_attention_dim = 64,transformer_attention_token_mode = 'hidden',piece_attention_backward_chunk_size = 32,train_batch_size = None,train_state_batch_size = None,train_max_batches = None,train_recent_ratio = None,train_batch_mix_mode = 'ordered',train_short_sequence_max_steps = None,train_short_sequence_min_ratio = None,train_medium_sequence_min_steps = None,train_medium_sequence_max_steps = None,train_medium_sequence_ratio = None,train_long_sequence_min_steps = None,train_long_sequence_ratio = None,train_long_sequence_max_ratio = None,gradient_log_enabled = False,search2_value_loss_type = 'myloss2',search2_value_loss_margin = 0.2,search2_value_target_scale = 1.0,steps_to_goal_value_loss_weight = 1.0,steps_to_goal_states_per_band = 0,steps_to_goal_replay_stratified_ratio = 0.0,steps_to_goal_long_route_min_ratio = 0.0,search2_rank_loss_mix = 0.0,search2_rank_loss_apply_type = 'distance',search3_rank_loss_mix = 0.0,w1_initializers = None,transformer_linear_skip = False,transformer_linear_skip_variance = 0.125,silu_beta_initial = 0.0,wo_v_initial_variance = 2.0):
         if cube == None:
             self.cube = Rubiks_3(size = cube_size)
         else:
@@ -90,6 +90,9 @@ class Rubiks_3_AI:
         self.silu_beta_initial = float(silu_beta_initial)
         if not math.isfinite(self.silu_beta_initial):
             raise ValueError('silu_beta_initial must be finite')
+        self.wo_v_initial_variance = float(wo_v_initial_variance)
+        if not math.isfinite(self.wo_v_initial_variance) or self.wo_v_initial_variance < 0:
+            raise ValueError('wo_v_initial_variance must be finite and non-negative')
         self.ips = self.cube.ips
         self.ops = self.cube.move_len
         self.Mid = self.requested_Mid
@@ -272,9 +275,9 @@ class Rubiks_3_AI:
         if self.use_transformer_attention:
             self._initialize_transformer_parameter_variances()
 
-        if self.search_mode == "search3":
-            self.params['WO_V'] *= 0.05
-
+        # Affine initializes Var(WO_V) = 2 / fan_in. Preserve its draw at
+        # C=2 and rescale it for the configured Var(WO_V) = C / fan_in.
+        self.params['WO_V'] *= math.sqrt(self.wo_v_initial_variance / 2.0)
 
         self._apply_w1_initializers(w1_initializers)
 
@@ -304,7 +307,7 @@ class Rubiks_3_AI:
         self.losslayer2 = self._create_search2_value_loss()
         self.search2_rank_loss = self._create_search2_rank_loss()
         self.losslayer3 = BCEWithLogits()
-        self.search3_pairwise_loss = MyLoss2Pairwise(margin = self.search3_pairwise_margin)
+        self.search3_pairwise_loss = RoutePairHuber(margin=self.search3_pairwise_margin)
         self.search3_rank_loss = Myloss()
         self.losslayer4 = Soft_Target_Cross_Entropy()
         self.search3_value_sigmoid = Sigmoid()
@@ -889,7 +892,7 @@ class Rubiks_3_AI:
         if self.search2_value_loss_type == 'myloss':
             return Myloss(self.search2_value_loss_margin)
         if self.search2_value_loss_type == 'myloss2_pairwise':
-            return MyLoss2Pairwise(self.search2_value_loss_margin)
+            return RoutePairHuber(margin=self.search2_value_loss_margin)
         if self.search2_value_loss_type == 'steps_to_goal':
             # Normalize inside each route but retain one contribution per
             # route.  A global state mean made Value gradients disappear when
@@ -1954,6 +1957,7 @@ class Rubiks_3_AI:
             'step_metadata': step_metadata,
             'value_indices': value_indices,
             'value_objective': self.search3_value_loss_type,
+            'pair_margin': self.search3_pairwise_margin,
         }
 
     def _compute_search3_losses(self, out, policy_targets, value_targets, sample_weights, value_indices = None, policy_weights = None):
@@ -1987,20 +1991,22 @@ class Rubiks_3_AI:
 
         if self.search3_value_loss_type == 'pairwise':
             values = np.asarray(out[-1],dtype = 'f')
-            differences = np.concatenate([
-                values[start + 1:end] - values[start:end - 1]
-                for start,end in zip(search3_inputs['value_indices'][:-1],search3_inputs['value_indices'][1:])
-                if end - start > 1
-            ]) if len(values) > 1 else np.zeros(0,dtype='f')
+            pair_errors = []
+            for start,end in zip(search3_inputs['value_indices'][:-1],search3_inputs['value_indices'][1:]):
+                left,right = adjacent_mirror_pairs(start,end)
+                if left.size:
+                    pair_errors.extend(np.abs(
+                        values[right] - values[left]
+                        - self.search3_pairwise_margin * (right - left)
+                    ))
             policy_probs = self._softmax_columns(out[:-1])
             active_policy = policy_weights > 0.0
             target_moves = np.argmax(policy_targets,axis = 0)
             target_probs = policy_probs[target_moves,np.arange(policy_probs.shape[1])]
             return (
-                f'Search3 pairwise value debug: states={len(values)} pairs={len(differences)} '
+                f'Search3 pair Huber value debug: states={len(values)} pairs={len(pair_errors)} '
                 f'raw={float(np.min(values)):.4f}/{float(np.mean(values)):.4f}/{float(np.max(values)):.4f} '
-                f'delta_mean={float(np.mean(differences)) if differences.size else 0.0:.4f} '
-                f'margin_hit={float(np.mean(differences >= self.search3_pairwise_margin)) if differences.size else 0.0:.3f}\n'
+                f'target_mae={float(np.mean(pair_errors)) if pair_errors else 0.0:.4f}\n'
                 f'Search3 policy debug: target_prob={self._masked_min_mean_max_text(target_probs,active_policy)}'
             )
 
@@ -2127,17 +2133,23 @@ class Rubiks_3_AI:
                 'bce_sum': 0.0, 'mae_sum': 0.0,
                 'weight_sum': 0.0, 'delta_sum': 0.0,
                 'target_delta_sum': 0.0, 'sequence_count': 0,
-                'pairwise_loss_sum': 0.0, 'pairwise_weight_sum': 0.0,
-                'pairwise_hit_sum': 0.0,
+                'pair_huber_loss_sum': 0.0, 'pair_target_abs_error_sum': 0.0,
+                'pair_huber_weight_sum': 0.0,
             }
             for start,end in zip(search3_inputs['value_indices'][:-1],search3_inputs['value_indices'][1:]):
                 if end - start <= 1:
                     continue
-                differences = logits[start + 1:end] - logits[start:end - 1]
-                pair_weights = weights[start:end - 1]
-                metrics['pairwise_loss_sum'] += float(np.sum(pair_weights * np.logaddexp(0.0,1.0 - differences)))
-                metrics['pairwise_hit_sum'] += float(np.sum(pair_weights * (differences >= 1.0)))
-                metrics['pairwise_weight_sum'] += float(np.sum(pair_weights))
+                left,right = adjacent_mirror_pairs(start,end)
+                pair_scale = (end - start - 1) / left.size
+                pair_weights = pair_scale * weights[left]
+                errors = logits[right] - logits[left] - float(search3_inputs.get('pair_margin',1.0)) * (right - left)
+                absolute = np.abs(errors)
+                quadratic = np.minimum(absolute,1.0)
+                metrics['pair_huber_loss_sum'] += float(np.sum(pair_weights * (
+                    0.5 * quadratic ** 2 + (absolute - quadratic)
+                )))
+                metrics['pair_target_abs_error_sum'] += float(np.sum(pair_weights * absolute))
+                metrics['pair_huber_weight_sum'] += float(np.sum(pair_weights))
                 metrics['delta_sum'] += float(logits[end - 1] - logits[start])
                 metrics['sequence_count'] += 1
             return metrics
@@ -2199,7 +2211,7 @@ class Rubiks_3_AI:
         for key in (
             'policy_ce_sum','policy_weight_sum','bce_sum','mae_sum',
             'weight_sum','delta_sum','target_delta_sum',
-            'pairwise_loss_sum','pairwise_weight_sum','pairwise_hit_sum',
+            'pair_huber_loss_sum','pair_target_abs_error_sum','pair_huber_weight_sum',
         ):
             current[key] = current.get(key,0.0) + float(metrics.get(key,0.0))
         current['sequence_count'] += int(metrics.get('sequence_count',0))
@@ -2564,56 +2576,77 @@ class Rubiks_3_AI:
 
     @staticmethod
     def _search3_stored_sample_weight(data_item):
-        """Apply the current greedy weight to old replay without rewriting it."""
-        weight = float(getattr(data_item,'sample_weight',1.0))
-        if getattr(data_item,'search_mode',None) == 'myval':
-            return min(weight, SEARCH3_GREEDY_FALLBACK_WEIGHT)
-        return weight
+        """Apply the current fallback weight to saved replay as well."""
+        origin = str(getattr(data_item,'trajectory_source','') or '').lower().replace('_','-')
+        if origin in ('mixed','greedy-fallback','fallback') or getattr(data_item,'search_mode',None) == 'myval':
+            return SEARCH3_GREEDY_FALLBACK_WEIGHT
+        return SEARCH3_SAMPLE_WEIGHT
 
     @staticmethod
     def _search3_base_sample_weight(data_item):
-        """Scale Search2-produced routes by their Value learning objective."""
-        sample_weight = Rubiks_3_AI._search3_stored_sample_weight(data_item)
-        if getattr(data_item,'search_mode',None) == 'search2':
-            objective = str(getattr(data_item,'source_objective','') or '')
-            if objective == 'original_search2':
-                return sample_weight * 0.2
-            if objective in ('steps_to_goal','pairwise'):
-                return sample_weight * 0.8
-            return sample_weight * 0.5
-        return sample_weight
+        """Return the effective Search3 Value weight."""
+        return Rubiks_3_AI._search3_stored_sample_weight(data_item)
 
     @staticmethod
     def _search3_policy_sample_weight(data_item):
-        """Keep the Policy scale uniform across Search2 producers."""
-        sample_weight = Rubiks_3_AI._search3_stored_sample_weight(data_item)
-        if getattr(data_item,'search_mode',None) == 'search2':
-            return sample_weight * 0.5
-        return sample_weight
+        """Return the effective Search3 Policy weight."""
+        return Rubiks_3_AI._search3_stored_sample_weight(data_item)
+
+    @staticmethod
+    def _search3_embedded_step_weight(data_item, weight):
+        """Retain fallback markers while upgrading older direct weights."""
+        stored_weight = float(weight)
+        if stored_weight <= 0.0:
+            return 0.0
+        origin = str(getattr(data_item,'trajectory_source','') or '').lower().replace('_','-')
+        objective = str(getattr(data_item,'source_objective','') or '')
+        # Old Search3 mixed routes can mark greedy moves with 0.2. Search2
+        # direct routes also used 0.2, so their markers must stay full weight.
+        search3_route = objective == 'search3' or (objective in ('','legacy') and origin == 'mixed')
+        if stored_weight <= SEARCH3_GREEDY_FALLBACK_WEIGHT + 1.0e-8 or (
+            search3_route and stored_weight <= 0.2 + 1.0e-8
+        ):
+            return SEARCH3_GREEDY_FALLBACK_WEIGHT
+        return SEARCH3_SAMPLE_WEIGHT
 
     def _search3_step_weight(self, data_item, move_index):
         """Search3 Value 学習の 1 手分 sample weight を返す。"""
         per_step = getattr(data_item,'value_step_weights',None)
         if per_step is not None:
-            return float(per_step[move_index])
+            return self._search3_embedded_step_weight(data_item,per_step[move_index])
         return self._search3_base_sample_weight(data_item)
 
     def _search3_policy_step_weight(self, data_item, move_index):
         """Search3 Policy 学習の 1 手分 sample weight を返す。"""
         per_step = getattr(data_item,'policy_step_weights',None)
         if per_step is not None:
-            return float(per_step[move_index])
+            return self._search3_embedded_step_weight(data_item,per_step[move_index])
         return self._search3_policy_sample_weight(data_item)
 
     def _search3_terminal_step_weight(self, data_item):
         """終端状態のValue比較または絶対値教師に使うweightを返す。"""
         per_step = getattr(data_item,'value_step_weights',None)
         if per_step is not None:
-            return float(per_step[-1])
+            return self._search3_embedded_step_weight(data_item,per_step[-1])
         return self._search3_base_sample_weight(data_item)
+
+    @staticmethod
+    def _search3_replay_contains_fallback_prefix(data_item):
+        origin = str(getattr(data_item,'trajectory_source','') or '').lower().replace('_','-')
+        if origin in ('mixed','search3-fallback-prefix','fallback-prefix'):
+            return True
+        return (origin == 'fallback'
+                and getattr(data_item,'search_mode',None) in ('search3','transformer'))
 
     def learn_search3(self,transformation = 0,flip_inside = False, progress_callback = None):
         self._last_training_search3_quality_metrics = None
+        # Old connected replay can contain a Search3 prefix followed by
+        # greedy fallback. Its starting state does not describe a greedy-only
+        # teacher, so retire it rather than continuing to train on the prefix.
+        self.indices_search3 = [
+            index for index in self.indices_search3
+            if not self._search3_replay_contains_fallback_prefix(self.datas_search3[index])
+        ]
         training_result = self._run_training_epochs(
             indices = self.indices_search3,
             data_source = self.datas_search3,
@@ -2663,12 +2696,21 @@ class Rubiks_3_AI:
             'policyEffectiveStateCount': None if quality is None else float(quality.get('policy_weight_sum',0.0)),
             'valueBcePerState': None if pairwise_search3 else self._search3_quality_value(quality,'bce_sum','weight_sum'),
             'valueMae': None if pairwise_search3 else self._search3_quality_value(quality,'mae_sum','weight_sum'),
-            'valuePairwiseLossPerPair': self._search3_quality_value(quality,'pairwise_loss_sum','pairwise_weight_sum') if pairwise_search3 else None,
-            'valuePairwiseMarginHitRate': self._search3_quality_value(quality,'pairwise_hit_sum','pairwise_weight_sum') if pairwise_search3 else None,
+            'valuePairwiseLossPerPair': None,
+            'valuePairwiseMarginHitRate': None,
+            'valueSlopeMae': None,
+            'valueSlopeLossWeight': None,
+            'valuePairHuberPerPair': self._search3_quality_value(quality,'pair_huber_loss_sum','pair_huber_weight_sum') if pairwise_search3 else None,
+            'valuePairTargetMae': self._search3_quality_value(quality,'pair_target_abs_error_sum','pair_huber_weight_sum') if pairwise_search3 else None,
+            'valuePairwiseForm': (
+                'adjacent_mirror_huber_v1'
+                if pairwise_search3 or getattr(self,'search2_value_loss_type',None) == 'myloss2_pairwise'
+                else None
+            ),
             'search3ValueLossType': getattr(self,'search3_value_loss_type','absolute') if getattr(self,'search_mode',None) == 'search3' else None,
             'valueStartToEndDelta': self._search3_quality_value(quality,'delta_sum','sequence_count'),
             'valueTargetStartToEndDelta': None if pairwise_search3 else self._search3_quality_value(quality,'target_delta_sum','sequence_count'),
-            'valueEffectiveStateCount': None if quality is None else float(quality.get('pairwise_weight_sum' if pairwise_search3 else 'weight_sum',0.0)),
+            'valueEffectiveStateCount': None if quality is None else float(quality.get('pair_huber_weight_sum' if pairwise_search3 else 'weight_sum',0.0)),
             'valueSequenceCount': None if quality is None else int(quality.get('sequence_count',0)),
             # One optimizer step is applied for each processed training batch.
             'updatesDuringSolve': updates,
@@ -3141,12 +3183,7 @@ class Rubiks_3_AI:
 
     @staticmethod
     def _search3_training_weight_summary(selected_indices, data_source):
-        """Sum the Policy CE and Value BCE sample weights of selected items.
-
-        This distinguishes the full-weight Search3 fallback prefix from the
-        0.2-weight greedy continuation, which the older source counts merge.
-        No state tensors or per-route details are retained in the history.
-        """
+        """Sum effective Policy and Value weights of selected replay items."""
         result = {}
         for data_index in selected_indices:
             item = data_source[data_index]
@@ -3171,11 +3208,11 @@ class Rubiks_3_AI:
             value_steps = getattr(item,'value_step_weights',None)
             policy_steps = getattr(item,'policy_step_weights',None)
             value_weight = (
-                float(sum(value_steps)) if value_steps is not None
+                float(sum(Rubiks_3_AI._search3_embedded_step_weight(item,weight) for weight in value_steps)) if value_steps is not None
                 else Rubiks_3_AI._search3_base_sample_weight(item) * (move_count + 1)
             )
             policy_weight = (
-                float(sum(policy_steps)) if policy_steps is not None
+                float(sum(Rubiks_3_AI._search3_embedded_step_weight(item,weight) for weight in policy_steps)) if policy_steps is not None
                 else Rubiks_3_AI._search3_policy_sample_weight(item) * move_count
             )
             row['trajectoryCount'] += 1
@@ -4819,23 +4856,40 @@ class Rubiks_3_AI:
         return total_loss
 
     def _torch_search2_value_loss_pairwise(self, values, indices, reduction = 'sum'):
+        if reduction == 'trajectory_mean':
+            total_loss = torch.zeros((),dtype=values.dtype,device=values.device)
+            for start,end in zip(indices[:-1],indices[1:]):
+                if end - start > 1:
+                    differences = values[start + 1:end] - values[start:end - 1]
+                    total_loss = total_loss + torch.mean(F_torch.softplus(
+                        self.search2_value_loss_margin - differences,
+                    ))
+            return total_loss
+        if reduction != 'sum':
+            raise ValueError(f'unknown pairwise reduction: {reduction}')
+        return self._torch_route_pair_huber(
+            values,indices,margin=self.search2_value_loss_margin,
+        )
+
+    @staticmethod
+    def _torch_route_pair_huber(values, indices, margin, weights=None):
+        """Match RoutePairHuber without materializing all route pair combinations."""
         total_loss = torch.zeros((), dtype = values.dtype, device = values.device)
-        has_loss = False
-        margin = torch.as_tensor(self.search2_value_loss_margin, dtype = values.dtype, device = values.device)
-        for index in range(len(indices) - 1):
-            start = indices[index]
-            end = indices[index + 1]
-            if end - start <= 1:
+        for start,end in zip(indices[:-1],indices[1:]):
+            left,right = adjacent_mirror_pairs(start,end)
+            if left.size == 0:
                 continue
-            diffs = values[start + 1:end] - values[start:end - 1]
-            pair_losses = F_torch.softplus(margin - diffs)
-            total_loss = total_loss + (
-                torch.mean(pair_losses) if reduction == 'trajectory_mean'
-                else torch.sum(pair_losses)
+            left_indices = torch.as_tensor(left,dtype=torch.long,device=values.device)
+            right_indices = torch.as_tensor(right,dtype=torch.long,device=values.device)
+            targets = torch.as_tensor(margin * (right - left),dtype=values.dtype,device=values.device)
+            errors = values[right_indices] - values[left_indices] - targets
+            pair_losses = F_torch.smooth_l1_loss(
+                errors,torch.zeros_like(errors),reduction='none',beta=1.0,
             )
-            has_loss = True
-        if not has_loss:
-            return torch.zeros((), dtype = values.dtype, device = values.device)
+            pair_scale = (end - start - 1) / left.size
+            if weights is not None:
+                pair_losses = pair_losses * weights[left_indices]
+            total_loss = total_loss + pair_scale * torch.sum(pair_losses)
         return total_loss
 
     def _torch_search2_value_loss_steps_to_goal(self, values, value_steps_to_goal, indices, trajectory_origins):
@@ -4870,15 +4924,10 @@ class Rubiks_3_AI:
         policy_log_probs = F_torch.log_softmax(out[:-1],dim = 0)
         policy_loss = -torch.sum(policy_weights * policy_targets * policy_log_probs)
         if self.search3_value_loss_type == 'pairwise':
-            value_loss = torch.zeros((),dtype=out.dtype,device=out.device)
-            for start,end in zip(search3_inputs['value_indices'][:-1],search3_inputs['value_indices'][1:]):
-                if end - start > 1:
-                    differences = out[-1,start + 1:end] - out[-1,start:end - 1]
-                    value_loss = value_loss + torch.sum(
-                        sample_weights[0,start:end - 1] * F_torch.softplus(
-                            self.search3_pairwise_margin - differences,
-                        )
-                    )
+            value_loss = self._torch_route_pair_huber(
+                out[-1],search3_inputs['value_indices'],self.search3_pairwise_margin,
+                sample_weights.reshape(-1),
+            )
         else:
             value_loss = F_torch.binary_cross_entropy_with_logits(
                 out[-1:],

@@ -6,7 +6,7 @@ import numpy as np
 from collections import Counter
 
 from model.search_result import data_search3
-from core.training_weights import SEARCH3_GREEDY_FALLBACK_WEIGHT
+from core.training_weights import SEARCH3_GREEDY_FALLBACK_WEIGHT, SEARCH3_SAMPLE_WEIGHT
 
 
 def sigmoid(x):
@@ -18,6 +18,37 @@ class SearchDataManager:
 
     def __init__(self, frame):
         self.frame = frame
+
+    @staticmethod
+    def erase_revisited_states(cube, scramble, moves):
+        """Remove closed walks while preserving the route's final cube state.
+
+        Return surviving original move indices so per-step Policy labels can
+        follow the same route. Distinct routes may still meet at one state.
+        """
+        snapshot = cube.state.copy()
+        try:
+            cube.reset()
+            cube.scramble(0, Move=tuple(scramble))
+            states = [tuple(cube.state)]
+            seen = {states[0]: 0}
+            kept = []
+            for original_index, move in enumerate(moves):
+                cube.make_move(move)
+                state = tuple(cube.state)
+                previous = seen.get(state)
+                if previous is not None:
+                    for old_state in states[previous + 1:]:
+                        del seen[old_state]
+                    del states[previous + 1:]
+                    del kept[previous:]
+                    continue
+                kept.append(original_index)
+                seen[state] = len(states)
+                states.append(state)
+            return tuple(moves[index] for index in kept), tuple(kept)
+        finally:
+            cube.state[:] = snapshot
 
     @staticmethod
     def source_objective(source_ai):
@@ -79,7 +110,7 @@ class SearchDataManager:
             {'source': 'bootstrap'},
             policy_target = self._one_hot_policy_target(segment_moves),
             search_mode = 'bootstrap',
-            sample_weight = 0.1,
+            sample_weight = SEARCH3_SAMPLE_WEIGHT,
             value_targets = value_targets,
             root_value_raw = value_trace_raw[0],
             value_trace_raw = value_trace_raw,
@@ -115,10 +146,19 @@ class SearchDataManager:
 
         ai = self.frame.AIs[ai_index]
         source_ai = self.frame.AIs[self.frame.AI_idx]
+        fallback_only = (
+            bool(getattr(state,'fallback_used',False))
+            and getattr(source_ai,'search_mode',None) in ('search3','transformer')
+        )
         next_index = len(ai.datas_search3)
         sample_cache = self._search3_sample_cache(state)
         pairwise_segments = []
         for history_index, history_item in enumerate(state.search_history):
+            # Progressive Search3 may have moved through several states before
+            # greedy recovery. Its partial search path did not solve the cube;
+            # only the greedy route from its own starting state is a teacher.
+            if fallback_only and getattr(history_item['search_result'],'search_mode',None) != 'myval':
+                continue
             if history_index not in sample_cache:
                 sample_cache[history_index] = self.build_search3_training_sample(
                     history_index,
@@ -137,25 +177,33 @@ class SearchDataManager:
             next_index += 1
         if pairwise_segments:
             connected = self.build_connected_pairwise_search3_sample(pairwise_segments,ai)
-            ai.datas_search3.append(connected)
-            ai.indices_search3.append(next_index)
+            if connected is not None:
+                ai.datas_search3.append(connected)
+                ai.indices_search3.append(next_index)
 
     def build_connected_pairwise_search3_sample(self, segments, ai):
         """Keep all successful moves and segment Policy labels in one Value route."""
         first = segments[0]
-        moves = tuple(move for segment in segments for move in segment.moves)
-        policy_targets_by_step = {}
-        value_step_weights = []
-        policy_step_weights = []
+        original_moves = tuple(move for segment in segments for move in segment.moves)
+        moves, kept_indices = self.erase_revisited_states(ai.cube, first.scramble, original_moves)
+        if not moves:
+            return None
+        original_policy_targets = {}
+        original_value_weights = []
+        original_policy_weights = []
         offset = 0
         for segment in segments:
             if segment.search_mode == 'search3' and segment.policy_target is not None:
-                policy_targets_by_step[offset] = np.asarray(segment.policy_target,dtype='f').copy()
+                original_policy_targets[offset] = np.asarray(segment.policy_target,dtype='f').copy()
             for local_index in range(len(segment.moves)):
-                value_step_weights.append(ai._search3_step_weight(segment,local_index))
-                policy_step_weights.append(ai._search3_policy_step_weight(segment,local_index))
+                original_value_weights.append(ai._search3_step_weight(segment,local_index))
+                original_policy_weights.append(ai._search3_policy_step_weight(segment,local_index))
             offset += len(segment.moves)
-        value_step_weights.append(ai._search3_terminal_step_weight(segments[-1]))
+        policy_targets_by_step = {
+            new_index: original_policy_targets[old_index]
+            for new_index, old_index in enumerate(kept_indices)
+            if old_index in original_policy_targets
+        }
         connected = data_search3(
             first.scramble,
             moves,
@@ -163,7 +211,8 @@ class SearchDataManager:
             first.root_value,
             [],
             segments[-1].best_value,
-            {'source': 'search3_pairwise_connected'},
+            {'source': 'search3_pairwise_connected',
+             'removedRevisitedMoves': len(original_moves) - len(moves)},
             policy_target = policy_targets_by_step.get(0),
             search_mode = getattr(ai,'search_mode','search3'),
             sample_weight = 1.0,
@@ -181,8 +230,12 @@ class SearchDataManager:
             training_target = 'search3',
         )
         connected.policy_targets_by_step = policy_targets_by_step
-        connected.value_step_weights = tuple(value_step_weights)
-        connected.policy_step_weights = tuple(policy_step_weights)
+        connected.value_step_weights = tuple(
+            original_value_weights[index] for index in kept_indices
+        ) + (ai._search3_terminal_step_weight(segments[-1]),)
+        connected.policy_step_weights = tuple(
+            original_policy_weights[index] for index in kept_indices
+        )
         return connected
 
     def store_connected_search3_data(self, source_ai):
@@ -405,14 +458,10 @@ class SearchDataManager:
         return features
 
     def search3_sample_weight(self, search_result):
-        """探索モードごとにSearch3学習のサンプル重みを決める。"""
-        if search_result.search_mode == 'search3':
-            return 1.0
-        if search_result.search_mode == 'search2':
-            return 1.0
-        if search_result.search_mode == 'myval':
+        """Greedy fallback由来の手だけ重みを下げる。"""
+        if getattr(search_result,'search_mode',None) == 'myval':
             return SEARCH3_GREEDY_FALLBACK_WEIGHT
-        return 1.0
+        return SEARCH3_SAMPLE_WEIGHT
 
     def dataset_summary_text(self, ai_index):
         """Return a human-readable summary of Search2/Search3 datasets for one AI."""

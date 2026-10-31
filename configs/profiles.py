@@ -232,87 +232,12 @@ def _default_initial_scramble_groups(size,puzzle_type):
     elif size == 4:
         return (
             [
-                (" R "," U2"," R'"," L'"," U2"," L ","2R2"," F2","2R'"," B2","2R "," F2","2R'"," B2","2R'"),
-                (" U2"," R "," U2"," R'"," L'"," U2"," L "," U2","2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2"),
-                (" F "," R "," F'","2U "," F "," R'"," F'"),
-                (" R "," F'"," R'","2U "," R "," F "," R'"),
-                (" F2"," R "," F2","2U "," F2"," R'"," F2"),
-                (" R2"," F "," R2","2U "," R2"," F'"," R2"),
-                (" F "," R "," F'","2U2"," F "," R'"," F'"),
-                (" R "," F'"," R'","2U2"," R "," F "," R'"),
-                (" F2"," R "," F2","2U2"," F2"," R'"," F2"),
-                (" R2"," F "," R2","2U2"," R2"," F'"," R2"),
-                ("2R2"," F2","2R'"," B2","2R "," F2","2R'"," B2","2R'") + (" F "," R "," U "," R'"," U'"," F'") * 2,
-                (" F "," R "," U "," R'"," U'"," F'") * 2 + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
-                (" F "," R "," U "," R'"," U'"," F'") * 2 + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
-                (" F "," R "," U "," R'"," U'"," F'") * 2 + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
-                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" F "," U "," R "," U'"," R'"," F'") * 2,
-                (" F "," U "," R "," U'"," R'"," F'") * 2 + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
-                (" F "," U "," R "," U'"," R'"," F'") * 2 + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
-                (" F "," U "," R "," U'"," R'"," F'") * 2 + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
-                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'"),
-                (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
-                (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'") + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
-                (" F "," U "," R "," U2"," R'"," U "," R "," U2"," R'"," U'"," F'") + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
-                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" R'"," F "," R "," U "," R'"," U'"," F'"," U "," R "),
-                (" R'"," F "," R "," U "," R'"," U'"," F'"," U "," R ") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
-                (" R'"," F "," R "," U "," R'"," U'"," F'"," U "," R ") + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
-                (" R'"," F "," R "," U "," R'"," U'"," F'"," U "," R ") + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
-                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" R'"," U'"," F "," U "," R "," U'"," R'"," F'"," R "),
-                (" R'"," U'"," F "," U "," R "," U'"," R'"," F'"," R ") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
-                (" R'"," U'"," F "," U "," R "," U'"," R'"," F'"," R ") + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
-                (" R'"," U'"," F "," U "," R "," U'"," R'"," F'"," R ") + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
-                ("2R "," B2","2R "," F2","2R'"," B2","2R "," F2","2R2") + (" R "," U "," R'"," F "," R'"," F'"," R "),
-                (" R "," U "," R'"," F "," R'"," F'"," R ") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'," U "),
-                (" R "," U "," R'"," F "," R'"," F'"," R ") + ("2R2"," F2"," U2","2R2"," U2"," F2","2R2"," U2"),
-                (" R "," U "," R'"," F "," R'"," F'"," R ") + ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2"," U'"),
-                (" R "," B'"," R'"," F "," R "," B "," R'"," F'","2R2"," F2","2R'"," B2","2R "," F2","2R'"," B2","2R'","2F "," R2","2F "," L2","2F'"," R2","2F "," L2","2F2"),
-                (" L2", " F2", " U2", " L'", " U2", " L2", " F2", " L'", " U2", " L2", " U2", " F2", " L'", " F2","2R2"," B2","2R "," F2","2R'"," B2","2R "," F2","2R ","2F'"," L2","2F'"," R2","2F "," L2","2F'"," R2","2F2"),
-                (" R "," U "," R'"," U'"," F'"," U "," F ") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'),
-                (" F'"," U'"," F "," U "," R "," U'"," R'") + ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2'),
-                (" U ","2R ","2F ","2R'","2F'","2L'","2B'","2L ","2B "," U'"),
-                (" U ","2R ","2F'","2R'","2F ","2L'","2B ","2L ","2B'"," U'"),
-
-                (" F2"," U2","2R2"," U2"," F2","2R2"),
-                ("2U "," R "," U "," R'","2U'"," F2","2L2"," U "," L'"," U'","2L2"),
-                ("2R "," U "," F'"," U'"," F ","2R'"," R2","2L "," D "," L2"," D'","2L'"),
-                ('2R2', ' D2', "2L'", ' U2', '2R ', ' U2', ' F2', '2R ', ' F2', "2R'", ' F2', '2L ', ' F2', ' D2', '2R2') + ("2F "," R "," U "," R'"," U'","2F'"," D2","2F "," U "," F "," U'","2F'"),
-                ("2R2"," F2","2R "," U2","2R "," U2"," F2","2R "," F2","2R'"," F2","2R "," F2","2R2"," F2") + ("2B "," U "," B "," U'"," B'","2B'"," R2","2F "," R "," F2"," R'","2F'"),
-
-                (" B2","2D2"," B2"," R2"," B2","2D ","2U'"," B2","2U ","2D "," R2","2R2","2U ","2R2","2U'"," F ","2F2","2D'","2F2","2D "," F'"),
-                ("2D "," R2","2D "," L2","2D'"," L2"," R2","2U "," L2","2U'"," L2"," B2","2U'"," B2","2D'"," R2","2U ","2F2","2U'","2F2"," R2"," F ","2D ","2R2","2D'","2R2"," F'"),
-                ("2R2","2F2","2U2","2F2","2R2"," F ","2R2","2U ","2R2","2U'"," F'"),
-                (" F2","2U "," F2","2U "," F2","2U "," F2","2U "," F2","2U2","2R2","2U ","2R2"," F2"),
-
-                ("2R ","2U ","2R'"," F ","2R ","2U'","2R'"),
-                ("2R ","2U'","2R'"," F ","2R ","2U ","2R'"),
-                ("2R ","2U2","2R'"," F ","2R ","2U2","2R'"),
-                ("2R ","2U ","2R'"," F2","2R ","2U'","2R'"),
-                ("2R ","2U'","2R'"," F2","2R ","2U ","2R'"),
-                ("2R ","2U2","2R'"," F2","2R ","2U2","2R'"),
-
-                (" R ","2U2"," R'"," U2"," R ","2U2"," R'"," U2"),
-                (" U "," R ","2U2"," R'"," U2"," R ","2U2"," R'"," U "),
-                (" U'"," R ","2U2"," R'"," U2"," R ","2U2"," R'"," U'"),
-                (" U2"," R ","2U2"," R'"," U2"," R ","2U2"," R'"),
-
-                ("2R "," U ","2R'"," D ","2R "," U'","2R'"," D'"),
-                ("2R'"," U ","2R'"," D ","2R "," U'","2R'"," D'","2R2"),
-                ("2R2"," U ","2R'"," D ","2R "," U'","2R'"," D'","2R'"),
-                (" U ","2R'"," D ","2R "," U'","2R'"," D'","2R "),
-
-                ('2U2', "2F'", ' L ', '2F ', ' R ', "2F'", " L'", '2F ', " R'", '2U2'),
-                ('2U2', ' R ', "2F'", ' L ', '2F ', " R'", "2F'", " L'", '2F ', '2U2'),
-                ('2D2', "2B'", ' R ', '2B ', ' L ', "2B'", " R'", '2B ', " L'", '2D2'),
-                ('2D2', ' L ', "2B'", ' R ', '2B ', " L'", "2B'", " R'", '2B ', '2D2'),
-
-
-
-
-
+                (" R ","2F2"," U ","2D2"," L ","2R2"," F ","2U2"," D ","2L2"),
+                (" U ","2R2"," U'"," L'"," U ","2R2"," U'"," L "),
+                (" F ","2R "," U2","2R "," U2"," F2","2R "," F2","2L'"," U2","2L "," U2","2R2"," F'"),
+                (" U ","2R ","2F'","2R'","2F "," U'"),
             ],
             [
-                (" L2", " F2", " U2", " L'", " U2", " L2", " F2", " L'", " U2", " L2", " U2", " F2", " L'", " F2","2F2"," R2"," U2","2F2"," U2"," R2","2F2"),
             ],
             [
             ],
@@ -393,8 +318,7 @@ def build_experiment_frame_config():
         else 'search2'
         for ai_index in range(25)
     ]
-    # AI20/21 are Linear steps-to-goal/pairwise controls; AI22-24 are their
-    # Transformer counterparts, with AI22's relative-loss treatment.
+    # AI20/21 are Linear pairwise AIs; AI22-24 are Transformer pairwise AIs.
     original_transformer_attention = [False] * 10 + [True] * 10 + [False,False,True,True,True]
     ai_count = len(ai_search_modes)
     is_search2_ai = [mode.startswith('search2') for mode in ai_search_modes]
@@ -403,58 +327,34 @@ def build_experiment_frame_config():
         5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,5.0e-6,
         2.0e-6,2.0e-6,2.0e-6,5.0e-6,5.0e-6,
     ]
-    # Match Transformer decay strength to the Linear AI with the same search mode.
-    wdlrs = [
-        1.0e-7 if is_search2_ai[ai_index] else 1.0e-5
-        for ai_index in range(ai_count)
-    ]
+    # Search3 now uses the same relative pairwise Value objective as AI20-24.
+    # Match their parameter decay while comparing the learned Value scale.
+    wdlrs = [1.0e-7] * ai_count
     skip_search = [is_search2_ai[ai_index] for ai_index in range(ai_count)]
     weight_decay = [True] * ai_count
     activations = ['SiLU'] * ai_count
     silu_beta_initials = [0.2] * ai_count  # AIごとに初期Betaを指定
     residuals = [True] * ai_count
-    # AI21/23/24 compare route-state pairs again.  They share the same
-    # direct, connected routes as the calibrated steps_to_goal group, while
-    # retaining their own pairwise Value objective.
-    search2_value_loss_types = ['myloss'] * 20 + [
-        'steps_to_goal', 'myloss2_pairwise', 'steps_to_goal',
-        'myloss2_pairwise', 'myloss2_pairwise',
-    ]
+    # AI20-24 compare adjacent and mirrored states on each complete route.
+    search2_value_loss_types = ['myloss'] * 20 + ['myloss2_pairwise'] * 5
     # Original Search2 compares every state on a segment with its endpoint.
-    # Pairwise Search2 applies the same one-point margin to adjacent states.
+    # Pairwise Search2 fits Huber targets on adjacent and mirrored route pairs.
     search2_value_loss_margins = [
         1.0 if is_search2_ai[index] and (
-            search2_value_loss_types[index] in ('myloss', 'myloss2_pairwise') or index == 22
+            search2_value_loss_types[index] in ('myloss', 'myloss2_pairwise')
         )
         else 0.0
         for index in range(ai_count)
     ]
-    # The calibrated regression group uses only its direct Huber objective.
+    # Keep legacy regression options inert while all five AIs use pairwise.
     search2_value_target_scales = [1.0] * ai_count
-    # Keep the target at -n.  This coefficient only balances the regression
-    # loss after route-wise normalization.
-    # AI22's long-route replay is populated, but its Value gradient share
-    # fell to roughly 2%.  Increase only this treatment; AI20 remains the
-    # calibrated Linear reference and the target stays at -remaining_steps.
-    steps_to_goal_value_loss_weights = [0.0] * 20 + [5.0,5.0,3.0,1.0,1.0]
-    # Keep at most twelve Value states from each near/mid/far remaining-step
-    # band in one route.  Policy training still sees the complete route.
-    steps_to_goal_states_per_bands = [0] * 20 + [12] * 5
-    # Transformer steps_to_goal replay reserves most non-recent samples for
-    # an even mix of remaining-step bands and route efficiency.
-    # Linear models consume their full buffer, so this is observational there.
-    steps_to_goal_replay_stratified_ratios = [0.0] * 22 + [0.75] * 3
-    # Guarantee that the calibrated Value objectives revisit genuinely long
-    # direct routes even after the replay buffer has filled with short ones.
-    # This is route-level sampling, distinct from within-route state balancing.
-    # AI20 is Linear and consumes the complete buffer, so a sampling quota
-    # would not change it.  Apply the reservation to Transformer AI22 only.
-    steps_to_goal_long_route_min_ratios = [0.0] * 22 + [0.25,0.0,0.0]
-    # AI22 alone rehearses successful recovery from a Search2 stall. Limit
-    # replay duplication and emphasize only the first three escape moves.
-    steps_to_goal_plateau_fallback_min_ratios = [0.05 if index == 22 else 0.0 for index in range(ai_count)]
-    steps_to_goal_plateau_escape_rank_mixes = [1.0 if index == 22 else 0.0 for index in range(ai_count)]
-    steps_to_goal_plateau_escape_prefix_steps = [3 if index == 22 else 0 for index in range(ai_count)]
+    steps_to_goal_value_loss_weights = [1.0] * ai_count
+    steps_to_goal_states_per_bands = [0] * ai_count
+    steps_to_goal_replay_stratified_ratios = [0.0] * ai_count
+    steps_to_goal_long_route_min_ratios = [0.0] * ai_count
+    steps_to_goal_plateau_fallback_min_ratios = [0.0] * ai_count
+    steps_to_goal_plateau_escape_rank_mixes = [0.0] * ai_count
+    steps_to_goal_plateau_escape_prefix_steps = [0] * ai_count
     # Reserve a modest share of Original Transformer replay for complete,
     # directly solved 31+ routes.  The sampler rejects strong detours and
     # limits repeats of a single route to avoid teaching one long anecdote.
@@ -470,43 +370,29 @@ def build_experiment_frame_config():
         0.40 if ai_index in (10,11,18,19,22) else 0.0
         for ai_index in range(ai_count)
     ]
-    # A direct solve that takes over three times its initial scramble length
-    # is useful Policy data but a poor absolute remaining-step calibration
-    # target.  Keep its policy/pairwise training while excluding it only from
-    # the two calibrated steps_to_goal Value losses.
-    # The latest fixed validation still loses Value ordering beyond 10 steps.
-    # Keep every successful route for Policy, but tighten the absolute Value
-    # teacher to routes no more than twice the setup distance.  This removes
-    # ambiguous recovery detours without reducing the long-route quota.
-    steps_to_goal_value_max_route_efficiencies = [0.0] * 20 + [2.0,0.0,2.0,0.0,0.0]
-    # Balance Huber supervision across remaining-step bands inside one batch.
-    # The cap is an oversampling bound, so every selected direct trajectory
-    # remains available to Policy even when 31+ Value states are scarce.
-    steps_to_goal_value_batch_band_max_copies = [1] * 20 + [3,1,3,1,1]
-    # Keep AI20 as the shortest-label control; AI22 omits ambiguous exact
-    # states only from its absolute Value loss.
-    steps_to_goal_exclude_conflicting_value_states = [
-        index == 22 for index in range(ai_count)
-    ]
+    steps_to_goal_value_max_route_efficiencies = [0.0] * ai_count
+    steps_to_goal_value_batch_band_max_copies = [1] * ai_count
+    steps_to_goal_exclude_conflicting_value_states = [False] * ai_count
     # Transformer pairwise buffers currently contain about one third fallback
     # routes.  Keep a direct-route majority in each sampled learning pass.
-    pairwise_fallback_max_ratios = [1.0] * 23 + [0.25,0.25]
-    # AI22 keeps its absolute -remaining-steps target, with an additional
-    # route-wise relative ordering objective. AI20 and pairwise AIs are controls.
-    search2_rank_loss_mixes = [1.0 if index == 22 else 0.0 for index in range(ai_count)]
-    search2_rank_loss_apply_types = ['all'] * 20 + ['none','none','steps_pairwise','none','none']
+    pairwise_fallback_max_ratios = [1.0] * 22 + [0.25] * 3
+    # The pairwise Huber objective is complete on its own.
+    search2_rank_loss_mixes = [0.0] * ai_count
+    search2_rank_loss_apply_types = ['all'] * 20 + ['none'] * 5
     # The experimental pairwise Value objective is complete on its own.
     search3_rank_loss_mixes = [0.0] * ai_count
-    # Experiment: train every Search3 Value head from adjacent successful
-    # route comparisons and search with its raw output.
+    # Experiment: train every Search3 Value head from adjacent and mirrored
+    # successful-route pairs with Huber targets, and search with raw Value.
     search3_value_loss_types = [
         'absolute' if is_search2_ai[ai_index] else 'pairwise'
         for ai_index in range(ai_count)
     ]
-    # Use one fixed 10k-playout budget for every Search3 AI.  Branches start
-    # narrow and open with visits; the progressive early-stop/rescue settings
-    # below remain available for a later controlled comparison, but are inert.
-    search3_budget_modes = ['fixed'] * ai_count
+    # Try staged Search3 allocation for one experiment cycle with the current
+    # pairwise Value checkpoints. Search2 AIs do not use this budget mode.
+    search3_budget_modes = [
+        'progressive' if mode == 'search3' else 'fixed'
+        for mode in ai_search_modes
+    ]
     search3_budget_stage_playouts = [(1000,3000,6000)] * ai_count
     search3_budget_confidence_visit_shares = [0.70] * ai_count
     # The progressive variants otherwise abandon 30+ move cases at tier 2
@@ -710,7 +596,7 @@ def build_experiment_frame_config():
             1.0, 1.0,                 # Search3: AI10-11 (unused)
             30.0, 30.0, 50.0, 50.0, 70.0, 70.0,  # Original Transformer: AI12-17
             1.0, 1.0,                 # Search3: AI18-19 (unused)
-            *([1000.0] * 5),          # steps_to_goal / pairwise: AI20-24
+            *([1000.0] * 5),          # pairwise: AI20-24
         ],
         search2_torch_batch_sizes = [
             64 if original_transformer_attention[ai_index] else 100
@@ -773,6 +659,9 @@ def build_experiment_frame_config():
         original_transformer_linear_skip_variances = [
             0.125 if enabled else 0.0 for enabled in original_transformer_attention
         ],
+        # Per-AI coefficient C in Var(WO_V) = C / fan_in. C=2.0 preserves
+        # the standard Affine initialization for both Linear and Transformer.
+        wo_v_initial_variances = [2.0] * ai_count,
         original_transformer_attention_token_modes = ['piece'] * ai_count,
         original_piece_attention_backward_chunk_sizes = [32] * ai_count,
         original_train_batch_sizes = [
@@ -788,7 +677,8 @@ def build_experiment_frame_config():
             for ai_index in range(ai_count)
         ],
         original_train_recent_ratios = [
-            (0.25 if ai_index in (19,22,23,24)
+            (0.25 if original_transformer_attention[ai_index]
+             and (not is_search2_ai[ai_index] or ai_index in (22,23,24))
              else (0.5 if original_transformer_attention[ai_index] else 0.0))
             for ai_index in range(ai_count)
         ],
@@ -846,5 +736,5 @@ def build_experiment_frame_config():
         priority_list = priority_list,
         bootstrap_datas = bootstrap_datas,
         bootstrap_search3_datas = bootstrap_search3_datas,
-        supplemental_myperm_composites = puzzle_type == 'cube' and cube_size == 4,
+        supplemental_myperm_composites = False,
     )

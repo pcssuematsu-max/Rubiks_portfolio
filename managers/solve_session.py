@@ -1857,18 +1857,15 @@ class SolveSessionManager:
         """Store one whole successful Search2 route for shared Value learning.
 
         Search2 can apply several separately searched move segments before the
-        goal.  The regression target must use the distance to that final
-        goal, not the length of each local segment; pairwise consumes the
-        same complete ordering.  Join the route before simplifying and
-        calculating the descending step labels.
+        goal. Join the route before simplifying; both distance regression and
+        pairwise learning need the complete ordering of route states.
         """
         state = self.frame.solve_state
         source_ai = self._current_source_ai()
         if getattr(source_ai, 'search_mode', None) not in ('search2', 'search3', 'transformer'):
             return False
         if target_ai_indices is None:
-            # Direct successes are intentionally shared: the regression and
-            # pairwise objectives observe precisely the same whole route.
+            # Direct successes are intentionally shared across Value objectives.
             target_ai_indices = self._steps_to_goal_shared_search2_ai_indices()
         if not target_ai_indices:
             return False
@@ -1877,12 +1874,18 @@ class SolveSessionManager:
         )
         if len(connected_moves) == 0:
             return False
+        has_regression_target = any(
+            getattr(self.frame.AIs[index], 'search2_value_loss_type', None) == 'steps_to_goal'
+            for index in target_ai_indices
+        )
         return self._store_search2_training_sample(
             state.s,
             connected_moves,
             source_ai = source_ai,
             source_search_mode = getattr(source_ai, 'search_mode', 'search2'),
-            source_value_loss_type = 'steps_to_goal_regression',
+            source_value_loss_type = (
+                'steps_to_goal_regression' if has_regression_target else 'myloss2_pairwise'
+            ),
             target_ai_indices = target_ai_indices,
         )
 
@@ -1942,10 +1945,6 @@ class SolveSessionManager:
         if len(simplified_moves) == 0:
             return False
 
-        rewards = np.zeros(len(simplified_moves),dtype = 'f')
-        rewards[-1] = 10
-        datas = self.frame.cube.make_transformations(scramble,simplified_moves)
-
         state = self.frame.solve_state
         if source_ai is None:
             source_ai = self._current_source_ai()
@@ -1972,6 +1971,22 @@ class SolveSessionManager:
             source_value_loss_type = 'myval'
         if target_ai_indices is None:
             target_ai_indices = self._default_search2_target_ai_indices(source_value_loss_type)
+        if any(
+            self.frame.AIs[index].search2_value_loss_type == 'myloss2_pairwise'
+            for index in target_ai_indices
+        ):
+            loop_free_moves, _ = self.frame.search_data_manager.erase_revisited_states(
+                self.frame.cube, scramble, moves,
+            )
+            simplified_moves = self.frame.cube.simplify(loop_free_moves)
+            simplified_moves, _ = self.frame.search_data_manager.erase_revisited_states(
+                self.frame.cube, scramble, simplified_moves,
+            )
+            if not simplified_moves:
+                return False
+        rewards = np.zeros(len(simplified_moves),dtype = 'f')
+        rewards[-1] = 10
+        datas = self.frame.cube.make_transformations(scramble,simplified_moves)
         data_item = data(
             datas[0][0],
             datas[1][0],

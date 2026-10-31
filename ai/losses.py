@@ -267,7 +267,7 @@ class MyLoss2:
 
 
 class MyLoss2Pairwise:
-    """Adjacent pairwise margin loss for Search2 value training."""
+    """Adjacent softplus ranking loss for the steps_to_goal auxiliary term."""
 
     def __init__(self, margin = 0.2, reduction = 'sum'):
         self.margin = float(margin)
@@ -320,6 +320,71 @@ class MyLoss2Pairwise:
             dO[:,start + 1:end] += d
             diff_index += count
         return dO
+
+
+def adjacent_mirror_pairs(start, end):
+    """Return each adjacent and nonduplicate mirrored route pair in O(length)."""
+    count = end - start
+    if count < 2:
+        empty = np.zeros(0,dtype='i')
+        return empty,empty
+    left = np.arange(start,end - 1,dtype='i')
+    right = left + 1
+    mirror_offsets = np.arange(count // 2,dtype='i')
+    mirror_left = start + mirror_offsets
+    mirror_right = end - 1 - mirror_offsets
+    nonadjacent = mirror_right - mirror_left > 1
+    if np.any(nonadjacent):
+        left = np.concatenate((left,mirror_left[nonadjacent]))
+        right = np.concatenate((right,mirror_right[nonadjacent]))
+    return left,right
+
+
+class RoutePairHuber:
+    """Huber regression on adjacent and mirrored route Value differences."""
+
+    def __init__(self, margin=1.0, delta=1.0):
+        self.margin = float(margin)
+        self.delta = max(1.0e-8,float(delta))
+        self.gradient = np.zeros((1,0),dtype='f')
+        self.pair_count = 0
+        self.pair_weight_sum = 0.0
+        self.pair_abs_error_sum = 0.0
+
+    def forward(self, x, indices, w=None):
+        self.gradient = np.zeros_like(x)
+        self.pair_count = 0
+        self.pair_weight_sum = 0.0
+        self.pair_abs_error_sum = 0.0
+        weights = None if w is None else np.asarray(w,dtype=x.dtype).reshape(-1)
+        if weights is not None and weights.size != x.shape[1]:
+            raise ValueError('pairwise weights must match the state count')
+        loss = 0.0
+        for start,end in zip(indices[:-1],indices[1:]):
+            left,right = adjacent_mirror_pairs(start,end)
+            if left.size == 0:
+                continue
+            # Adding mirrored pairs should not silently increase a long
+            # route's total weight relative to the old adjacent-only loss.
+            scale = (end - start - 1) / left.size
+            pair_weights = np.ones(left.size,dtype=x.dtype) if weights is None else weights[left]
+            pair_weights = scale * pair_weights
+            errors = x[0,right] - x[0,left] - self.margin * (right - left)
+            absolute = np.abs(errors)
+            quadratic = np.minimum(absolute,self.delta)
+            loss += float(np.sum(pair_weights * (
+                0.5 * quadratic ** 2 + self.delta * (absolute - quadratic)
+            )))
+            derivatives = pair_weights * np.clip(errors,-self.delta,self.delta)
+            np.add.at(self.gradient[0],left,-derivatives)
+            np.add.at(self.gradient[0],right,derivatives)
+            self.pair_count += int(left.size)
+            self.pair_weight_sum += float(np.sum(pair_weights))
+            self.pair_abs_error_sum += float(np.sum(pair_weights * absolute))
+        return loss
+
+    def backward(self):
+        return self.gradient
 
 
 class Huber:
