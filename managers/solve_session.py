@@ -335,7 +335,7 @@ class SolveSessionManager:
             self._append_initial_value(AI)
 
         if self._uses_progressive_search3(AI):
-            self._show_latest_progressive_move(state.last_search_result)
+            self._show_progressive_move_sequence(state.last_search_result)
         self._set_status('探索中', getattr(AI, 'search_mode', 'search'))
         search_started_at = perf_counter()
         if self._uses_search3(AI):
@@ -383,7 +383,7 @@ class SolveSessionManager:
             self._advance_search_engine(AI, move)
 
         if reduced_lis[0] and self._uses_progressive_search3(AI):
-            self._show_latest_progressive_move(search_result)
+            self._show_progressive_move_sequence(search_result)
         if (self.frame.cube.state == current_state).all():
             self._handle_no_progress_search(AI)
 
@@ -693,8 +693,8 @@ class SolveSessionManager:
     def _uses_progressive_search3(self, AI):
         return self._uses_search3(AI) and getattr(AI, 'search3_budget_mode', None) == 'progressive'
 
-    def _show_latest_progressive_move(self, search_result):
-        """Show the last applied move above only the current Search3 attempts."""
+    def _show_progressive_move_sequence(self, search_result):
+        """Show all applied moves in one row above current Search3 attempts."""
         state = self.frame.solve_state
         for rows in (
             state.display_move_lis,
@@ -704,13 +704,25 @@ class SolveSessionManager:
             state.display_val_lis2,
         ):
             del rows[1:]
-        if search_result is None or len(state.move_lis) < 2 or not state.move_lis[-1]:
+        if search_result is None:
             return
-        state.display_move_lis.append(state.move_lis[-1])
+        moves = []
+        step_values = []
+        for index, segment in enumerate(state.move_lis[1:], 1):
+            if not segment:
+                continue
+            values = state.val_lis2[index] if index < len(state.val_lis2) else []
+            if not step_values:
+                step_values.append(values[0] if values else None)
+            moves.extend(segment)
+            step_values.extend(values[1:] if len(values) == len(segment) + 1 else [None] * len(segment))
+        if not moves:
+            return
+        state.display_move_lis.append(tuple(moves))
         state.display_key_lis.append('この手を動かしました')
-        state.display_root_lis.append(search_result.root_value)
+        state.display_root_lis.append(state.val_lis[0])
         state.display_val_lis.append(search_result.best_value)
-        state.display_val_lis2.append(state.val_lis2[-1])
+        state.display_val_lis2.append(step_values)
 
     def _record_search_attempt_progress(self, AI, attempt_result):
         """Search3のattempt結果を表示ログへ反映し、MoveViewerを即時更新する。"""

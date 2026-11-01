@@ -31,9 +31,10 @@ class Search3PairwiseViewerTests(unittest.TestCase):
             color_for_search3_value(0.8),
         )
 
-    def test_progressive_display_keeps_latest_move_above_current_attempts(self):
+    def test_progressive_display_keeps_all_applied_moves_above_current_attempts(self):
         state = SolveSessionState()
         state.move_lis = [(), ('R',)]
+        state.val_lis = [0.2, 0.2]
         state.val_lis2 = [[], [0.2, 0.4]]
         state.display_move_lis = [(), ('old attempt',), ('older attempt',)]
         state.display_key_lis = ['', 'S3-1', 'S3-2']
@@ -51,7 +52,7 @@ class Search3PairwiseViewerTests(unittest.TestCase):
         self.assertFalse(manager._uses_progressive_search3(SimpleNamespace(
             search_mode='search3', search3_budget_mode='fixed',
         )))
-        manager._show_latest_progressive_move(previous)
+        manager._show_progressive_move_sequence(previous)
         self.assertEqual(state.display_move_lis, [(), ('R',)])
         self.assertEqual(state.display_key_lis, ['', 'この手を動かしました'])
         self.assertEqual(state.display_val_lis2[-1], [0.2, 0.4])
@@ -65,10 +66,55 @@ class Search3PairwiseViewerTests(unittest.TestCase):
         self.assertEqual(state.display_move_lis[-1], ('U',))
 
         state.move_lis.append(('U',))
+        state.val_lis.append(0.4)
         state.val_lis2.append([0.4, 0.6])
-        manager._show_latest_progressive_move(attempt)
-        self.assertEqual(state.display_move_lis, [(), ('U',)])
+        manager._show_progressive_move_sequence(attempt)
+        self.assertEqual(state.display_move_lis, [(), ('R', 'U')])
         self.assertEqual(state.display_key_lis, ['', 'この手を動かしました'])
+        self.assertEqual(state.display_val_lis2[-1], [0.2, 0.4, 0.6])
+        self.assertEqual(state.display_root_lis[-1], 0.2)
+        viewer = SimpleNamespace(text_color='#FFFFFF')
+        self.assertEqual(
+            MoveViewer._move_square_color(viewer, state.display_val_lis2[-1], 0, 'search3'),
+            color_for_search3_value(0.4),
+        )
+        self.assertEqual(
+            MoveViewer._move_square_color(viewer, state.display_val_lis2[-1], 1, 'search3'),
+            color_for_search3_value(0.6),
+        )
+
+        state.move_lis.append(('F', 'B'))
+        state.val_lis.append(0.6)
+        state.val_lis2.append([0.6, 0.7, 0.8])
+        manager._show_progressive_move_sequence(SearchResult(
+            False, ('F', 'B'), 0.6, [0.6, 0.7, 0.8], 0.8, [3, 100], search_mode='search3',
+        ))
+        self.assertEqual(state.display_move_lis, [(), ('R', 'U', 'F', 'B')])
+        self.assertEqual(state.display_val_lis2[-1], [0.2, 0.4, 0.6, 0.7, 0.8])
+
+    def test_progressive_display_leaves_moves_without_values_uncolored(self):
+        state = SolveSessionState()
+        state.move_lis = [(), ('R',), ('U',)]
+        state.val_lis = [0.2, 0.2, 0.4]
+        state.val_lis2 = [[], [0.2, 0.4], []]
+        state.display_move_lis = [()]
+        state.display_key_lis = ['']
+        state.display_root_lis = [0.2]
+        state.display_val_lis = [0.2]
+        state.display_val_lis2 = [[]]
+        manager = SolveSessionManager(SimpleNamespace(solve_state=state))
+        manager._show_progressive_move_sequence(SearchResult(
+            False, ('U',), 0.4, [], 0.4, [1, 100], search_mode='search3',
+        ))
+
+        self.assertEqual(state.display_move_lis[-1], ('R', 'U'))
+        self.assertEqual(state.display_val_lis2[-1], [0.2, 0.4, None])
+        self.assertEqual(
+            MoveViewer._move_square_color(
+                SimpleNamespace(text_color='#FFFFFF'), state.display_val_lis2[-1], 1, 'search3',
+            ),
+            '#FFFFFF',
+        )
 
 
 if __name__ == '__main__':

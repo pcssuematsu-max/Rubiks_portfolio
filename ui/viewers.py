@@ -506,7 +506,7 @@ class MoveViewer(Tk.Canvas):
         return f'{leaf_value:.3f}'
 
     def _move_square_color(self, step_values, step_index, search_mode, search2_value_loss_type = None, search3_value_loss_type = None):
-        if len(step_values) == 0:
+        if len(step_values) <= step_index + 1 or step_values[step_index + 1] is None:
             return self.text_color
         step_value = step_values[step_index + 1]
         if search_mode == 'search2' or (
