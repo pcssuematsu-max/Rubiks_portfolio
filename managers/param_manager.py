@@ -154,6 +154,8 @@ class ParamManager:
         namespace = getattr(self.frame.cube, 'parameter_namespace', None)
         if namespace:
             return self.project_root / 'GroupAIdatas' / namespace / ('AI' + str(index))
+        if getattr(self.frame, 'puzzle_type', None) == 'pyraminx':
+            return self.project_root / 'AI_datas_storage' / 'Pyraminx_3x3' / ('AIdatas' + str(index))
         return self.project_root / ('AIdatas' + str(index))
 
     def _target_keys(self, ai, keylis):

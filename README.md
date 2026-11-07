@@ -156,7 +156,7 @@ Success Viewerは、既定で **自力成功のみ** を表示します。ここ
 
 ## 公開版について
 
-`python3 main.py` は、ポートフォリオ閲覧者向けの軽量な `public` プロファイルを既定で起動します。現在の `experiment` プロファイルは `cube_size = 4`, `puzzle_type = 'cube'`, AI 25体です。設定は [`configs/profiles.py`](configs/profiles.py) で変更できます。
+`python3 main.py` は、ポートフォリオ閲覧者向けの軽量な `public` プロファイルを既定で起動します。現在の `experiment` プロファイルは `cube_size = 3`, `puzzle_type = 'pyraminx'`, AI 25体です。設定は [`configs/profiles.py`](configs/profiles.py) で変更できます。4×4の旧パラメータはローカルの `AI_datas_storage/Rubiks_4x4/` に退避し、ピラミンクスのパラメータは `AI_datas_storage/Pyraminx_3x3/` に保存します。
 
 公開版では、3×3キューブをSearch2がどのように学習し、解けるようになっていくかを確認できます。このリポジトリには学習済みパラメータを含めていないため、起動直後のAIはランダムなパラメータから始まり、はじめは見当違いな動きをします。学習が進むにつれて、どのような手順を良いものとして評価するかを自動的に獲得していきます。
 

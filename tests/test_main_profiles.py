@@ -1,5 +1,5 @@
 import unittest
-from dataclasses import fields, replace
+from dataclasses import replace
 
 from configs import build_frame_config
 from main import parse_args
@@ -20,11 +20,13 @@ class MainProfileTests(unittest.TestCase):
         self.assertEqual(config.bootstrap_datas, ())
         self.assertEqual(config.control_panel_mode, "simple")
 
-    def test_experiment_profile_preserves_the_original_configuration(self):
+    def test_experiment_profile_uses_pyraminx_with_existing_ai_settings(self):
         config = build_frame_config("experiment")
 
-        self.assertEqual(config.puzzle_type, "cube")
-        self.assertEqual(config.cube_size, 4)
+        self.assertEqual(config.puzzle_type, "pyraminx")
+        self.assertEqual(config.cube_size, 3)
+        self.assertEqual(config.bootstrap_datas, None)
+        self.assertEqual(config.priority_list[0], ['Corner', 'Edge', 'Center'])
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(config.control_panel_mode, "advanced")
         self.assertEqual(config.search2_value_loss_types[20:], ['myloss2_pairwise'] * 5)
@@ -72,19 +74,9 @@ class MainProfileTests(unittest.TestCase):
         )
         self.assertEqual(
             [config.transform_idx[index] for index in (10,11,18,19)],
-            [0,1,24,25],
+            [0] * 4,
         )
-        for first, second, expected_difference in (
-            (10,11,{'original_train_batch_mix_modes', 'transform_idx'}),
-            (18,19,{'transform_idx'}),
-        ):
-            differences = {
-                field.name for field in fields(config)
-                if isinstance((values := getattr(config,field.name)),(list,tuple))
-                and len(values) == len(config.ai_search_modes)
-                and values[first] != values[second]
-            }
-            self.assertTrue(expected_difference.issubset(differences))
+        self.assertNotEqual(config.original_train_batch_mix_modes[10], config.original_train_batch_mix_modes[11])
         self.assertEqual(config.original_transformer_linear_skips, config.original_transformer_attention)
         self.assertEqual(config.original_transformer_linear_skip_variances[10], 0.125)
         self.assertEqual(config.original_transformer_linear_skip_variances[22], 0.125)
@@ -111,7 +103,7 @@ class MainProfileTests(unittest.TestCase):
     def test_test_profile_is_an_alias_for_experiment(self):
         config = build_frame_config("test")
 
-        self.assertEqual(config.puzzle_type, "cube")
+        self.assertEqual(config.puzzle_type, "pyraminx")
         self.assertEqual(len(config.ai_search_modes), 25)
 
     def test_control_panel_mode_must_be_simple_or_advanced(self):

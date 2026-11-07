@@ -33,6 +33,18 @@ class _Frame:
 
 
 class ParamManagerTests(unittest.TestCase):
+    def test_pyraminx_parameters_use_a_separate_directory(self):
+        frame = _Frame()
+        frame.puzzle_type = 'pyraminx'
+        manager = ParamManager(frame)
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            manager.project_root = Path(temporary_directory)
+            expected = manager.project_root / 'AI_datas_storage' / 'Pyraminx_3x3' / 'AIdatas0'
+            self.assertEqual(manager._data_dir(0), expected)
+            manager.save(0)
+            self.assertTrue((expected / 'W1.npy').exists())
+            self.assertFalse((manager.project_root / 'AIdatas0').exists())
+
     def test_load_records_exactly_which_parameter_files_were_restored(self):
         frame = _Frame()
         manager = ParamManager(frame)
