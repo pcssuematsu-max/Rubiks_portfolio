@@ -17,8 +17,8 @@ class PyraminxStateViewer(Tk.Canvas):
         width, height = self._canvas_size()
         self.color = {
             "U":"#7F0000",
-            "L":"#007F00",
-            "R":"#0000BF",
+            "L":"#0000BF",
+            "R":"#007F00",
             "B":"#BFBF00",
             "":"#7F7F7F",
         }
