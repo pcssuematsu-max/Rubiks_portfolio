@@ -20,13 +20,13 @@ class MainProfileTests(unittest.TestCase):
         self.assertEqual(config.bootstrap_datas, ())
         self.assertEqual(config.control_panel_mode, "simple")
 
-    def test_experiment_profile_uses_pyraminx_with_existing_ai_settings(self):
+    def test_experiment_profile_uses_skewb_with_existing_ai_settings(self):
         config = build_frame_config("experiment")
 
-        self.assertEqual(config.puzzle_type, "pyraminx")
+        self.assertEqual(config.puzzle_type, "skewb")
         self.assertEqual(config.cube_size, 3)
         self.assertEqual(config.bootstrap_datas, None)
-        self.assertEqual(config.priority_list[0], ['Corner', 'Edge', 'Center'])
+        self.assertEqual(config.priority_list[0], ['Corner', 'Center'])
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(config.control_panel_mode, "advanced")
         self.assertEqual(config.search2_value_loss_types[20:], ['myloss2_pairwise'] * 5)
@@ -103,7 +103,7 @@ class MainProfileTests(unittest.TestCase):
     def test_test_profile_is_an_alias_for_experiment(self):
         config = build_frame_config("test")
 
-        self.assertEqual(config.puzzle_type, "pyraminx")
+        self.assertEqual(config.puzzle_type, "skewb")
         self.assertEqual(len(config.ai_search_modes), 25)
 
     def test_control_panel_mode_must_be_simple_or_advanced(self):

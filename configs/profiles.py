@@ -470,7 +470,7 @@ def build_experiment_frame_config():
     adam = weight_decay.copy()
 
     cube_size = 3
-    puzzle_type = 'pyraminx'
+    puzzle_type = 'skewb'
     if cube_size >= 6:
         transform_idx = ([0,49,50,3,52,5,54,7,24,25] * 2) + [0] * 5
         flip_inside_idx = ([False,True] * 10) + [False] * 5

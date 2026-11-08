@@ -26,7 +26,7 @@ python3 -m ruff check .
 
 ## 同一局面の独立比較（実験用）
 
-保存済みの実験用AIを、同じ固定局面から直接解かせる独立比較です。現在の `experiment` プロファイルは4×4キューブ・25体で、既定の局面群は `4x4-algorithms` です。通常の200試行、学習データ、GUIの成功カウンタには追加しません。Search2は複数回の探索を連結して完成まで判定し、Search3はプロファイルの探索条件（現在は固定10,000 playout）を使います。greedy fallbackが必要になった時点で直接失敗とします。
+保存済みの実験用AIを、同じ固定局面から直接解かせる独立比較です。以下の4×4局面群を使うには、`experiment` プロファイルを4×4キューブに設定し、対応するパラメータを用意してください。現在の既定値はスキューブです。通常の200試行、学習データ、GUIの成功カウンタには追加しません。Search2は複数回の探索を連結して完成まで判定し、Search3はプロファイルの探索条件を使います。greedy fallbackが必要になった時点で直接失敗とします。
 
 ```bash
 python3.14 tools/compare_ai_same_positions.py --list-fixtures
@@ -100,7 +100,7 @@ Webでは効果タイプとEffectNameを選び、同じ型の中で `effectCount
 
 ![Twisty Puzzle AI Lab のGUI画面](assets/gui-overview2.png)
 
-*7×7 Rubik's Cube を使ったGUIの表示例。現在の `experiment` プロファイルの既定値は4×4です。*
+*7×7 Rubik's Cube を使ったGUIの表示例。現在の `experiment` プロファイルの既定値はスキューブです。*
 
 ## GUI画面の見方
 
@@ -156,7 +156,7 @@ Success Viewerは、既定で **自力成功のみ** を表示します。ここ
 
 ## 公開版について
 
-`python3 main.py` は、ポートフォリオ閲覧者向けの軽量な `public` プロファイルを既定で起動します。現在の `experiment` プロファイルは `cube_size = 3`, `puzzle_type = 'pyraminx'`, AI 25体です。設定は [`configs/profiles.py`](configs/profiles.py) で変更できます。4×4の旧パラメータはローカルの `AI_datas_storage/Rubiks_4x4/` に退避し、ピラミンクスのパラメータは `AI_datas_storage/Pyraminx_3x3/` に保存します。
+`python3 main.py` は、ポートフォリオ閲覧者向けの軽量な `public` プロファイルを既定で起動します。現在の `experiment` プロファイルは `cube_size = 3`, `puzzle_type = 'skewb'`, AI 25体です。設定は [`configs/profiles.py`](configs/profiles.py) で変更できます。4×4とピラミンクスのパラメータはローカルの `AI_datas_storage/Rubiks_4x4/` と `AI_datas_storage/Pyraminx_3x3/` にそれぞれ保存され、スキューブのパラメータは `AI_datas_storage/Skewb_3x3/` に保存します。
 
 公開版では、3×3キューブをSearch2がどのように学習し、解けるようになっていくかを確認できます。このリポジトリには学習済みパラメータを含めていないため、起動直後のAIはランダムなパラメータから始まり、はじめは見当違いな動きをします。学習が進むにつれて、どのような手順を良いものとして評価するかを自動的に獲得していきます。
 

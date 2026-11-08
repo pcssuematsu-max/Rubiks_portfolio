@@ -45,6 +45,19 @@ class ParamManagerTests(unittest.TestCase):
             self.assertTrue((expected / 'W1.npy').exists())
             self.assertFalse((manager.project_root / 'AIdatas0').exists())
 
+    def test_skewb_parameters_do_not_use_pyraminx_directory(self):
+        frame = _Frame()
+        frame.puzzle_type = 'skewb'
+        manager = ParamManager(frame)
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            manager.project_root = Path(temporary_directory)
+            expected = manager.project_root / 'AI_datas_storage' / 'Skewb_3x3' / 'AIdatas0'
+            self.assertEqual(manager._data_dir(0), expected)
+            manager.save(0)
+            self.assertTrue((expected / 'W1.npy').exists())
+            self.assertFalse((manager.project_root / 'AI_datas_storage' / 'Pyraminx_3x3').exists())
+            self.assertFalse((manager.project_root / 'AIdatas0').exists())
+
     def test_load_records_exactly_which_parameter_files_were_restored(self):
         frame = _Frame()
         manager = ParamManager(frame)
