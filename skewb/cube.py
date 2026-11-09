@@ -42,7 +42,16 @@ MOVE_AXES = {
     "DBL": np.array([-1.0, -1.0, -1.0]),
     "DFR": np.array([1.0, -1.0, 1.0]),
 }
-AXIS_TO_MOVE = {tuple(axis.astype(int)):move for move, axis in MOVE_AXES.items()}
+# WCA specifies four vertex turns. Prefix the opposite four with "o" so move
+# names stay distinct from face names. Accept old three-face names as input.
+WCA_CORNER_MOVES = {"R": "DRB", "U": "ULB", "L": "DFL", "B": "DBL"}
+OPPOSITE_CORNER_MOVES = {"oR": "UFL", "oU": "DFR", "oL": "UBR", "oB": "URF"}
+MOVE_TO_CORNER = {**WCA_CORNER_MOVES, **OPPOSITE_CORNER_MOVES}
+CORNER_TO_MOVE = {corner: move for move, corner in MOVE_TO_CORNER.items()}
+CANONICAL_MOVE_AXES = {
+    CORNER_TO_MOVE[corner]: axis for corner, axis in MOVE_AXES.items()
+}
+AXIS_TO_MOVE = {tuple(axis.astype(int)): move for move, axis in CANONICAL_MOVE_AXES.items()}
 
 
 class SkewbCube:
@@ -129,13 +138,16 @@ class SkewbCube:
 
     def _init_move_tables(self):
         self.move = {}
-        for move_key, axis in MOVE_AXES.items():
+        for move_key, axis in CANONICAL_MOVE_AXES.items():
             # A Skewb turn is a 120-degree rotation around a body diagonal.
             # The axis name identifies the visible corner; the opposite corner
             # lies on the same diagonal.
             clockwise = self._build_move_permutation(axis, clockwise = True)
             self.move[move_key] = clockwise
             self.move[move_key + "'"] = np.argsort(clockwise)
+        for move_key, corner in MOVE_TO_CORNER.items():
+            for suffix in ("", "'"):
+                self.move[corner + suffix] = self.move[move_key + suffix]
 
     def _build_move_permutation(self, axis, clockwise = True):
         perm = np.arange(self.sticker_num)
@@ -173,7 +185,9 @@ class SkewbCube:
         )
 
     def _init_move_keys(self):
-        self.move_keys = tuple(self.move.keys())
+        self.move_keys = tuple(
+            move_key + suffix for move_key in CANONICAL_MOVE_AXES for suffix in ("", "'")
+        )
         self.move_len = len(self.move_keys)
         self.key_to_num = {key:index for index, key in enumerate(self.move_keys)}
         self.inverse = {"":"'","'":""}
@@ -223,21 +237,21 @@ class SkewbCube:
         self._expand_myperms2()
 
     def _register_myperms2(self):
-        self._add_myperm2("Skewb-Sledgehammer-A", ("URF'", "ULB", "URF", "ULB'"))
-        self._add_myperm2("Skewb-Sledgehammer-B", ("URF", "ULB'", "URF'", "ULB"))
-        self._add_myperm2("Skewb-Sexy-A", ("URF", "DFL", "URF'", "DFL'"))
-        self._add_myperm2("Skewb-Sexy-B", ("URF'", "DFL", "URF", "DFL'"))
+        self._add_myperm2("Skewb-Sledgehammer-A", ("oB'", "U", "oB", "U'"))
+        self._add_myperm2("Skewb-Sledgehammer-B", ("oB", "U'", "oB'", "U"))
+        self._add_myperm2("Skewb-Sexy-A", ("oB", "L", "oB'", "L'"))
+        self._add_myperm2("Skewb-Sexy-B", ("oB'", "L", "oB", "L'"))
 
-        self._add_myperm2("Skewb-Corner2Twist", ("DRB'", 'DBL', 'DRB', 'DFR', 'DFL', 'DBL', "DFR'", "DBL'", "DFR'", "DFL'"))
+        self._add_myperm2("Skewb-Corner2Twist", ("R'", 'B', 'R', 'oU', 'L', 'B', "oU'", "B'", "oU'", "L'"))
 
-        self._add_myperm2("Skewb-Center3Cycle-A", ("UBR","ULB'","UBR'","ULB","UFL","URF'","UFL'","URF"))
-        self._add_myperm2("Skewb-Center3Cycle-B", ("UBR'","ULB'","UBR'","ULB","UFL","URF'","UFL'","URF","UBR'"))
+        self._add_myperm2("Skewb-Center3Cycle-A", ("oL", "U'", "oL'", "U", "oR", "oB'", "oR'", "oB"))
+        self._add_myperm2("Skewb-Center3Cycle-B", ("oL'", "U'", "oL'", "U", "oR", "oB'", "oR'", "oB", "oL'"))
 
-        self._add_myperm2("Skewb-Corner3", ("DRB'", "DBL'", "ULB'", 'UFL', "URF'", "ULB'", "UBR'", 'ULB', "UBR'", "ULB'", "UFL'", 'ULB'))
+        self._add_myperm2("Skewb-Corner3", ("R'", "B'", "U'", "oR", "oB'", "U'", "oL'", "U", "oL'", "U'", "oR'", "U"))
 
-        self._add_myperm2("Skewb-Corner4-A", ('DRB', 'UBR', "ULB'", 'DRB', "UBR'", "ULB'", "UBR'", "ULB'", 'UBR'))
-        self._add_myperm2("Skewb-Corner4-B", ("DRB'", 'DBL', "DRB'", "DBL'", 'DFL', "DRB'", "DFR'", 'DRB', 'DFR', "DRB'"))
-        self._add_myperm2("Skewb-Corner4-C", ('UBR', "ULB'", 'UBR', "ULB'", "UBR'", 'ULB', "UBR'", 'ULB'))
+        self._add_myperm2("Skewb-Corner4-A", ("R", "oL", "U'", "R", "oL'", "U'", "oL'", "U'", "oL"))
+        self._add_myperm2("Skewb-Corner4-B", ("R'", "B", "R'", "B'", "L", "R'", "oU'", "R", "oU", "R'"))
+        self._add_myperm2("Skewb-Corner4-C", ("oL", "U'", "oL", "U'", "oL'", "U", "oL'", "U"))
 
     def _add_myperm2(self, name, moves, add_inverse = True):
         name = normalize_myperm_name(name)
@@ -388,8 +402,11 @@ class SkewbCube:
                 move = move[0]
             else:
                 raise KeyError(move)
-        if move in self.move:
-            return move
+        if isinstance(move, str):
+            base, suffix = self._split_move(move)
+            canonical = CORNER_TO_MOVE.get(base, base) + suffix
+            if canonical in self.move:
+                return canonical
         raise KeyError(move)
 
     def normalize_move_sequence(self, moves):
@@ -605,7 +622,7 @@ class SkewbCube:
 
     def _transform_move(self, move, transformation):
         base, suffix = self._split_move(move)
-        mapped_axis = tuple(transformation["matrix"] @ MOVE_AXES[base].astype(int))
+        mapped_axis = tuple(transformation["matrix"] @ CANONICAL_MOVE_AXES[base].astype(int))
         mapped_base = AXIS_TO_MOVE[mapped_axis]
         if transformation["mirror"]:
             suffix = "" if suffix == "'" else "'"

@@ -13,6 +13,10 @@ OWN_3D_VIEWER_URL = (
     "https://pcssuematsu-max.github.io/github.io/"
     "3d-puzzle-viewer.html"
 )
+SKEWB_3D_VIEWER_URL = (
+    "https://pcssuematsu-max.github.io/github.io/"
+    "skewb-viewer.html"
+)
 
 
 def web_puzzle_key(puzzle_type: str, cube_size: int) -> str | None:
@@ -51,6 +55,8 @@ def own_viewer_puzzle_key(puzzle_type: str, cube_size: int) -> str | None:
     cubing.js page available for non-cube puzzles it already supports.
     """
     normalized_type = str(puzzle_type).strip().lower()
+    if normalized_type == "skewb":
+        return "skewb"
     size = int(cube_size)
     if normalized_type in {"cube", "rubiks", "rubiks_cube"} and 2 <= size <= 7:
         return f"cube-{size}x{size}"
@@ -76,4 +82,5 @@ def build_own_3d_viewer_url(
         query["position"] = str(int(position))
     if theme:
         query["theme"] = str(theme)
-    return OWN_3D_VIEWER_URL + "?" + urlencode(query)
+    base_url = SKEWB_3D_VIEWER_URL if puzzle == "skewb" else OWN_3D_VIEWER_URL
+    return base_url + "?" + urlencode(query)

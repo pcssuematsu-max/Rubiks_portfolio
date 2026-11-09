@@ -11,6 +11,7 @@ from core.web_playback import (
     own_viewer_puzzle_key,
     web_puzzle_key,
 )
+from skewb.cube import SkewbCube
 from ui.frame import Frame
 
 
@@ -31,6 +32,7 @@ class WebPlaybackTests(unittest.TestCase):
         self.assertEqual(own_viewer_puzzle_key("cube", 7), "cube-7x7")
         self.assertIsNone(own_viewer_puzzle_key("cube", 8))
         self.assertIsNone(own_viewer_puzzle_key("pyraminx", 3))
+        self.assertEqual(own_viewer_puzzle_key("skewb", 3), "skewb")
 
     def test_playback_url_preserves_moves_and_setup(self):
         url = build_web_playback_url("3x3x3", ("R", "U", "R'"), ("F2", "E"))
@@ -51,6 +53,13 @@ class WebPlaybackTests(unittest.TestCase):
             "moves": ["R U R'"],
             "setup": ["F2 D"],
             "theme": ["portfolio"],
+        })
+
+    def test_skewb_uses_its_own_viewer_url(self):
+        url = build_own_3d_viewer_url("skewb", ("R", "U", "oB'"), ("L",))
+        self.assertTrue(urlparse(url).path.endswith("/skewb-viewer.html"))
+        self.assertEqual(parse_qs(urlparse(url).query), {
+            "puzzle": ["skewb"], "moves": ["R U oB'"], "setup": ["L"],
         })
 
     def test_gui_opens_the_current_solve_with_setup_and_moves(self):
@@ -109,3 +118,24 @@ class WebPlaybackTests(unittest.TestCase):
         self.assertEqual(query["setup"], ["F2 D"])
         self.assertEqual(query["moves"], ["R U'"])
         self.assertEqual(frame.messages, ["独自3D: 現在の解法を自作ビューアで開きました。"])
+
+    def test_skewb_gui_web_button_uses_wca_names_and_own_viewer(self):
+        class FakeFrame:
+            puzzle_type = "skewb"
+            cube_size = 3
+            solve_state = SimpleNamespace(s=("DRB", "ULB'"), move_lis=[("DFL", "URF'")])
+            cube = SkewbCube()
+
+            def display_move_sequence(self, moves):
+                return self.cube.format_moves(moves)
+
+            def append_log(self, message):
+                pass
+
+        with patch("ui.frame.webbrowser.open_new_tab") as open_new_tab:
+            Frame.open_web_playback(FakeFrame())
+
+        url = urlparse(open_new_tab.call_args.args[0])
+        self.assertTrue(url.path.endswith("/skewb-viewer.html"))
+        self.assertEqual(parse_qs(url.query)["setup"], ["R U'"])
+        self.assertEqual(parse_qs(url.query)["moves"], ["L oB'"])
