@@ -25,6 +25,7 @@ class _AI:
 class _Frame:
     def __init__(self):
         self.AIs = [_AI()]
+        self.AInum = len(self.AIs)
         self.cube = object()
         self.events = []
 
@@ -33,6 +34,36 @@ class _Frame:
 
 
 class ParamManagerTests(unittest.TestCase):
+    def test_cube_3x3_loads_archived_weights_without_touching_other_puzzles(self):
+        frame = _Frame()
+        frame.puzzle_type = 'cube'
+        frame.cube_size = 3
+        manager = ParamManager(frame)
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            manager.project_root = Path(temporary_directory)
+            data_dir = manager._data_dir(0)
+            self.assertEqual(data_dir, manager.project_root / 'AI_datas_storage' / 'Rubiks_3x3' / 'AIdatas0')
+            data_dir.mkdir(parents=True)
+            np.save(data_dir / 'W1.npy', np.asarray(((3.0, 4.0),), dtype='f'))
+            other_dir = manager.project_root / 'AI_datas_storage' / 'Skewb_3x3' / 'AIdatas0'
+            other_dir.mkdir(parents=True)
+            np.save(other_dir / 'W1.npy', np.asarray(((9.0, 9.0),), dtype='f'))
+
+            self.assertEqual(manager.load_available_all(), (0,))
+            self.assertTrue(np.allclose(frame.AIs[0].params['W1'], ((3.0, 4.0),)))
+            self.assertEqual(frame.AIs[0].dirty_calls, 1)
+            self.assertEqual(frame.AIs[0].perfect_calls, 1)
+
+    def test_auto_load_skips_a_puzzle_without_saved_parameters(self):
+        frame = _Frame()
+        frame.puzzle_type = 'cube'
+        frame.cube_size = 5
+        manager = ParamManager(frame)
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            manager.project_root = Path(temporary_directory)
+            self.assertEqual(manager.load_available_all(), ())
+        self.assertEqual(frame.AIs[0].dirty_calls, 0)
+
     def test_pyraminx_parameters_use_a_separate_directory(self):
         frame = _Frame()
         frame.puzzle_type = 'pyraminx'

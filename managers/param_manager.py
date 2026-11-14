@@ -58,7 +58,7 @@ class ParamManager:
                 requested_keys = requested_keys,
                 loaded_keys = tuple(ai.params.keys()),
             )
-            return
+            return len(ai.params)
         loaded_keys = []
         for key in requested_keys:
             if self._load_param_set(ai, data_dir, key):
@@ -71,6 +71,7 @@ class ParamManager:
             requested_keys = requested_keys,
             loaded_keys = tuple(loaded_keys),
         )
+        return len(loaded_keys)
 
     def save(self, index, keylis = None):
         """指定AIのパラメータ・optimizer状態をAIdatasへ保存する。"""
@@ -86,6 +87,14 @@ class ParamManager:
         for index in range(self.frame.AInum):
             self.load(index, keylis = keylis)
         print("Load Completed!!")
+
+    def load_available_all(self):
+        """Load saved parameters for this puzzle, leaving new AIs initialized."""
+        loaded_indices = []
+        for index in range(self.frame.AInum):
+            if self._data_dir(index).is_dir() and self.load(index) > 0:
+                loaded_indices.append(index)
+        return tuple(loaded_indices)
 
     def save_all(self, keylis = None):
         """全AIのパラメータを順番に保存する。"""
@@ -154,11 +163,21 @@ class ParamManager:
         namespace = getattr(self.frame.cube, 'parameter_namespace', None)
         if namespace:
             return self.project_root / 'GroupAIdatas' / namespace / ('AI' + str(index))
-        puzzle_directory = {
-            'pyraminx': 'Pyraminx_3x3',
-            'skewb': 'Skewb_3x3',
-        }.get(getattr(self.frame, 'puzzle_type', None))
-        if puzzle_directory:
+        puzzle_type = getattr(self.frame, 'puzzle_type', None)
+        puzzle_names = {
+            'cube': 'Rubiks',
+            'rubiks': 'Rubiks_public',
+            'pyraminx': 'Pyraminx',
+            'master_pyraminx': 'MasterPyraminx',
+            'skewb': 'Skewb',
+            'megaminx': 'Megaminx',
+            'square1': 'Square1',
+            'fto': 'FTO',
+            'cto': 'CTO',
+        }
+        if puzzle_type in puzzle_names:
+            size = int(getattr(self.frame.cube, 'size', getattr(self.frame, 'cube_size', 3)))
+            puzzle_directory = f'{puzzle_names[puzzle_type]}_{size}x{size}'
             return self.project_root / 'AI_datas_storage' / puzzle_directory / ('AIdatas' + str(index))
         return self.project_root / ('AIdatas' + str(index))
 

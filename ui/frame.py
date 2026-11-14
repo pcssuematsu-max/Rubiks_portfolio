@@ -232,6 +232,13 @@ class Frame(Tk.Frame):
         # Finalize solve/runtime state after all dependencies are in place.
         self._init_runtime_state()
         self._record_application_started()
+        if config.auto_load_parameters:
+            self.set_activity_status('パラメータ読込中')
+            loaded_indices = self.param_manager.load_available_all()
+            self.append_log(
+                f'{self.puzzle_type} の保存済みパラメータを {len(loaded_indices)}/{self.AInum} AI から読み込みました'
+            )
+            self.set_activity_status('待機中')
         
         
     def _register_initial_scrambles(self, initial_scramble_groups = None, F2L = False, OLL = False, Centers = False, Edges = False, Cross = False):

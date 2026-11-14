@@ -19,14 +19,15 @@ class MainProfileTests(unittest.TestCase):
         self.assertEqual(config.use_torch, (False,))
         self.assertEqual(config.bootstrap_datas, ())
         self.assertEqual(config.control_panel_mode, "simple")
+        self.assertFalse(config.auto_load_parameters)
 
-    def test_experiment_profile_uses_skewb_with_existing_ai_settings(self):
+    def test_experiment_profile_uses_3x3_cube_with_saved_parameters(self):
         config = build_frame_config("experiment")
 
-        self.assertEqual(config.puzzle_type, "skewb")
+        self.assertEqual(config.puzzle_type, "cube")
         self.assertEqual(config.cube_size, 3)
-        self.assertEqual(config.bootstrap_datas, None)
-        self.assertEqual(config.priority_list[0], ['Corner', 'Center'])
+        self.assertTrue(config.bootstrap_datas)
+        self.assertTrue(config.auto_load_parameters)
         self.assertEqual(len(config.ai_search_modes), 25)
         self.assertEqual(config.control_panel_mode, "advanced")
         self.assertEqual(config.search2_value_loss_types[20:], ['myloss2_pairwise'] * 5)
@@ -74,7 +75,7 @@ class MainProfileTests(unittest.TestCase):
         )
         self.assertEqual(
             [config.transform_idx[index] for index in (10,11,18,19)],
-            [0] * 4,
+            [0,0,24,24],
         )
         self.assertNotEqual(config.original_train_batch_mix_modes[10], config.original_train_batch_mix_modes[11])
         self.assertEqual(config.original_transformer_linear_skips, config.original_transformer_attention)
@@ -103,7 +104,7 @@ class MainProfileTests(unittest.TestCase):
     def test_test_profile_is_an_alias_for_experiment(self):
         config = build_frame_config("test")
 
-        self.assertEqual(config.puzzle_type, "skewb")
+        self.assertEqual(config.puzzle_type, "cube")
         self.assertEqual(len(config.ai_search_modes), 25)
 
     def test_control_panel_mode_must_be_simple_or_advanced(self):

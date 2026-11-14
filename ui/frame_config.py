@@ -17,6 +17,7 @@ class FrameConfig:
     # Control panel presentation.  Public demos start in the simpler view,
     # while development profiles can expose every control immediately.
     control_panel_mode: str = 'advanced'
+    auto_load_parameters: bool = False
 
     # Cube mode selection.
     puzzle_type: str = 'rubiks'

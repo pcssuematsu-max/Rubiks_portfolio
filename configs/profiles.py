@@ -470,7 +470,7 @@ def build_experiment_frame_config():
     adam = weight_decay.copy()
 
     cube_size = 3
-    puzzle_type = 'skewb'
+    puzzle_type = 'cube'
     if cube_size >= 6:
         transform_idx = ([0,49,50,3,52,5,54,7,24,25] * 2) + [0] * 5
         flip_inside_idx = ([False,True] * 10) + [False] * 5
@@ -542,6 +542,7 @@ def build_experiment_frame_config():
 
     return FrameConfig(
         control_panel_mode="advanced",
+        auto_load_parameters = True,
         puzzle_type = puzzle_type,
         cube_size = cube_size,
         ai_search_modes = ai_search_modes,
